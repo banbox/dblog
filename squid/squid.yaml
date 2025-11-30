@@ -1,0 +1,12 @@
+manifestVersion: subsquid.io/v0.1
+name: squid
+version: 1
+description: 'DBlog decentralized blog indexer'
+build: 
+deploy:
+  addons:
+    postgres: 
+  processor:
+    cmd: ["node", "lib/main.js"]
+  api:
+    cmd: ["npx", "squid-graphql-server"]

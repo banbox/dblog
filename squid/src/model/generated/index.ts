@@ -1,0 +1,6 @@
+export * from "./user.model"
+export * from "./article.model"
+export * from "./evaluation.model"
+export * from "./comment.model"
+export * from "./follow.model"
+export * from "./collection.model"

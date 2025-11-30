@@ -1,0 +1,75 @@
+# 用户实体
+type User @entity {
+  id: ID!                          # 钱包地址
+  articles: [Article!]! @derivedFrom(field: "author")
+  comments: [Comment!]! @derivedFrom(field: "user")
+  followers: [Follow!]! @derivedFrom(field: "following")
+  following: [Follow!]! @derivedFrom(field: "follower")
+  totalArticles: Int!
+  totalFollowers: Int!
+  totalFollowing: Int!
+  createdAt: DateTime!
+}
+
+# 文章实体
+type Article @entity {
+  id: ID!                          # articleId
+  arweaveId: String!               # Arweave 存储 Hash
+  author: User!                    # 作者地址
+  originalAuthor: String           # 原始作者（代发时记录）
+  categoryId: BigInt!
+  royaltyBps: Int!
+  likes: Int!
+  dislikes: Int!
+  totalTips: BigInt!               # 累计打赏金额
+  comments: [Comment!]! @derivedFrom(field: "article")
+  evaluations: [Evaluation!]! @derivedFrom(field: "article")
+  createdAt: DateTime!
+  blockNumber: Int!
+  txHash: String!
+}
+
+# 评价实体（点赞/踩/打赏）
+type Evaluation @entity {
+  id: ID!                          # txHash-logIndex
+  article: Article!
+  user: User!
+  score: Int!                      # 0=中立, 1=喜欢, 2=不喜欢
+  amount: BigInt!                  # 打赏金额
+  comment: String                  # 评论内容
+  referrer: String                 # 推荐人地址
+  createdAt: DateTime!
+  txHash: String!
+}
+
+# 评论实体
+type Comment @entity {
+  id: ID!                          # articleId-commentId
+  article: Article!
+  user: User!
+  content: String!
+  parentCommentId: BigInt          # 父评论ID（回复时）
+  likes: Int!
+  createdAt: DateTime!
+  txHash: String!
+}
+
+# 关注关系
+type Follow @entity {
+  id: ID!                          # follower-following
+  follower: User!
+  following: User!
+  isActive: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+# NFT 收藏记录
+type Collection @entity {
+  id: ID!                          # user-articleId
+  user: User!
+  article: Article!
+  tokenId: BigInt!
+  amount: BigInt!
+  createdAt: DateTime!
+}

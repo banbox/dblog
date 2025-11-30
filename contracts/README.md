@@ -42,7 +42,8 @@ $ forge snapshot
 ### Anvil
 
 ```shell
-$ anvil
+$ anvil --load-state cache/anvil.json
+$ anvil --dump-state cache/anvil.json --load-state cache/anvil.json
 ```
 
 ### Deploy
