@@ -2,20 +2,19 @@
 此项目完全去中心化，无后端参与，相关角色：前端 + 智能合约 + 索引查询 + 存储。
 基于Optimism(solidity) + Arweave(Irys) + Subsquid + SvelteKit
 
+## 如何学习？
+[最细节的手把手开发日志](learn/README.md)
+
+此项目基本都是AI开发完成的，上面包含了最细的完整项目开发细节，逐步尝试即可复现你的dblog
+
 
 ```perl
 dblog/
-├── contracts/        # Foundry 项目
-│   ├── lib/          # 会包含 as submodule 的 OpenZeppelin 等
-│   ├── src/
-│   ├── foundry.toml
-│   └── ...
-│
-├── frontend/
-│   └── ...           # SvelteKit
-│
+├── contracts/        # Foundry 智能合约
+├── frontend/         # SvelteKit
+├── squid/            # Subsquid 链上索引
+├── learn/            # 学习教程
 ├── .gitmodules       # 统一管理所有 submodules（如 foundry 的 lib/）
-└── .git/
 ```
 
 ## 关键点说明
