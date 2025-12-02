@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { publishArticle } from '$lib/publish'
-	import * as m from '$lib/paraglide/messages'
+	import * as messages from '$lib/paraglide/messages'
 
 	let title = $state('')
 	let summary = $state('')
@@ -19,19 +19,24 @@
 	let arweaveId = $state('')
 	let txHash = $state('')
 
+	// Helper to access nested message keys
+	function msg(key: string) {
+		return (messages as Record<string, (inputs?: Record<string, any>) => string>)[key] || (() => '')
+	}
+
 	function handleCoverImageChange(e: Event) {
 		const input = e.target as HTMLInputElement
 		const file = input.files?.[0]
 
 		if (file) {
 			if (!file.type.startsWith('image/')) {
-				statusMessage = m.publish.error_image_invalid()
+				statusMessage = msg('publish.error_image_invalid')()
 				submitStatus = 'error'
 				return
 			}
 
 			if (file.size > 10 * 1024 * 1024) {
-				statusMessage = m.publish.error_image_too_large()
+				statusMessage = msg('publish.error_image_too_large')()
 				submitStatus = 'error'
 				return
 			}
@@ -69,26 +74,26 @@
 
 	async function handleSubmit() {
 		submitStatus = 'validating'
-		statusMessage = m.publish.status_validating()
+		statusMessage = msg('publish.status_validating')()
 
 		const tags = category ? category.split(',').map((t) => t.trim()).filter(Boolean) : []
 
 		try {
 			// Validate inputs
 			if (!title.trim()) {
-				throw new Error(m.publish.error_title_required())
+				throw new Error(msg('publish.error_title_required')())
 			}
 			if (!summary.trim()) {
-				throw new Error(m.publish.error_summary_required())
+				throw new Error(msg('publish.error_summary_required')())
 			}
 			if (!content.trim()) {
-				throw new Error(m.publish.error_content_required())
+				throw new Error(msg('publish.error_content_required')())
 			}
 			if (categoryId < 0n) {
-				throw new Error(m.publish.error_category_invalid())
+				throw new Error(msg('publish.error_category_invalid')())
 			}
 			if (royaltyBps < 0n || royaltyBps > 10000n) {
-				throw new Error(m.publish.error_royalty_invalid())
+				throw new Error(msg('publish.error_royalty_invalid')())
 			}
 
 			isSubmitting = true
@@ -96,16 +101,16 @@
 			// Upload cover image if provided
 			if (coverImageFile) {
 				submitStatus = 'uploadingCover'
-				statusMessage = m.publish.status_uploading_cover()
+				statusMessage = msg('publish.status_uploading_cover')()
 			}
 
 			// Upload article to Arweave
 			submitStatus = 'uploadingArticle'
-			statusMessage = m.publish.status_uploading_article()
+			statusMessage = msg('publish.status_uploading_article')()
 
 			// Publish to contract
 			submitStatus = 'publishingContract'
-			statusMessage = m.publish.status_publishing()
+			statusMessage = msg('publish.status_publishing')()
 
 			// Call the unified publish function
 			const result = await publishArticle({
@@ -123,7 +128,7 @@
 			txHash = result.txHash
 
 			submitStatus = 'success'
-			statusMessage = m.publish.status_success({ arweaveId: result.arweaveId, txHash: result.txHash })
+			statusMessage = msg('publish.status_success')({ arweaveId: result.arweaveId, txHash: result.txHash })
 
 			// Reset form after success
 			setTimeout(() => {
@@ -133,7 +138,7 @@
 			console.error('Publish error:', error)
 			submitStatus = 'error'
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-			statusMessage = m.publish.error_publish({ error: errorMessage })
+			statusMessage = msg('publish.error_publish')({ error: errorMessage })
 		} finally {
 			isSubmitting = false
 		}
@@ -143,8 +148,8 @@
 <div class="min-h-screen bg-white">
 	<div class="mx-auto max-w-3xl px-6 py-12">
 		<header class="mb-12">
-			<h1 class="mb-2 text-4xl font-light tracking-tight">{m.publish.title()}</h1>
-			<p class="text-gray-500">{m.publish.subtitle()}</p>
+			<h1 class="mb-2 text-4xl font-light tracking-tight">{msg('publish.title')()}</h1>
+			<p class="text-gray-500">{msg('publish.subtitle')()}</p>
 		</header>
 
 		<form
@@ -156,13 +161,13 @@
 		>
 			<div>
 				<label for="title" class="mb-2 block text-sm font-medium text-gray-700">
-					{m.publish.field_title()} *
+					{msg('publish.field_title')()} *
 				</label>
 				<input
 					id="title"
 					type="text"
 					bind:value={title}
-					placeholder={m.publish.field_title_placeholder()}
+					placeholder={msg('publish.field_title_placeholder')()}
 					class="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-base text-gray-900 placeholder-gray-400 transition-colors focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-300"
 					disabled={isSubmitting}
 				/>
@@ -170,13 +175,13 @@
 
 			<div>
 				<label for="summary" class="mb-2 block text-sm font-medium text-gray-700">
-					{m.publish.field_summary()} *
+					{msg('publish.field_summary')()} *
 				</label>
 				<input
 					id="summary"
 					type="text"
 					bind:value={summary}
-					placeholder={m.publish.field_summary_placeholder()}
+					placeholder={msg('publish.field_summary_placeholder')()}
 					class="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-base text-gray-900 placeholder-gray-400 transition-colors focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-300"
 					disabled={isSubmitting}
 				/>
@@ -184,13 +189,13 @@
 
 			<div>
 				<label for="category" class="mb-2 block text-sm font-medium text-gray-700">
-					{m.publish.field_category()}
+					{msg('publish.field_category')()}
 				</label>
 				<input
 					id="category"
 					type="text"
 					bind:value={category}
-					placeholder={m.publish.field_category_placeholder()}
+					placeholder={msg('publish.field_category_placeholder')()}
 					class="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-base text-gray-900 placeholder-gray-400 transition-colors focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-300"
 					disabled={isSubmitting}
 				/>
@@ -198,13 +203,13 @@
 
 			<div>
 				<label for="categoryId" class="mb-2 block text-sm font-medium text-gray-700">
-					{m.publish.field_category_id()} *
+					{msg('publish.field_category_id')()} *
 				</label>
 				<input
 					id="categoryId"
 					type="number"
 					bind:value={categoryId}
-					placeholder={m.publish.field_category_id_placeholder()}
+					placeholder={msg('publish.field_category_id_placeholder')()}
 					min="0"
 					class="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-base text-gray-900 placeholder-gray-400 transition-colors focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-300"
 					disabled={isSubmitting}
@@ -213,27 +218,27 @@
 						categoryId = BigInt(target.value || '0')
 					}}
 				/>
-				<p class="mt-1 text-xs text-gray-500">{m.publish.field_category_id_help()}</p>
+				<p class="mt-1 text-xs text-gray-500">{msg('publish.field_category_id_help')()}</p>
 			</div>
 
 			<div>
 				<label for="author" class="mb-2 block text-sm font-medium text-gray-700">
-					{m.publish.field_author()}
+					{msg('publish.field_author')()}
 				</label>
 				<input
 					id="author"
 					type="text"
 					bind:value={author}
-					placeholder={m.publish.field_author_placeholder()}
+					placeholder={msg('publish.field_author_placeholder')()}
 					class="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-base text-gray-900 placeholder-gray-400 transition-colors focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-300"
 					disabled={isSubmitting}
 				/>
-				<p class="mt-1 text-xs text-gray-500">{m.publish.field_author_help()}</p>
+				<p class="mt-1 text-xs text-gray-500">{msg('publish.field_author_help')()}</p>
 			</div>
 
 			<div>
 				<label for="royalty" class="mb-2 block text-sm font-medium text-gray-700">
-					{m.publish.field_royalty()} *
+					{msg('publish.field_royalty')()} *
 				</label>
 				<div class="flex items-center gap-3">
 					<input
@@ -252,12 +257,12 @@
 					/>
 					<span class="text-sm text-gray-600 whitespace-nowrap">({(Number(royaltyBps) / 100).toFixed(2)}%)</span>
 				</div>
-				<p class="mt-1 text-xs text-gray-500">{m.publish.field_royalty_help()}</p>
+				<p class="mt-1 text-xs text-gray-500">{msg('publish.field_royalty_help')()}</p>
 			</div>
 
 			<div>
 				<label for="cover-image" class="mb-3 block text-sm font-medium text-gray-700">
-					{m.publish.field_cover_image()}
+					{msg('publish.field_cover_image')()}
 				</label>
 				{#if coverImagePreview}
 					<div class="space-y-3">
@@ -270,7 +275,7 @@
 							class="text-sm text-gray-600 underline hover:text-gray-900"
 							disabled={isSubmitting}
 						>
-							{m.publish.field_cover_image_remove()}
+							{msg('publish.field_cover_image_remove')()}
 						</button>
 					</div>
 				{:else}
@@ -281,8 +286,8 @@
 						<svg class="mb-2 h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
 						</svg>
-						<p class="text-sm font-medium text-gray-700">{m.publish.field_cover_image_upload()}</p>
-						<p class="text-xs text-gray-500">{m.publish.field_cover_image_help()}</p>
+						<p class="text-sm font-medium text-gray-700">{msg('publish.field_cover_image_upload')()}</p>
+						<p class="text-xs text-gray-500">{msg('publish.field_cover_image_help')()}</p>
 						<input
 							id="cover-image"
 							type="file"
@@ -297,12 +302,12 @@
 
 			<div>
 				<label for="content" class="mb-2 block text-sm font-medium text-gray-700">
-					{m.publish.field_content()} *
+					{msg('publish.field_content')()} *
 				</label>
 				<textarea
 					id="content"
 					bind:value={content}
-					placeholder={m.publish.field_content_placeholder()}
+					placeholder={msg('publish.field_content_placeholder')()}
 					rows={12}
 					class="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 font-mono text-sm text-gray-900 placeholder-gray-400 transition-colors focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-300"
 					disabled={isSubmitting}
@@ -311,12 +316,12 @@
 
 			<div>
 				<label for="postscript" class="mb-2 block text-sm font-medium text-gray-700">
-					{m.publish.field_postscript()}
+					{msg('publish.field_postscript')()}
 				</label>
 				<textarea
 					id="postscript"
 					bind:value={postscript}
-					placeholder={m.publish.field_postscript_placeholder()}
+					placeholder={msg('publish.field_postscript_placeholder')()}
 					rows={4}
 					class="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-base text-gray-900 placeholder-gray-400 transition-colors focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-300"
 					disabled={isSubmitting}
@@ -346,15 +351,15 @@
 					{#if isSubmitting}
 						<span>
 							{submitStatus === 'uploadingCover'
-								? m.publish.status_uploading_cover()
+								? msg('publish.status_uploading_cover')()
 								: submitStatus === 'uploadingArticle'
-									? m.publish.status_uploading_article()
+									? msg('publish.status_uploading_article')()
 									: submitStatus === 'publishingContract'
-										? m.publish.status_publishing()
-										: m.publish.button_publish()}
+										? msg('publish.status_publishing')()
+										: msg('publish.button_publish')()}
 						</span>
 					{:else}
-						<span>{m.publish.button_publish()}</span>
+						<span>{msg('publish.button_publish')()}</span>
 					{/if}
 				</button>
 				<button
@@ -363,11 +368,11 @@
 					disabled={isSubmitting}
 					class="rounded-lg border border-gray-200 px-6 py-3 font-medium text-gray-900 transition-colors hover:bg-gray-50 disabled:opacity-50"
 				>
-					{m.publish.button_clear()}
+					{msg('publish.button_clear')()}
 				</button>
 			</div>
 
-			<p class="text-xs text-gray-500">{m.publish.required_fields()}</p>
+			<p class="text-xs text-gray-500">{msg('publish.required_fields')()}</p>
 		</form>
 	</div>
 </div>
