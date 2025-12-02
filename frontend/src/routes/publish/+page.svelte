@@ -88,9 +88,15 @@
 			<p class="text-gray-500">Share your thoughts with the world</p>
 		</header>
 
-		<form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }} class="space-y-8">
+		<form
+			onsubmit={(e) => {
+				e.preventDefault()
+				handleSubmit()
+			}}
+			class="space-y-8"
+		>
 			<div>
-				<label for="title" class="block text-sm font-medium text-gray-700 mb-2">Title</label>
+				<label for="title" class="mb-2 block text-sm font-medium text-gray-700">Title</label>
 				<input
 					id="title"
 					type="text"
@@ -102,7 +108,7 @@
 			</div>
 
 			<div>
-				<label for="category" class="block text-sm font-medium text-gray-700 mb-2">
+				<label for="category" class="mb-2 block text-sm font-medium text-gray-700">
 					Category (comma-separated)
 				</label>
 				<input
@@ -116,7 +122,7 @@
 			</div>
 
 			<div>
-				<label for="author" class="block text-sm font-medium text-gray-700 mb-2">Author</label>
+				<label for="author" class="mb-2 block text-sm font-medium text-gray-700">Author</label>
 				<input
 					id="author"
 					type="text"
@@ -128,7 +134,7 @@
 			</div>
 
 			<div>
-				<label class="block text-sm font-medium text-gray-700 mb-3">Cover Image</label>
+				<label for="cover-image" class="mb-3 block text-sm font-medium text-gray-700">Cover Image</label>
 				{#if coverImagePreview}
 					<div class="space-y-3">
 						<div class="relative overflow-hidden rounded-lg bg-gray-100">
@@ -144,13 +150,17 @@
 						</button>
 					</div>
 				{:else}
-					<label class="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-200 px-6 py-10 transition-colors hover:border-gray-300">
+					<label
+						for="cover-image"
+						class="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-200 px-6 py-10 transition-colors hover:border-gray-300"
+					>
 						<svg class="mb-2 h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
 						</svg>
 						<p class="text-sm font-medium text-gray-700">Upload cover image</p>
 						<p class="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
 						<input
+							id="cover-image"
 							type="file"
 							accept="image/*"
 							onchange={handleCoverImageChange}
@@ -162,7 +172,7 @@
 			</div>
 
 			<div>
-				<label for="content" class="block text-sm font-medium text-gray-700 mb-2">
+				<label for="content" class="mb-2 block text-sm font-medium text-gray-700">
 					Content (Markdown supported)
 				</label>
 				<textarea
@@ -172,11 +182,11 @@
 					rows={12}
 					class="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 font-mono text-sm text-gray-900 placeholder-gray-400 transition-colors focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-300"
 					disabled={isSubmitting}
-				/>
+				></textarea>
 			</div>
 
 			<div>
-				<label for="postscript" class="block text-sm font-medium text-gray-700 mb-2">Postscript</label>
+				<label for="postscript" class="mb-2 block text-sm font-medium text-gray-700">Postscript</label>
 				<textarea
 					id="postscript"
 					bind:value={postscript}
@@ -184,7 +194,7 @@
 					rows={4}
 					class="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-base text-gray-900 placeholder-gray-400 transition-colors focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-300"
 					disabled={isSubmitting}
-				/>
+				></textarea>
 			</div>
 
 			{#if submitStatus !== 'idle'}
