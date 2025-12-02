@@ -631,73 +631,7 @@ npm install @irys/web-upload @irys/web-upload-ethereum @irys/web-upload-ethereum
 
 **浏览器端（Viem v2 + @wagmi/core）：**
 
-```typescript
-// frontend/src/lib/irys.ts
-import { WebUploader } from '@irys/web-upload'
-import { WebEthereum } from '@irys/web-upload-ethereum'
-import { ViemV2Adapter } from '@irys/web-upload-ethereum-viem-v2'
-import { createWalletClient, createPublicClient, custom } from 'viem'
-import { optimismSepolia } from 'viem/chains'
-
-// 连接到 Irys Mainnet
-export async function getIrysUploader() {
-  const [account] = await window.ethereum.request({ method: 'eth_requestAccounts' })
-  
-  const walletClient = createWalletClient({
-    account,
-    chain: optimismSepolia,
-    transport: custom(window.ethereum)
-  })
-  
-  const publicClient = createPublicClient({
-    chain: optimismSepolia,
-    transport: custom(window.ethereum)
-  })
-  
-  const irysUploader = await WebUploader(WebEthereum).withAdapter(
-    ViemV2Adapter(walletClient, { publicClient })
-  )
-  return irysUploader
-}
-
-// 连接到 Irys Devnet（测试用，免费但数据约60天后删除）
-export async function getIrysUploaderDevnet() {
-  const [account] = await window.ethereum.request({ method: 'eth_requestAccounts' })
-  
-  const walletClient = createWalletClient({
-    account,
-    chain: optimismSepolia,
-    transport: custom(window.ethereum)
-  })
-  
-  const publicClient = createPublicClient({
-    chain: optimismSepolia,
-    transport: custom(window.ethereum)
-  })
-  
-  // RPC URL 可从 https://chainlist.org/ 获取最新地址
-  const rpcURL = 'https://sepolia.optimism.io'
-  const irysUploader = await WebUploader(WebEthereum)
-    .withAdapter(ViemV2Adapter(walletClient, { publicClient }))
-    .withRpc(rpcURL)
-    .devnet()
-  return irysUploader
-}
-
-// 检查余额
-export async function getIrysBalance(uploader: any): Promise<string> {
-  const balance = await uploader.getLoadedBalance()
-  return uploader.utils.fromAtomic(balance).toString()
-}
-
-// 充值（Mainnet 需要）
-export async function fundIrys(uploader: any, amount: string) {
-  const fundTx = await uploader.fund(uploader.utils.toAtomic(amount))
-  console.log(`Successfully funded ${uploader.utils.fromAtomic(fundTx.quantity)} ${uploader.token}`)
-  return fundTx.id
-}
-```
-
+[frontend\src\lib\arweave\irys.ts](frontend\src\lib\arweave\irys.ts)
 
 ### 10.3 网络说明
 
@@ -718,128 +652,15 @@ Irys 有两个 Bundler 网络：
 
 ### 11.1 文章数据结构
 
-```typescript
-// frontend/src/lib/types.ts
-export interface ArticleMetadata {
-  title: string
-  summary: string
-  content: string           // Markdown 格式
-  coverImage?: string       // 封面图 Arweave Hash
-  tags: string[]
-  createdAt: number         // Unix 时间戳
-  version: string           // 数据格式版本
-}
-
-export interface ArticleBundle {
-  metadata: ArticleMetadata
-  contentType: 'application/json'
-}
-```
+[frontend\src\lib\arweave\types.ts](frontend\src\lib\arweave\types.ts)
 
 ### 11.2 上传文章到 Arweave
 
-```typescript
-// frontend/src/lib/article.ts
-import { getIrysUploader } from './irys'
-import type { ArticleMetadata } from './types'
-
-export async function uploadArticle(metadata: ArticleMetadata): Promise<string> {
-  const uploader = await getIrysUploader()
-  
-  // 准备数据
-  const data = JSON.stringify({
-    ...metadata,
-    version: '1.0.0',
-    createdAt: Date.now()
-  })
-  
-  // 添加标签（用于 Arweave GraphQL 查询）
-  const tags = [
-    { name: 'Content-Type', value: 'application/json' },
-    { name: 'App-Name', value: 'DBlog' },
-    { name: 'App-Version', value: '1.0.0' },
-    { name: 'Type', value: 'article' },
-    { name: 'Title', value: metadata.title },
-    ...metadata.tags.map(tag => ({ name: 'Tag', value: tag }))
-  ]
-  
-  try {
-    // 上传数据
-    const receipt = await uploader.upload(data, { tags })
-    console.log(`Article uploaded ==> https://gateway.irys.xyz/${receipt.id}`)
-    return receipt.id  // 返回 Transaction ID
-  } catch (e) {
-    console.error('Error when uploading article:', e)
-    throw e
-  }
-}
-
-// 上传图片文件
-export async function uploadImage(file: File): Promise<string> {
-  const uploader = await getIrysUploader()
-  
-  const tags = [
-    { name: 'Content-Type', value: file.type },
-    { name: 'App-Name', value: 'DBlog' },
-    { name: 'Type', value: 'image' }
-  ]
-  
-  try {
-    const receipt = await uploader.uploadFile(file, { tags })
-    console.log(`Image uploaded ==> https://gateway.irys.xyz/${receipt.id}`)
-    return receipt.id
-  } catch (e) {
-    console.error('Error when uploading image:', e)
-    throw e
-  }
-}
-```
+[frontend\src\lib\arweave\upload.ts](frontend\src\lib\arweave\upload.ts)
 
 ### 11.3 完整发布流程
 
-```typescript
-// frontend/src/lib/publish.ts
-import { uploadArticle, uploadImage } from './article'
-import { publishToContract } from './contracts'
-
-export async function publishArticle(
-  title: string,
-  summary: string,
-  content: string,
-  coverImage: File | null,
-  tags: string[],
-  categoryId: bigint,
-  royaltyBps: bigint,
-  originalAuthor: string = ''
-) {
-  // 1. 上传封面图（如果有）
-  let coverImageHash = ''
-  if (coverImage) {
-    coverImageHash = await uploadImage(coverImage)
-  }
-  
-  // 2. 上传文章内容到 Arweave
-  const arweaveId = await uploadArticle({
-    title,
-    summary,
-    content,
-    coverImage: coverImageHash,
-    tags,
-    createdAt: Date.now(),
-    version: '1.0.0'
-  })
-  
-  // 3. 调用智能合约发布
-  const txHash = await publishToContract(
-    arweaveId,
-    categoryId,
-    royaltyBps,
-    originalAuthor
-  )
-  
-  return { arweaveId, txHash }
-}
-```
+[upload_example.ts](../learn/09_upload_example.ts)
 
 ---
 
