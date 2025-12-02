@@ -89,7 +89,6 @@
 		</header>
 
 		<form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }} class="space-y-8">
-			{/* Title Field */}
 			<div>
 				<label for="title" class="block text-sm font-medium text-gray-700 mb-2">Title</label>
 				<input
@@ -102,7 +101,6 @@
 				/>
 			</div>
 
-			{/* Category Field */}
 			<div>
 				<label for="category" class="block text-sm font-medium text-gray-700 mb-2">
 					Category (comma-separated)
@@ -117,7 +115,6 @@
 				/>
 			</div>
 
-			{/* Author Field */}
 			<div>
 				<label for="author" class="block text-sm font-medium text-gray-700 mb-2">Author</label>
 				<input
@@ -130,7 +127,6 @@
 				/>
 			</div>
 
-			{/* Cover Image Field */}
 			<div>
 				<label class="block text-sm font-medium text-gray-700 mb-3">Cover Image</label>
 				{coverImagePreview ? (
@@ -165,7 +161,6 @@
 				)}
 			</div>
 
-			{/* Content Field */}
 			<div>
 				<label for="content" class="block text-sm font-medium text-gray-700 mb-2">
 					Content (Markdown supported)
@@ -180,7 +175,6 @@
 				/>
 			</div>
 
-			{/* Postscript Field */}
 			<div>
 				<label for="postscript" class="block text-sm font-medium text-gray-700 mb-2">Postscript</label>
 				<textarea
@@ -193,7 +187,6 @@
 				/>
 			</div>
 
-			{/* Status Messages */}
 			{submitStatus !== 'idle' && (
 				<div
 					class={`rounded-lg px-4 py-3 text-sm ${
@@ -206,7 +199,6 @@
 				</div>
 			)}
 
-			{/* Submit Button */}
 			<div class="flex gap-3">
 				<button
 					type="submit"
