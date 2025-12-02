@@ -67,7 +67,10 @@ export async function createIrysUploader(config: IrysConfig = { network: 'devnet
 
 	// 使用类型断言解决 viem 版本与 @irys/web-upload-ethereum-viem-v2 的类型不兼容问题
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	let builder = WebUploader(WebEthereum).withAdapter(ViemV2Adapter(walletClient as any, { publicClient: publicClient as any }))
+	const viemAdapter = ViemV2Adapter(walletClient as any, { publicClient: publicClient as any })
+
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	let builder = (WebUploader as any)(WebEthereum).withAdapter(viemAdapter)
 
 	if (config.network === 'devnet') {
 		const rpcUrl = config.rpcUrl || DEFAULT_RPC_URL
