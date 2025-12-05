@@ -452,3 +452,9 @@ Claude: 提取了十多个常见错误。
 frontend\app\composables\contracts.ts 的191行和 frontend\app\composables\arweave 的一些文件，这些都是代码中硬编码的配置，不方便长期维护。当前项目使用nuxt.js，请根据nuxt.js的最佳实践，帮我在frontend的某个地方集中维护前端的所有必要配置  
 Claude: 集中到nuxt.config.ts中维护。
 
+#### 2025-12-05 21:10  判断是否浏览器环境
+frontend\app\composables\arweave\cache.ts 第四行时用于判断是否是浏览器环境，此文件是从sveltekit项目直接移植的，所以在当前nuxt.js中不可用，请帮我改为适合nuxt.js架构的判断方式  
+Claude: 改为nuxt的import.meta.client
+
+#### 2025-12-05 21:25  文档从sveltekit改为nuxt.js
+README.md doc\Developers.md 此项目前端之前使用sveltekit，当前已迁移到nuxt.js；请帮我把这两个文件中所有关于sveltekit的描述改为nuxt.js，并将相关的命令和代码等进行对应的修改兼容  

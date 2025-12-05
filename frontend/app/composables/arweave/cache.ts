@@ -1,9 +1,10 @@
 /**
  * 客户端缓存策略
  */
-import { browser } from '$app/environment'
 import { fetchArticleContent } from './fetch'
 import type { ArticleMetadata, CachedArticle } from './types'
+
+const browser = import.meta.client
 
 const CACHE_PREFIX = 'dblog_article_'
 const CACHE_TTL = 24 * 60 * 60 * 1000 // 24 小时

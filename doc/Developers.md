@@ -13,7 +13,7 @@
 | 部署脚本 | ✅ 已完成 | 支持本地/测试网/主网部署 |
 | SubSquid 索引 | 🔨 开发中 | ABI 已生成，Processor 已配置，待本地测试 |
 | Irys + Arweave | 🔲 待开发 | 文章内容永久存储 |
-| SvelteKit 前端 | 🔲 待开发 | 用户界面、钱包集成 |
+| Nuxt.js 前端 | 🔲 待开发 | 用户界面、钱包集成 |
 
 ---
 
@@ -37,7 +37,7 @@
 11. [文章上传与元数据](#11-文章上传与元数据)
 12. [内容获取与缓存](#12-内容获取与缓存)
 
-**Part 4: SvelteKit 前端（待开发）**
+**Part 4: Nuxt.js 前端（待开发）**
 13. [前端项目初始化](#13-前端项目初始化)
 14. [钱包连接与合约交互](#14-钱包连接与合约交互)
 15. [Session Key 无感交互](#15-session-key-无感交互)
@@ -603,18 +603,24 @@ sqd deploy .
 
 ### 9.3 前端集成
 ```shell
-npx sv create frontend
+npx nuxi@latest init frontend
 cd frontend
 npm run dev
 ```
 
 ```typescript
-// frontend/src/lib/graphql.ts
-import { Client, cacheExchange, fetchExchange } from '@urql/svelte'
+// frontend/app/plugins/urql.ts
+import { createClient, cacheExchange, fetchExchange } from '@urql/vue'
 
-export const graphqlClient = new Client({
-  url: process.env.SUBSQUID_GRAPHQL_URL || 'http://localhost:4350/graphql',
-  exchanges: [cacheExchange, fetchExchange]
+export default defineNuxtPlugin((nuxtApp) => {
+  const runtimeConfig = useRuntimeConfig()
+  
+  const client = createClient({
+    url: runtimeConfig.public.subsquidGraphqlUrl || 'http://localhost:4350/graphql',
+    exchanges: [cacheExchange, fetchExchange]
+  })
+  
+  nuxtApp.vueApp.provide('urql', client)
 })
 ```
 
@@ -718,9 +724,7 @@ export function getImageUrl(arweaveId: string): string {
 ### 12.2 客户端缓存策略
 
 ```typescript
-// frontend/src/lib/cache.ts
-import { browser } from '$app/environment'
-
+// frontend/app/composables/useCache.ts
 const CACHE_PREFIX = 'dblog_article_'
 const CACHE_TTL = 24 * 60 * 60 * 1000  // 24 小时
 
@@ -730,7 +734,7 @@ interface CachedArticle {
 }
 
 export function getCachedArticle(arweaveId: string): ArticleMetadata | null {
-  if (!browser) return null
+  if (!import.meta.client) return null
   
   const cached = localStorage.getItem(CACHE_PREFIX + arweaveId)
   if (!cached) return null
@@ -747,7 +751,7 @@ export function getCachedArticle(arweaveId: string): ArticleMetadata | null {
 }
 
 export function setCachedArticle(arweaveId: string, data: ArticleMetadata) {
-  if (!browser) return
+  if (!import.meta.client) return
   
   const cached: CachedArticle = {
     data,
@@ -773,120 +777,140 @@ export async function getArticleWithCache(arweaveId: string): Promise<ArticleMet
 }
 ```
 
-### 12.3 SvelteKit 服务端渲染
+### 12.3 Nuxt.js 服务端渲染
 
 ```typescript
-// frontend/src/routes/article/[id]/+page.server.ts
-import type { PageServerLoad } from './$types'
-import { fetchArticleContent } from '$lib/arweave'
-import { graphqlClient } from '$lib/graphql'
+// frontend/app/pages/article/[id].vue
+<script setup lang="ts">
+import { fetchArticleContent } from '~/composables/useArweave'
+import { useQuery } from '@urql/vue'
+import { gql } from 'graphql-tag'
 
-export const load: PageServerLoad = async ({ params }) => {
-  // 从 SubSquid 获取文章链上数据
-  const { data } = await graphqlClient.query(ArticleDetailQuery, {
-    articleId: params.id
-  }).toPromise()
-  
-  if (!data?.articleById) {
-    throw error(404, 'Article not found')
+const route = useRoute()
+const articleId = route.params.id as string
+
+const ArticleDetailQuery = gql`
+  query ArticleDetail($articleId: String!) {
+    articleById(id: $articleId) {
+      id
+      arweaveId
+      author { id }
+      originalAuthor
+      likes
+      dislikes
+      totalTips
+      createdAt
+    }
   }
-  
-  // 从 Arweave 获取文章内容
-  const content = await fetchArticleContent(data.articleById.arweaveId)
-  
-  return {
-    article: data.articleById,
-    content
-  }
-}
+`
+
+const { data, fetching, error } = useQuery({
+  query: ArticleDetailQuery,
+  variables: { articleId }
+})
+
+// 使用 useAsyncData 进行服务端渲染
+const { data: content } = await useAsyncData(
+  `article-content-${articleId}`,
+  async () => {
+    if (!data.value?.articleById?.arweaveId) return null
+    return await fetchArticleContent(data.value.articleById.arweaveId)
+  },
+  { watch: [data] }
+)
+</script>
 ```
 
 ---
 
-# Part 4: SvelteKit 前端
+# Part 4: Nuxt.js 前端
 
 ## 13. 前端项目初始化
 
-### 13.1 创建 SvelteKit 项目
+### 13.1 创建 Nuxt.js 项目
 
 ```bash
 # 在项目根目录
-npx sv create frontend
-
-# 选择配置:
-# - Template: SvelteKit minimal
-# - Type checking: TypeScript
-# - Additional options: prettier, eslint, tailwindcss
+npx nuxi@latest init frontend
 
 cd frontend
 npm install
+
+# 安装 Tailwind CSS
+npm install -D @nuxtjs/tailwindcss
+npx tailwindcss init
 ```
 
 ### 13.2 安装依赖
 
 ```bash
 # Web3 相关
-npm install viem @wagmi/core svelte-wagmi @reown/appkit
+npm install viem @wagmi/vue @wagmi/core @reown/appkit @reown/appkit-adapter-wagmi
 
 # GraphQL
-npm install @urql/svelte graphql
+npm install @urql/vue graphql
 
 # Arweave/Irys（浏览器端，使用 Viem v2）
 npm install @irys/web-upload @irys/web-upload-ethereum @irys/web-upload-ethereum-viem-v2
 
 # UI 组件
-npm install lucide-svelte bits-ui tailwind-variants clsx tailwind-merge
+npm install lucide-vue-next radix-vue tailwind-variants clsx tailwind-merge
 
 # Markdown 渲染
 npm install marked dompurify @types/dompurify
+
+# 国际化
+npm install @nuxtjs/i18n
 ```
 
 ### 13.3 项目结构
 
 ```
 frontend/
-├── src/
-│   ├── lib/
-│   │   ├── abi/              # 合约 ABI
-│   │   ├── components/       # 可复用组件
-│   │   │   ├── ui/           # 基础 UI 组件
-│   │   │   ├── ArticleCard.svelte
-│   │   │   ├── CommentList.svelte
-│   │   │   └── WalletButton.svelte
-│   │   ├── stores/           # Svelte stores
-│   │   │   ├── wallet.ts
-│   │   │   └── session.ts
-│   │   ├── contracts.ts      # 合约交互
-│   │   ├── graphql.ts        # GraphQL 客户端
-│   │   ├── irys.ts           # Irys 上传
-│   │   ├── arweave.ts        # Arweave 获取
-│   │   └── sessionKey.ts     # Session Key 管理
-│   ├── routes/
-│   │   ├── +layout.svelte    # 全局布局
-│   │   ├── +page.svelte      # 首页（文章列表）
+├── app/
+│   ├── assets/               # 静态资源
+│   ├── components/           # 可复用组件
+│   │   ├── ui/               # 基础 UI 组件
+│   │   ├── ArticleCard.vue
+│   │   ├── CommentList.vue
+│   │   └── WalletButton.vue
+│   ├── composables/          # Vue composables
+│   │   ├── useWallet.ts
+│   │   ├── useSession.ts
+│   │   ├── useContracts.ts   # 合约交互
+│   │   ├── useGraphql.ts     # GraphQL 客户端
+│   │   ├── useIrys.ts        # Irys 上传
+│   │   ├── useArweave.ts     # Arweave 获取
+│   │   └── useSessionKey.ts  # Session Key 管理
+│   ├── pages/
+│   │   ├── index.vue         # 首页（文章列表）
 │   │   ├── article/
-│   │   │   ├── [id]/+page.svelte      # 文章详情
-│   │   │   └── new/+page.svelte       # 发布文章
+│   │   │   ├── [id].vue      # 文章详情
+│   │   │   └── new.vue       # 发布文章
 │   │   ├── user/
-│   │   │   └── [address]/+page.svelte # 用户主页
-│   │   └── settings/+page.svelte      # 设置页面
-│   └── app.html
-├── static/
+│   │   │   └── [address].vue # 用户主页
+│   │   └── settings.vue      # 设置页面
+│   ├── layouts/
+│   │   └── default.vue       # 全局布局
+│   └── app.vue
+├── public/
+├── i18n/
+│   └── locales/              # 国际化文件
 ├── tailwind.config.js
-└── svelte.config.js
+└── nuxt.config.ts
 ```
 
 ### 13.4 环境变量配置
 
 ```bash
 # frontend/.env
-PUBLIC_CHAIN_ID=11155420
-PUBLIC_RPC_URL=https://sepolia.optimism.io
-PUBLIC_BLOG_HUB_ADDRESS=0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9
-PUBLIC_SESSION_KEY_MANAGER_ADDRESS=0x5FbDB2315678afecb367f032d93F642f64180aa3
-PUBLIC_PAYMASTER_ADDRESS=0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512
-PUBLIC_SUBSQUID_GRAPHQL_URL=http://localhost:4350/graphql
-PUBLIC_REOWN_PROJECT_ID=your_reown_project_id
+NUXT_PUBLIC_CHAIN_ID=11155420
+NUXT_PUBLIC_RPC_URL=https://sepolia.optimism.io
+NUXT_PUBLIC_BLOG_HUB_ADDRESS=0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9
+NUXT_PUBLIC_SESSION_KEY_MANAGER_ADDRESS=0x5FbDB2315678afecb367f032d93F642f64180aa3
+NUXT_PUBLIC_PAYMASTER_ADDRESS=0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512
+NUXT_PUBLIC_SUBSQUID_GRAPHQL_URL=http://localhost:4350/graphql
+NUXT_PUBLIC_REOWN_PROJECT_ID=your_reown_project_id
 ```
 
 ---
@@ -896,12 +920,13 @@ PUBLIC_REOWN_PROJECT_ID=your_reown_project_id
 ### 14.1 Wagmi 配置
 
 ```typescript
-// frontend/src/lib/wagmi.ts
+// frontend/app/composables/useWagmi.ts
 import { createConfig, http } from '@wagmi/core'
 import { optimismSepolia, localhost } from '@wagmi/core/chains'
 import { injected, walletConnect } from '@wagmi/connectors'
 
-const projectId = import.meta.env.PUBLIC_REOWN_PROJECT_ID
+const runtimeConfig = useRuntimeConfig()
+const projectId = runtimeConfig.public.reownProjectId
 
 export const config = createConfig({
   chains: [optimismSepolia, localhost],
@@ -918,66 +943,68 @@ export const config = createConfig({
 
 ### 14.2 钱包连接组件
 
-```svelte
-<!-- frontend/src/lib/components/WalletButton.svelte -->
-<script lang="ts">
-  import { connect, disconnect, getAccount } from '@wagmi/core'
-  import { config } from '$lib/wagmi'
-  import { onMount } from 'svelte'
-  
-  let address: string | undefined
-  let isConnected = false
-  
-  onMount(() => {
+```vue
+<!-- frontend/app/components/WalletButton.vue -->
+<script setup lang="ts">
+import { connect, disconnect, getAccount } from '@wagmi/core'
+import { injected } from '@wagmi/connectors'
+import { config } from '~/composables/useWagmi'
+
+const address = ref<string | undefined>()
+const isConnected = ref(false)
+
+onMounted(() => {
+  const account = getAccount(config)
+  address.value = account.address
+  isConnected.value = account.isConnected
+})
+
+async function handleConnect() {
+  try {
+    await connect(config, { connector: injected() })
     const account = getAccount(config)
-    address = account.address
-    isConnected = account.isConnected
-  })
-  
-  async function handleConnect() {
-    try {
-      await connect(config, { connector: injected() })
-      const account = getAccount(config)
-      address = account.address
-      isConnected = true
-    } catch (error) {
-      console.error('Failed to connect:', error)
-    }
+    address.value = account.address
+    isConnected.value = true
+  } catch (error) {
+    console.error('Failed to connect:', error)
   }
-  
-  async function handleDisconnect() {
-    await disconnect(config)
-    address = undefined
-    isConnected = false
-  }
+}
+
+async function handleDisconnect() {
+  await disconnect(config)
+  address.value = undefined
+  isConnected.value = false
+}
 </script>
 
-{#if isConnected}
+<template>
   <button 
+    v-if="isConnected"
     class="px-4 py-2 bg-gray-800 text-white rounded-lg"
-    on:click={handleDisconnect}
+    @click="handleDisconnect"
   >
-    {address?.slice(0, 6)}...{address?.slice(-4)}
+    {{ address?.slice(0, 6) }}...{{ address?.slice(-4) }}
   </button>
-{:else}
   <button 
+    v-else
     class="px-4 py-2 bg-blue-600 text-white rounded-lg"
-    on:click={handleConnect}
+    @click="handleConnect"
   >
     连接钱包
   </button>
-{/if}
+</template>
 ```
 
 ### 14.3 合约交互封装
 
 ```typescript
-// frontend/src/lib/contracts.ts
+// frontend/app/composables/useContracts.ts
 import { readContract, writeContract, getAccount } from '@wagmi/core'
-import { config } from './wagmi'
-import BlogHubABI from './abi/BlogHub.json'
+import { config } from './useWagmi'
+import BlogHubABI from '~/assets/abi/BlogHub.json'
 
-const BLOG_HUB_ADDRESS = import.meta.env.PUBLIC_BLOG_HUB_ADDRESS as `0x${string}`
+const runtimeConfig = useRuntimeConfig()
+const BLOG_HUB_ADDRESS = runtimeConfig.public.blogHubAddress as `0x${string}`
 
 // 发布文章
 export async function publishToContract(
@@ -1045,15 +1072,16 @@ export async function getArticle(articleId: bigint) {
 ### 15.1 Session Key 管理
 
 ```typescript
-// frontend/src/lib/sessionKey.ts
+// frontend/app/composables/useSessionKey.ts
 import { Wallet } from 'ethers'
 import { writeContract, getAccount } from '@wagmi/core'
-import { config } from './wagmi'
-import SessionKeyManagerABI from './abi/SessionKeyManager.json'
+import { config } from './useWagmi'
+import SessionKeyManagerABI from '~/assets/abi/SessionKeyManager.json'
 
 const SESSION_KEY_STORAGE = 'dblog_session_key'
-const SESSION_KEY_MANAGER = import.meta.env.PUBLIC_SESSION_KEY_MANAGER_ADDRESS as `0x${string}`
-const BLOG_HUB_ADDRESS = import.meta.env.PUBLIC_BLOG_HUB_ADDRESS as `0x${string}`
+const runtimeConfig = useRuntimeConfig()
+const SESSION_KEY_MANAGER = runtimeConfig.public.sessionKeyManagerAddress as `0x${string}`
+const BLOG_HUB_ADDRESS = runtimeConfig.public.blogHubAddress as `0x${string}`
 
 interface StoredSessionKey {
   address: string
@@ -1172,80 +1200,82 @@ export async function revokeSessionKey() {
 
 ### 15.2 Session Key 状态组件
 
-```svelte
-<!-- frontend/src/lib/components/SessionKeyStatus.svelte -->
-<script lang="ts">
-  import { onMount } from 'svelte'
-  import { getStoredSessionKey, createSessionKey, revokeSessionKey } from '$lib/sessionKey'
-  
-  let hasSessionKey = false
-  let validUntil: Date | null = null
-  let isLoading = false
-  
-  onMount(() => {
+```vue
+<!-- frontend/app/components/SessionKeyStatus.vue -->
+<script setup lang="ts">
+import { getStoredSessionKey, createSessionKey, revokeSessionKey } from '~/composables/useSessionKey'
+
+const hasSessionKey = ref(false)
+const validUntil = ref<Date | null>(null)
+const isLoading = ref(false)
+
+onMounted(() => {
+  checkSessionKey()
+})
+
+function checkSessionKey() {
+  const sk = getStoredSessionKey()
+  hasSessionKey.value = !!sk
+  validUntil.value = sk ? new Date(sk.validUntil * 1000) : null
+}
+
+async function handleCreate() {
+  isLoading.value = true
+  try {
+    await createSessionKey()
     checkSessionKey()
-  })
-  
-  function checkSessionKey() {
-    const sk = getStoredSessionKey()
-    hasSessionKey = !!sk
-    validUntil = sk ? new Date(sk.validUntil * 1000) : null
+  } catch (error) {
+    console.error('Failed to create session key:', error)
+  } finally {
+    isLoading.value = false
   }
-  
-  async function handleCreate() {
-    isLoading = true
-    try {
-      await createSessionKey()
-      checkSessionKey()
-    } catch (error) {
-      console.error('Failed to create session key:', error)
-    } finally {
-      isLoading = false
-    }
+}
+
+async function handleRevoke() {
+  isLoading.value = true
+  try {
+    await revokeSessionKey()
+    checkSessionKey()
+  } catch (error) {
+    console.error('Failed to revoke session key:', error)
+  } finally {
+    isLoading.value = false
   }
-  
-  async function handleRevoke() {
-    isLoading = true
-    try {
-      await revokeSessionKey()
-      checkSessionKey()
-    } catch (error) {
-      console.error('Failed to revoke session key:', error)
-    } finally {
-      isLoading = false
-    }
-  }
+}
 </script>
 
-<div class="p-4 border rounded-lg">
-  <h3 class="font-semibold mb-2">无感交互模式</h3>
-  
-  {#if hasSessionKey}
-    <p class="text-green-600 mb-2">✓ 已启用</p>
-    <p class="text-sm text-gray-500 mb-4">
-      有效期至: {validUntil?.toLocaleDateString()}
-    </p>
-    <button 
-      class="px-3 py-1 bg-red-100 text-red-600 rounded"
-      on:click={handleRevoke}
-      disabled={isLoading}
-    >
-      撤销授权
-    </button>
-  {:else}
-    <p class="text-gray-500 mb-2">未启用</p>
-    <p class="text-sm text-gray-400 mb-4">
-      启用后，点赞、评论、关注等操作无需每次签名
-    </p>
-    <button 
-      class="px-3 py-1 bg-blue-600 text-white rounded"
-      on:click={handleCreate}
-      disabled={isLoading}
-    >
-      {isLoading ? '授权中...' : '启用无感交互'}
-    </button>
-  {/if}
-</div>
+<template>
+  <div class="p-4 border rounded-lg">
+    <h3 class="font-semibold mb-2">无感交互模式</h3>
+    
+    <template v-if="hasSessionKey">
+      <p class="text-green-600 mb-2">✓ 已启用</p>
+      <p class="text-sm text-gray-500 mb-4">
+        有效期至: {{ validUntil?.toLocaleDateString() }}
+      </p>
+      <button 
+        class="px-3 py-1 bg-red-100 text-red-600 rounded"
+        :disabled="isLoading"
+        @click="handleRevoke"
+      >
+        撤销授权
+      </button>
+    </template>
+    <template v-else>
+      <p class="text-gray-500 mb-2">未启用</p>
+      <p class="text-sm text-gray-400 mb-4">
+        启用后，点赞、评论、关注等操作无需每次签名
+      </p>
+      <button 
+        class="px-3 py-1 bg-blue-600 text-white rounded"
+        :disabled="isLoading"
+        @click="handleCreate"
+      >
+        {{ isLoading ? '授权中...' : '启用无感交互' }}
+      </button>
+    </template>
+  </div>
+</template>
 ```
 
 ---
@@ -1254,296 +1284,300 @@ export async function revokeSessionKey() {
 
 ### 16.1 全局布局
 
-```svelte
-<!-- frontend/src/routes/+layout.svelte -->
-<script lang="ts">
-  import '../app.css'
-  import WalletButton from '$lib/components/WalletButton.svelte'
+```vue
+<!-- frontend/app/layouts/default.vue -->
+<script setup lang="ts">
+import WalletButton from '~/components/WalletButton.vue'
 </script>
 
-<div class="min-h-screen bg-gray-50">
-  <header class="bg-white border-b">
-    <nav class="container mx-auto px-4 py-4 flex justify-between items-center">
-      <a href="/" class="text-xl font-bold">DBlog</a>
-      
-      <div class="flex items-center gap-4">
-        <a href="/article/new" class="text-gray-600 hover:text-gray-900">
-          发布文章
-        </a>
-        <WalletButton />
+<template>
+  <div class="min-h-screen bg-gray-50">
+    <header class="bg-white border-b">
+      <nav class="container mx-auto px-4 py-4 flex justify-between items-center">
+        <NuxtLink to="/" class="text-xl font-bold">DBlog</NuxtLink>
+        
+        <div class="flex items-center gap-4">
+          <NuxtLink to="/article/new" class="text-gray-600 hover:text-gray-900">
+            发布文章
+          </NuxtLink>
+          <WalletButton />
+        </div>
+      </nav>
+    </header>
+    
+    <main class="container mx-auto px-4 py-8">
+      <slot />
+    </main>
+    
+    <footer class="bg-white border-t mt-auto">
+      <div class="container mx-auto px-4 py-6 text-center text-gray-500">
+        DBlog - 去中心化博客 | Powered by Optimism + Arweave
       </div>
-    </nav>
-  </header>
-  
-  <main class="container mx-auto px-4 py-8">
-    <slot />
-  </main>
-  
-  <footer class="bg-white border-t mt-auto">
-    <div class="container mx-auto px-4 py-6 text-center text-gray-500">
-      DBlog - 去中心化博客 | Powered by Optimism + Arweave
-    </div>
-  </footer>
-</div>
+    </footer>
+  </div>
+</template>
 ```
 
 ### 16.2 首页（文章列表）
 
-```svelte
-<!-- frontend/src/routes/+page.svelte -->
-<script lang="ts">
-  import { onMount } from 'svelte'
-  import { queryStore, gql } from '@urql/svelte'
-  import { graphqlClient } from '$lib/graphql'
-  import ArticleCard from '$lib/components/ArticleCard.svelte'
-  
-  const articlesQuery = queryStore({
-    client: graphqlClient,
-    query: gql`
-      query LatestArticles($limit: Int!, $offset: Int!) {
-        articles(orderBy: createdAt_DESC, limit: $limit, offset: $offset) {
-          id
-          arweaveId
-          author { id }
-          originalAuthor
-          likes
-          dislikes
-          totalTips
-          createdAt
-        }
-      }
-    `,
-    variables: { limit: 20, offset: 0 }
-  })
+```vue
+<!-- frontend/app/pages/index.vue -->
+<script setup lang="ts">
+import { useQuery } from '@urql/vue'
+import { gql } from 'graphql-tag'
+import ArticleCard from '~/components/ArticleCard.vue'
+
+const LatestArticlesQuery = gql`
+  query LatestArticles($limit: Int!, $offset: Int!) {
+    articles(orderBy: createdAt_DESC, limit: $limit, offset: $offset) {
+      id
+      arweaveId
+      author { id }
+      originalAuthor
+      likes
+      dislikes
+      totalTips
+      createdAt
+    }
+  }
+`
+
+const { data, fetching, error } = useQuery({
+  query: LatestArticlesQuery,
+  variables: { limit: 20, offset: 0 }
+})
 </script>
 
-<div class="max-w-3xl mx-auto">
-  <h1 class="text-2xl font-bold mb-6">最新文章</h1>
-  
-  {#if $articlesQuery.fetching}
-    <p class="text-gray-500">加载中...</p>
-  {:else if $articlesQuery.error}
-    <p class="text-red-500">加载失败: {$articlesQuery.error.message}</p>
-  {:else}
-    <div class="space-y-4">
-      {#each $articlesQuery.data?.articles || [] as article}
-        <ArticleCard {article} />
-      {/each}
+<template>
+  <div class="max-w-3xl mx-auto">
+    <h1 class="text-2xl font-bold mb-6">最新文章</h1>
+    
+    <p v-if="fetching" class="text-gray-500">加载中...</p>
+    <p v-else-if="error" class="text-red-500">加载失败: {{ error.message }}</p>
+    <div v-else class="space-y-4">
+      <ArticleCard 
+        v-for="article in data?.articles || []" 
+        :key="article.id" 
+        :article="article" 
+      />
     </div>
-  {/if}
-</div>
+  </div>
+</template>
 ```
 
 ### 16.3 文章卡片组件
 
-```svelte
-<!-- frontend/src/lib/components/ArticleCard.svelte -->
-<script lang="ts">
-  import { onMount } from 'svelte'
-  import { getArticleWithCache } from '$lib/cache'
-  import { formatEther } from 'viem'
-  import { ThumbsUp, ThumbsDown, MessageCircle } from 'lucide-svelte'
-  
-  export let article: {
-    id: string
-    arweaveId: string
-    author: { id: string }
-    likes: number
-    dislikes: number
-    totalTips: bigint
-    createdAt: string
+```vue
+<!-- frontend/app/components/ArticleCard.vue -->
+<script setup lang="ts">
+import { getArticleWithCache } from '~/composables/useCache'
+import { formatEther } from 'viem'
+import { ThumbsUp, ThumbsDown } from 'lucide-vue-next'
+
+interface Article {
+  id: string
+  arweaveId: string
+  author: { id: string }
+  likes: number
+  dislikes: number
+  totalTips: bigint
+  createdAt: string
+}
+
+const props = defineProps<{
+  article: Article
+}>()
+
+const metadata = ref<{ title: string; summary: string } | null>(null)
+
+onMounted(async () => {
+  try {
+    metadata.value = await getArticleWithCache(props.article.arweaveId)
+  } catch (error) {
+    console.error('Failed to load article metadata:', error)
   }
-  
-  let metadata: { title: string; summary: string } | null = null
-  
-  onMount(async () => {
-    try {
-      metadata = await getArticleWithCache(article.arweaveId)
-    } catch (error) {
-      console.error('Failed to load article metadata:', error)
-    }
-  })
+})
 </script>
 
-<a 
-  href="/article/{article.id}" 
-  class="block p-6 bg-white rounded-lg border hover:shadow-md transition"
->
-  {#if metadata}
-    <h2 class="text-xl font-semibold mb-2">{metadata.title}</h2>
-    <p class="text-gray-600 mb-4 line-clamp-2">{metadata.summary}</p>
-  {:else}
-    <div class="animate-pulse">
+<template>
+  <NuxtLink 
+    :to="`/article/${article.id}`" 
+    class="block p-6 bg-white rounded-lg border hover:shadow-md transition"
+  >
+    <template v-if="metadata">
+      <h2 class="text-xl font-semibold mb-2">{{ metadata.title }}</h2>
+      <p class="text-gray-600 mb-4 line-clamp-2">{{ metadata.summary }}</p>
+    </template>
+    <div v-else class="animate-pulse">
       <div class="h-6 bg-gray-200 rounded w-3/4 mb-2"></div>
       <div class="h-4 bg-gray-200 rounded w-full mb-4"></div>
     </div>
-  {/if}
-  
-  <div class="flex items-center justify-between text-sm text-gray-500">
-    <span>
-      {article.author.id.slice(0, 6)}...{article.author.id.slice(-4)}
-    </span>
     
-    <div class="flex items-center gap-4">
-      <span class="flex items-center gap-1">
-        <ThumbsUp size={16} />
-        {article.likes}
+    <div class="flex items-center justify-between text-sm text-gray-500">
+      <span>
+        {{ article.author.id.slice(0, 6) }}...{{ article.author.id.slice(-4) }}
       </span>
-      <span class="flex items-center gap-1">
-        <ThumbsDown size={16} />
-        {article.dislikes}
-      </span>
-      {#if article.totalTips > 0n}
-        <span class="text-green-600">
-          {formatEther(article.totalTips)} ETH
+      
+      <div class="flex items-center gap-4">
+        <span class="flex items-center gap-1">
+          <ThumbsUp :size="16" />
+          {{ article.likes }}
         </span>
-      {/if}
+        <span class="flex items-center gap-1">
+          <ThumbsDown :size="16" />
+          {{ article.dislikes }}
+        </span>
+        <span v-if="article.totalTips > 0n" class="text-green-600">
+          {{ formatEther(article.totalTips) }} ETH
+        </span>
+      </div>
     </div>
-  </div>
-</a>
+  </NuxtLink>
+</template>
 ```
 
 ### 16.4 发布文章页面
 
-```svelte
-<!-- frontend/src/routes/article/new/+page.svelte -->
-<script lang="ts">
-  import { goto } from '$app/navigation'
-  import { publishArticle } from '$lib/publish'
-  
-  let title = ''
-  let summary = ''
-  let content = ''
-  let tags = ''
-  let categoryId = 1n
-  let royaltyBps = 500n  // 5%
-  let coverImage: File | null = null
-  let isPublishing = false
-  let error = ''
-  
-  async function handleSubmit() {
-    if (!title || !content) {
-      error = '请填写标题和内容'
-      return
-    }
-    
-    isPublishing = true
-    error = ''
-    
-    try {
-      const { arweaveId, txHash } = await publishArticle(
-        title,
-        summary,
-        content,
-        coverImage,
-        tags.split(',').map(t => t.trim()).filter(Boolean),
-        categoryId,
-        royaltyBps
-      )
-      
-      // 跳转到文章页面
-      goto(`/article/${arweaveId}`)
-    } catch (err) {
-      error = err instanceof Error ? err.message : '发布失败'
-    } finally {
-      isPublishing = false
-    }
+```vue
+<!-- frontend/app/pages/article/new.vue -->
+<script setup lang="ts">
+import { publishArticle } from '~/composables/usePublish'
+
+const router = useRouter()
+
+const title = ref('')
+const summary = ref('')
+const content = ref('')
+const tags = ref('')
+const categoryId = ref(1n)
+const royaltyBps = ref(500n)  // 5%
+const coverImage = ref<File | null>(null)
+const isPublishing = ref(false)
+const error = ref('')
+
+async function handleSubmit() {
+  if (!title.value || !content.value) {
+    error.value = '请填写标题和内容'
+    return
   }
   
-  function handleImageChange(e: Event) {
-    const input = e.target as HTMLInputElement
-    coverImage = input.files?.[0] || null
+  isPublishing.value = true
+  error.value = ''
+  
+  try {
+    const { arweaveId } = await publishArticle(
+      title.value,
+      summary.value,
+      content.value,
+      coverImage.value,
+      tags.value.split(',').map(t => t.trim()).filter(Boolean),
+      categoryId.value,
+      royaltyBps.value
+    )
+    
+    // 跳转到文章页面
+    router.push(`/article/${arweaveId}`)
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '发布失败'
+  } finally {
+    isPublishing.value = false
   }
+}
+
+function handleImageChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  coverImage.value = input.files?.[0] || null
+}
 </script>
 
-<div class="max-w-3xl mx-auto">
-  <h1 class="text-2xl font-bold mb-6">发布文章</h1>
-  
-  {#if error}
-    <div class="p-4 bg-red-100 text-red-600 rounded mb-4">{error}</div>
-  {/if}
-  
-  <form on:submit|preventDefault={handleSubmit} class="space-y-6">
-    <div>
-      <label class="block text-sm font-medium mb-2">标题</label>
-      <input 
-        type="text" 
-        bind:value={title}
-        class="w-full px-4 py-2 border rounded-lg"
-        placeholder="文章标题"
-      />
-    </div>
+<template>
+  <div class="max-w-3xl mx-auto">
+    <h1 class="text-2xl font-bold mb-6">发布文章</h1>
     
-    <div>
-      <label class="block text-sm font-medium mb-2">摘要</label>
-      <textarea 
-        bind:value={summary}
-        class="w-full px-4 py-2 border rounded-lg"
-        rows="2"
-        placeholder="简短描述"
-      ></textarea>
-    </div>
+    <div v-if="error" class="p-4 bg-red-100 text-red-600 rounded mb-4">{{ error }}</div>
     
-    <div>
-      <label class="block text-sm font-medium mb-2">内容 (Markdown)</label>
-      <textarea 
-        bind:value={content}
-        class="w-full px-4 py-2 border rounded-lg font-mono"
-        rows="15"
-        placeholder="使用 Markdown 格式编写..."
-      ></textarea>
-    </div>
-    
-    <div>
-      <label class="block text-sm font-medium mb-2">封面图片</label>
-      <input 
-        type="file" 
-        accept="image/*"
-        on:change={handleImageChange}
-        class="w-full"
-      />
-    </div>
-    
-    <div>
-      <label class="block text-sm font-medium mb-2">标签（逗号分隔）</label>
-      <input 
-        type="text" 
-        bind:value={tags}
-        class="w-full px-4 py-2 border rounded-lg"
-        placeholder="Web3, 区块链, 教程"
-      />
-    </div>
-    
-    <div class="grid grid-cols-2 gap-4">
+    <form class="space-y-6" @submit.prevent="handleSubmit">
       <div>
-        <label class="block text-sm font-medium mb-2">分类</label>
-        <select bind:value={categoryId} class="w-full px-4 py-2 border rounded-lg">
-          <option value={1n}>技术</option>
-          <option value={2n}>生活</option>
-          <option value={3n}>观点</option>
-        </select>
+        <label class="block text-sm font-medium mb-2">标题</label>
+        <input 
+          v-model="title"
+          type="text" 
+          class="w-full px-4 py-2 border rounded-lg"
+          placeholder="文章标题"
+        />
       </div>
       
       <div>
-        <label class="block text-sm font-medium mb-2">版税比例</label>
-        <select bind:value={royaltyBps} class="w-full px-4 py-2 border rounded-lg">
-          <option value={0n}>0%</option>
-          <option value={250n}>2.5%</option>
-          <option value={500n}>5%</option>
-          <option value={1000n}>10%</option>
-        </select>
+        <label class="block text-sm font-medium mb-2">摘要</label>
+        <textarea 
+          v-model="summary"
+          class="w-full px-4 py-2 border rounded-lg"
+          rows="2"
+          placeholder="简短描述"
+        ></textarea>
       </div>
-    </div>
-    
-    <button 
-      type="submit"
-      class="w-full py-3 bg-blue-600 text-white rounded-lg font-medium disabled:opacity-50"
-      disabled={isPublishing}
-    >
-      {isPublishing ? '发布中...' : '发布文章'}
-    </button>
-  </form>
-</div>
+      
+      <div>
+        <label class="block text-sm font-medium mb-2">内容 (Markdown)</label>
+        <textarea 
+          v-model="content"
+          class="w-full px-4 py-2 border rounded-lg font-mono"
+          rows="15"
+          placeholder="使用 Markdown 格式编写..."
+        ></textarea>
+      </div>
+      
+      <div>
+        <label class="block text-sm font-medium mb-2">封面图片</label>
+        <input 
+          type="file" 
+          accept="image/*"
+          class="w-full"
+          @change="handleImageChange"
+        />
+      </div>
+      
+      <div>
+        <label class="block text-sm font-medium mb-2">标签（逗号分隔）</label>
+        <input 
+          v-model="tags"
+          type="text" 
+          class="w-full px-4 py-2 border rounded-lg"
+          placeholder="Web3, 区块链, 教程"
+        />
+      </div>
+      
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium mb-2">分类</label>
+          <select v-model="categoryId" class="w-full px-4 py-2 border rounded-lg">
+            <option :value="1n">技术</option>
+            <option :value="2n">生活</option>
+            <option :value="3n">观点</option>
+          </select>
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium mb-2">版税比例</label>
+          <select v-model="royaltyBps" class="w-full px-4 py-2 border rounded-lg">
+            <option :value="0n">0%</option>
+            <option :value="250n">2.5%</option>
+            <option :value="500n">5%</option>
+            <option :value="1000n">10%</option>
+          </select>
+        </div>
+      </div>
+      
+      <button 
+        type="submit"
+        class="w-full py-3 bg-blue-600 text-white rounded-lg font-medium disabled:opacity-50"
+        :disabled="isPublishing"
+      >
+        {{ isPublishing ? '发布中...' : '发布文章' }}
+      </button>
+    </form>
+  </div>
+</template>
 ```
 
 ---
@@ -1804,6 +1838,6 @@ cast estimate <CONTRACT> <FUNCTION_SIG> <ARGS> --rpc-url <RPC_URL>
 *最后更新: 2025-11*
 
 **更新日志:**
-- v2.0.0: 完整重构文档结构；新增 SubSquid 索引开发指南（第6-9章）；新增 Irys+Arweave 存储集成指南（第10-12章）；新增 SvelteKit 前端开发指南（第13-16章）；添加项目进度概览
+- v2.0.0: 完整重构文档结构；新增 SubSquid 索引开发指南（第6-9章）；新增 Irys+Arweave 存储集成指南（第10-12章）；新增 Nuxt.js 前端开发指南（第13-16章）；添加项目进度概览
 - v1.2.0: 更新合约地址（BlogHub Proxy: 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9）；更新函数选择器；移除 withdraw/accountBalance 相关功能（打赏现为直接转账）
 - v1.1.0: `publish` 函数新增 `originalAuthor` 参数，支持代发文章记录真实作者
