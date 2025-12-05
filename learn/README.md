@@ -414,3 +414,10 @@ Claude: 修改 contracts\src\BlogHub.sol 新增了title和coverImage字段；执
 #### 2025-12-05 16:55  更新前端等
 doc\Developers.md frontend\app\composables  frontend\app\pages\publish.vue 我对 contracts\src\BlogHub.sol 合约进行了修改，给Article新增了title和coverImage字段，请在上面的几个位置中，查找受影响需要更新的地方进行更新，确保整体协调正确运行  
 Claude：修改了composables和Developers.md
+
+#### 2025-12-05 16:55  解决irys错误
+我点击发布文章，页面出现错误：Error during article publishing: ReferenceError: Buffer is not defined irys.ts:79:9 请帮我定位原因并解决  
+Claude：Irys使用了Node.js的Buffer，浏览器环境中不存在。需安装buffer包。  
+这次遇到了新的错误 Error when uploading image: TypeError: (0 , import_crypto3.randomBytes) is not a function upload.ts:87:19。似乎感觉irys内部是走的node.js逻辑，而非浏览器端逻辑？请帮我检查irys当前安装的依赖版本是否正确，查询官方文档，确认。并搜索相关资料，深入分析具体原因  
+Claude: Irys SDK (irys/web-upload) 内部依赖 Node.js 的 crypto 模块，特别是 randomBytes 函数。在浏览器环境中，这些 Node.js 内置模块不存在，导致运行时错误。安装vite-plugin-node-polyfills解决。  
+开发者：在[irys文档](https://docs.irys.xyz/build/d/irys-in-the-browser)中找到需要安装vite-plugin-node-polyfills等依赖，全部安装。

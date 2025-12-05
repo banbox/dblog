@@ -49,11 +49,7 @@ export async function publishArticle(params: PublishArticleParams): Promise<Publ
 	if (!content.trim()) {
 		throw new Error('Content is required')
 	}
-
-	if (!summary.trim()) {
-		throw new Error('Summary is required')
-	}
-
+	
 	if (categoryId < 0n) {
 		throw new Error('Valid category is required')
 	}

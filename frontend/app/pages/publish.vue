@@ -96,9 +96,6 @@ async function handleSubmit() {
     if (!title.value.trim()) {
       throw new Error(t('field_required', { field: t('title') }))
     }
-    if (!summary.value.trim()) {
-      throw new Error(t('field_required', { field: t('summary') }))
-    }
     if (!content.value.trim()) {
       throw new Error(t('field_required', { field: t('content_markdown') }))
     }
