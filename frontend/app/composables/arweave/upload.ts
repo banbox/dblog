@@ -4,9 +4,14 @@
 import { getIrysUploader, getIrysUploaderDevnet, type IrysUploader } from './irys'
 import type { ArticleMetadata, IrysTag, IrysNetwork } from './types'
 
-// 应用标识
-const APP_NAME = 'DBlog'
-const APP_VERSION = '1.0.0'
+// 从 runtime config 获取应用配置
+function getAppConfig() {
+	const config = useRuntimeConfig()
+	return {
+		appName: config.public.appName,
+		appVersion: config.public.appVersion
+	}
+}
 
 /**
  * 上传文章到 Arweave
@@ -32,9 +37,10 @@ export async function uploadArticleWithUploader(
 	metadata: Omit<ArticleMetadata, 'createdAt' | 'version'>
 ): Promise<string> {
 	// 准备完整数据
+	const { appName, appVersion } = getAppConfig()
 	const fullMetadata: ArticleMetadata = {
 		...metadata,
-		version: APP_VERSION,
+		version: appVersion,
 		createdAt: Date.now()
 	}
 
@@ -43,8 +49,8 @@ export async function uploadArticleWithUploader(
 	// 构建标签（用于 Arweave GraphQL 查询）
 	const tags: IrysTag[] = [
 		{ name: 'Content-Type', value: 'application/json' },
-		{ name: 'App-Name', value: APP_NAME },
-		{ name: 'App-Version', value: APP_VERSION },
+		{ name: 'App-Name', value: appName },
+		{ name: 'App-Version', value: appVersion },
 		{ name: 'Type', value: 'article' },
 		{ name: 'Title', value: metadata.title },
 		...metadata.tags.map((tag) => ({ name: 'Tag', value: tag }))
@@ -77,9 +83,10 @@ export async function uploadImage(file: File, network: IrysNetwork = 'devnet'): 
  * @param file - 图片文件
  */
 export async function uploadImageWithUploader(uploader: IrysUploader, file: File): Promise<string> {
+	const { appName } = getAppConfig()
 	const tags: IrysTag[] = [
 		{ name: 'Content-Type', value: file.type },
-		{ name: 'App-Name', value: APP_NAME },
+		{ name: 'App-Name', value: appName },
 		{ name: 'Type', value: 'image' }
 	]
 
@@ -107,10 +114,11 @@ export async function uploadData(
 	network: IrysNetwork = 'devnet'
 ): Promise<string> {
 	const uploader = network === 'mainnet' ? await getIrysUploader() : await getIrysUploaderDevnet()
+	const { appName } = getAppConfig()
 
 	const tags: IrysTag[] = [
 		{ name: 'Content-Type', value: contentType },
-		{ name: 'App-Name', value: APP_NAME },
+		{ name: 'App-Name', value: appName },
 		...customTags
 	]
 

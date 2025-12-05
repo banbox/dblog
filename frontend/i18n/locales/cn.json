@@ -81,5 +81,16 @@
   "invalid_royalty": "版税必须在 0-100% 之间",
   "invalid_image": "请选择有效的图片文件",
   "image_too_large": "图片文件必须小于 10MB",
-  "publish_failed": "发布失败：{error}"
+  "publish_failed": "发布失败：{error}",
+  "error_user_rejected": "您取消了交易签名",
+  "error_insufficient_funds": "账户余额不足，无法完成交易",
+  "error_network_error": "网络连接出错，请检查网络后重试",
+  "error_contract_reverted": "合约执行失败，请检查输入参数",
+  "error_gas_estimation_failed": "Gas 估算失败，交易可能无法执行",
+  "error_nonce_too_low": "交易 nonce 过低，请稍后重试",
+  "error_replacement_underpriced": "替换交易的 Gas 价格过低",
+  "error_wallet_not_connected": "钱包未连接，请先连接钱包",
+  "error_wrong_network": "网络错误，请切换到正确的网络",
+  "error_timeout": "交易超时，请稍后重试",
+  "error_unknown": "发生未知错误，请稍后重试"
 }

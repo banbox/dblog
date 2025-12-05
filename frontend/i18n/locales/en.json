@@ -81,5 +81,16 @@
   "invalid_royalty": "Royalty must be between 0-100%",
   "invalid_image": "Please select a valid image file",
   "image_too_large": "Image must be smaller than 10MB",
-  "publish_failed": "Failed to publish: {error}"
+  "publish_failed": "Failed to publish: {error}",
+  "error_user_rejected": "You cancelled the transaction",
+  "error_insufficient_funds": "Insufficient funds to complete the transaction",
+  "error_network_error": "Network error, please check your connection and try again",
+  "error_contract_reverted": "Contract execution failed, please check your input",
+  "error_gas_estimation_failed": "Gas estimation failed, transaction may not be executable",
+  "error_nonce_too_low": "Transaction nonce is too low, please try again later",
+  "error_replacement_underpriced": "Replacement transaction gas price is too low",
+  "error_wallet_not_connected": "Wallet not connected, please connect your wallet first",
+  "error_wrong_network": "Wrong network, please switch to the correct network",
+  "error_timeout": "Transaction timed out, please try again later",
+  "error_unknown": "An unknown error occurred, please try again later"
 }

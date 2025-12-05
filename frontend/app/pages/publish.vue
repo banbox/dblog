@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { publishArticle } from '~/composables/publish'
+import { ContractError } from '~/composables/contracts'
 import { CATEGORY_KEYS } from '~/composables/data'
 import type { SelectOption } from '~/components/SearchSelect.vue'
 
@@ -138,8 +139,14 @@ async function handleSubmit() {
     statusMessage.value = t('publish_success', { arweaveId: result.arweaveId, txHash: result.txHash })
   } catch (error) {
     submitStatus.value = 'error'
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    statusMessage.value = t('publish_failed', { error: errorMessage })
+    // Handle ContractError with i18n
+    if (error instanceof ContractError) {
+      const errorKey = `error_${error.code}`
+      statusMessage.value = t(errorKey)
+    } else {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      statusMessage.value = t('publish_failed', { error: errorMessage })
+    }
   } finally {
     isSubmitting.value = false
   }

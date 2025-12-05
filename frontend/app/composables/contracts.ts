@@ -6,6 +6,169 @@
 import { createWalletClient, custom } from 'viem'
 import { optimismSepolia } from 'viem/chains'
 
+/**
+ * Contract error codes for i18n
+ */
+export type ContractErrorCode =
+	| 'user_rejected'
+	| 'insufficient_funds'
+	| 'network_error'
+	| 'contract_reverted'
+	| 'gas_estimation_failed'
+	| 'nonce_too_low'
+	| 'replacement_underpriced'
+	| 'wallet_not_connected'
+	| 'wrong_network'
+	| 'timeout'
+	| 'unknown_error'
+
+/**
+ * Custom error class for contract interactions
+ */
+export class ContractError extends Error {
+	public readonly code: ContractErrorCode
+	public readonly originalError?: Error
+
+	constructor(code: ContractErrorCode, message: string, originalError?: Error) {
+		super(message)
+		this.name = 'ContractError'
+		this.code = code
+		this.originalError = originalError
+	}
+}
+
+/**
+ * Parse error and return a ContractError with appropriate code
+ */
+function parseContractError(error: unknown): ContractError {
+	const errorMessage = error instanceof Error ? error.message : String(error)
+	const lowerMessage = errorMessage.toLowerCase()
+
+	// User rejected transaction
+	if (
+		lowerMessage.includes('user rejected') ||
+		lowerMessage.includes('user denied') ||
+		lowerMessage.includes('rejected the request') ||
+		lowerMessage.includes('user cancelled') ||
+		lowerMessage.includes('user canceled')
+	) {
+		return new ContractError(
+			'user_rejected',
+			'User rejected the transaction.',
+			error instanceof Error ? error : undefined
+		)
+	}
+
+	// Insufficient funds
+	if (
+		lowerMessage.includes('insufficient funds') ||
+		lowerMessage.includes('insufficient balance') ||
+		lowerMessage.includes('not enough balance')
+	) {
+		return new ContractError(
+			'insufficient_funds',
+			'Insufficient funds to complete the transaction.',
+			error instanceof Error ? error : undefined
+		)
+	}
+
+	// Gas estimation failed
+	if (
+		lowerMessage.includes('gas required exceeds') ||
+		lowerMessage.includes('gas estimation') ||
+		lowerMessage.includes('out of gas') ||
+		lowerMessage.includes('intrinsic gas too low')
+	) {
+		return new ContractError(
+			'gas_estimation_failed',
+			'Failed to estimate gas for the transaction.',
+			error instanceof Error ? error : undefined
+		)
+	}
+
+	// Contract reverted
+	if (
+		lowerMessage.includes('revert') ||
+		lowerMessage.includes('execution reverted') ||
+		lowerMessage.includes('transaction failed')
+	) {
+		return new ContractError(
+			'contract_reverted',
+			'The contract reverted the transaction.',
+			error instanceof Error ? error : undefined
+		)
+	}
+
+	// Nonce issues
+	if (lowerMessage.includes('nonce too low') || lowerMessage.includes('nonce has already been used')) {
+		return new ContractError(
+			'nonce_too_low',
+			'Nonce is too low or has already been used.',
+			error instanceof Error ? error : undefined
+		)
+	}
+
+	// Replacement transaction underpriced
+	if (
+		lowerMessage.includes('replacement transaction underpriced') ||
+		lowerMessage.includes('transaction underpriced')
+	) {
+		return new ContractError(
+			'replacement_underpriced',
+			'Replacement transaction is underpriced.',
+			error instanceof Error ? error : undefined
+		)
+	}
+
+	// Network errors
+	if (
+		lowerMessage.includes('network') ||
+		lowerMessage.includes('disconnected') ||
+		lowerMessage.includes('connection') ||
+		lowerMessage.includes('timeout') ||
+		lowerMessage.includes('econnrefused')
+	) {
+		return new ContractError(
+			'network_error',
+			'Network error occurred.',
+			error instanceof Error ? error : undefined
+		)
+	}
+
+	// Wallet not connected
+	if (
+		lowerMessage.includes('no accounts') ||
+		lowerMessage.includes('wallet not connected') ||
+		lowerMessage.includes('not connected')
+	) {
+		return new ContractError(
+			'wallet_not_connected',
+			'Wallet is not connected.',
+			error instanceof Error ? error : undefined
+		)
+	}
+
+	// Wrong network
+	if (
+		lowerMessage.includes('wrong network') ||
+		lowerMessage.includes('chain mismatch') ||
+		lowerMessage.includes('switch') && lowerMessage.includes('chain')
+	) {
+		return new ContractError(
+			'wrong_network',
+			'Wrong network selected.',
+			error instanceof Error ? error : undefined
+		)
+	}
+
+	// Unknown error
+	return new ContractError(
+		'unknown_error',
+		'An unknown error occurred.',
+		error instanceof Error ? error : undefined
+	)
+}
+
 // BlogHub contract ABI (minimal for publish function)
 const BLOGHUB_ABI = [
 	{
@@ -24,8 +187,11 @@ const BLOGHUB_ABI = [
 	}
 ] as const
 
-// BlogHub contract address (Optimism Sepolia testnet)
-const BLOGHUB_CONTRACT_ADDRESS = '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9' as `0x${string}`
+// BlogHub contract address from runtime config
+function getBlogHubContractAddress(): `0x${string}` {
+	const config = useRuntimeConfig()
+	return config.public.blogHubContractAddress as `0x${string}`
+}
 
 /**
  * Get Ethereum account from wallet
@@ -163,7 +329,7 @@ export async function publishToContract(
 
 		// Call publish function
 		const txHash = await walletClient.writeContract({
-			address: BLOGHUB_CONTRACT_ADDRESS,
+			address: getBlogHubContractAddress(),
 			abi: BLOGHUB_ABI,
 			functionName: 'publish',
 			args: [arweaveId, categoryId, royaltyBps, originalAuthor, title, coverImage]
@@ -173,8 +339,6 @@ export async function publishToContract(
 		return txHash
 	} catch (error) {
 		console.error('Error publishing to contract:', error)
-		throw new Error(
-			`Failed to publish to contract: ${error instanceof Error ? error.message : 'Unknown error'}`
-		)
+		throw parseContractError(error)
 	}
 }

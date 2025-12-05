@@ -21,8 +21,14 @@ import { createWalletClient, createPublicClient, custom } from 'viem'
 import { optimismSepolia } from 'viem/chains'
 import type { IrysConfig, IrysNetwork } from './types'
 
-// 默认 RPC URL
-const DEFAULT_RPC_URL = 'https://sepolia.optimism.io'
+// 从 runtime config 获取配置
+function getIrysConfig() {
+	const config = useRuntimeConfig()
+	return {
+		rpcUrl: config.public.rpcUrl,
+		network: config.public.irysNetwork as 'mainnet' | 'devnet'
+	}
+}
 
 // Irys Uploader 类型
 export type IrysUploader = Awaited<ReturnType<typeof createIrysUploader>>
@@ -62,7 +68,7 @@ async function createViemClients() {
  * 创建 Irys Uploader
  * @param config - Irys 配置
  */
-export async function createIrysUploader(config: IrysConfig = { network: 'devnet' }) {
+export async function createIrysUploader(config?: Partial<IrysConfig>) {
 	const { walletClient, publicClient } = await createViemClients()
 
 	// 使用类型断言解决 viem 版本与 @irys/web-upload-ethereum-viem-v2 的类型不兼容问题
@@ -71,8 +77,11 @@ export async function createIrysUploader(config: IrysConfig = { network: 'devnet
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	let builder = WebUploader(WebEthereum).withAdapter(viemAdapter)
 
-	if (config.network === 'devnet') {
-		const rpcUrl = config.rpcUrl || DEFAULT_RPC_URL
+	const runtimeConfig = getIrysConfig()
+	const network = config?.network || runtimeConfig.network
+	const rpcUrl = config?.rpcUrl || runtimeConfig.rpcUrl
+
+	if (network === 'devnet') {
 		builder = builder.withRpc(rpcUrl).devnet()
 	}
 

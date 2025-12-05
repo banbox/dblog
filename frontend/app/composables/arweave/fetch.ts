@@ -3,9 +3,11 @@
  */
 import type { ArticleMetadata } from './types'
 
-// Arweave 网关列表（用于负载均衡和容错）
-// Irys 官方网关优先
-const ARWEAVE_GATEWAYS = ['https://gateway.irys.xyz', 'https://arweave.net', 'https://arweave.dev']
+// 从 runtime config 获取 Arweave 网关列表
+function getArweaveGateways(): string[] {
+	const config = useRuntimeConfig()
+	return config.public.arweaveGateways as string[]
+}
 
 /**
  * 从 Arweave 获取文章内容
@@ -13,7 +15,8 @@ const ARWEAVE_GATEWAYS = ['https://gateway.irys.xyz', 'https://arweave.net', 'ht
  */
 export async function fetchArticleContent(arweaveId: string): Promise<ArticleMetadata> {
 	// 尝试多个网关
-	for (const gateway of ARWEAVE_GATEWAYS) {
+	const gateways = getArweaveGateways()
+	for (const gateway of gateways) {
 		try {
 			const response = await fetch(`${gateway}/${arweaveId}`, {
 				headers: { Accept: 'application/json' }
@@ -35,7 +38,8 @@ export async function fetchArticleContent(arweaveId: string): Promise<ArticleMet
  * @param arweaveId - Arweave 交易 ID
  */
 export function getImageUrl(arweaveId: string): string {
-	return `https://gateway.irys.xyz/${arweaveId}`
+	const gateways = getArweaveGateways()
+	return `${gateways[0]}/${arweaveId}`
 }
 
 /**
@@ -43,8 +47,10 @@ export function getImageUrl(arweaveId: string): string {
  * @param arweaveId - Arweave 交易 ID
  * @param gateway - 指定网关（可选）
  */
-export function getArweaveUrl(arweaveId: string, gateway: string = ARWEAVE_GATEWAYS[0]): string {
-	return `${gateway}/${arweaveId}`
+export function getArweaveUrl(arweaveId: string, gateway?: string): string {
+	const gateways = getArweaveGateways()
+	const selectedGateway = gateway || gateways[0]
+	return `${selectedGateway}/${arweaveId}`
 }
 
 /**
@@ -52,7 +58,8 @@ export function getArweaveUrl(arweaveId: string, gateway: string = ARWEAVE_GATEW
  * @param arweaveId - Arweave 交易 ID
  */
 export async function fetchRawContent(arweaveId: string): Promise<ArrayBuffer> {
-	for (const gateway of ARWEAVE_GATEWAYS) {
+	const gateways = getArweaveGateways()
+	for (const gateway of gateways) {
 		try {
 			const response = await fetch(`${gateway}/${arweaveId}`)
 
@@ -72,7 +79,8 @@ export async function fetchRawContent(arweaveId: string): Promise<ArrayBuffer> {
  * @param arweaveId - Arweave 交易 ID
  */
 export async function fetchTextContent(arweaveId: string): Promise<string> {
-	for (const gateway of ARWEAVE_GATEWAYS) {
+	const gateways = getArweaveGateways()
+	for (const gateway of gateways) {
 		try {
 			const response = await fetch(`${gateway}/${arweaveId}`)
 
@@ -92,7 +100,8 @@ export async function fetchTextContent(arweaveId: string): Promise<string> {
  * @param arweaveId - Arweave 交易 ID
  */
 export async function checkContentExists(arweaveId: string): Promise<boolean> {
-	for (const gateway of ARWEAVE_GATEWAYS) {
+	const gateways = getArweaveGateways()
+	for (const gateway of gateways) {
 		try {
 			const response = await fetch(`${gateway}/${arweaveId}`, {
 				method: 'HEAD'

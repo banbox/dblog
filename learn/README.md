@@ -443,3 +443,12 @@ Claude: 在 contracts.ts 的 getWalletClient() 函数中，创建 walletClient �
 Error: Failed to publish to contract: The current chain of the wallet (id: 1) does not match the target chain for the transaction (id: 11155420 – OP Sepolia).
 又遇到了上面错误，似乎是钱包的网络和当前dapp要求网络不匹配导致的。一般如何解决这个问题？是否有最佳实践？比如能通过viem修改钱包当前激活的网络吗？  
 Claude: 最佳实践是交易前自动请求切换网络。已添加对应逻辑到 frontend\app\composables\contracts.ts
+
+#### 2025-12-05 19:50  错误信息改善 
+合约调用过程中可能遇到很多错误，上面是其中一种；目前是直接把上面的错误信息展示给用户了，这样并不直观；请针对常见的各种可能返回的错误，进行区分，并显示为可读友好的信息  
+Claude: 提取了十多个常见错误。
+
+#### 2025-12-05 20:10  配置集中维护
+frontend\app\composables\contracts.ts 的191行和 frontend\app\composables\arweave 的一些文件，这些都是代码中硬编码的配置，不方便长期维护。当前项目使用nuxt.js，请根据nuxt.js的最佳实践，帮我在frontend的某个地方集中维护前端的所有必要配置  
+Claude: 集中到nuxt.config.ts中维护。
+
