@@ -1,13 +1,26 @@
 <script setup lang="ts">
 import { publishArticle } from '~/composables/publish'
+import { CATEGORY_KEYS } from '~/composables/data'
+import type { SelectOption } from '~/components/SearchSelect.vue'
 
 const { t } = useI18n()
+
+// Category options for SearchSelect
+const categoryOptions = computed<SelectOption[]>(() => {
+  return CATEGORY_KEYS.map((key, index) => ({
+    key,
+    label: t(key),
+    value: BigInt(index)
+  }))
+})
+
+// Selected category value (null means no selection)
+const selectedCategory = ref<bigint | null>(null)
 
 // Form state
 const title = ref('')
 const summary = ref('')
-const category = ref('')
-const categoryId = ref<bigint>(0n)
+const categoryId = computed(() => selectedCategory.value ?? 0n)
 const author = ref('')
 const content = ref('')
 const postscript = ref('')
@@ -60,8 +73,7 @@ function removeCoverImage() {
 function resetForm() {
   title.value = ''
   summary.value = ''
-  category.value = ''
-  categoryId.value = 0n
+  selectedCategory.value = null
   author.value = ''
   content.value = ''
   postscript.value = ''
@@ -70,12 +82,6 @@ function resetForm() {
   isSubmitting.value = false
   submitStatus.value = 'idle'
   statusMessage.value = ''
-}
-
-// Handle category ID input
-function handleCategoryIdChange(e: Event) {
-  const target = e.target as HTMLInputElement
-  categoryId.value = BigInt(target.value || '0')
 }
 
 // Handle royalty input
@@ -113,11 +119,9 @@ async function handleSubmit() {
       throw new Error(t('invalid_royalty'))
     }
 
-    // Parse tags from category field
-    const tags = category.value
-      .split(',')
-      .map((tag) => tag.trim())
-      .filter(Boolean)
+    // Use selected category as tag
+    const selectedKey = CATEGORY_KEYS[Number(categoryId.value)]
+    const tags = selectedKey ? [t(selectedKey)] : []
 
     // Combine content with postscript if provided
     const fullContent = postscript.value.trim()
@@ -210,52 +214,18 @@ const statusClass = computed(() => {
           />
         </div>
 
-        <!-- Summary -->
-        <div>
-          <label for="summary" class="mb-2 block text-sm font-medium text-gray-700">
-            {{ $t('summary') }} *
-          </label>
-          <input
-            id="summary"
-            v-model="summary"
-            type="text"
-            :placeholder="$t('describe_content')"
-            class="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-base text-gray-900 placeholder-gray-400 transition-colors focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-300"
-            :disabled="isSubmitting"
-          />
-        </div>
-
         <!-- Category -->
         <div>
-          <label for="category" class="mb-2 block text-sm font-medium text-gray-700">
-            {{ $t('category_comma_separated') }}
+          <label class="mb-2 block text-sm font-medium text-gray-700">
+            {{ $t('category') }} *
           </label>
-          <input
-            id="category"
-            v-model="category"
-            type="text"
-            :placeholder="$t('category_example')"
-            class="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-base text-gray-900 placeholder-gray-400 transition-colors focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-300"
+          <SearchSelect
+            v-model="selectedCategory"
+            :options="categoryOptions"
+            :placeholder="$t('search_category')"
             :disabled="isSubmitting"
+            :no-results-text="$t('no_results')"
           />
-        </div>
-
-        <!-- Category ID -->
-        <div>
-          <label for="categoryId" class="mb-2 block text-sm font-medium text-gray-700">
-            {{ $t('category_id_contract') }} *
-          </label>
-          <input
-            id="categoryId"
-            type="number"
-            :value="Number(categoryId)"
-            placeholder="0"
-            min="0"
-            class="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-base text-gray-900 placeholder-gray-400 transition-colors focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-300"
-            :disabled="isSubmitting"
-            @change="handleCategoryIdChange"
-          />
-          <p class="mt-1 text-xs text-gray-500">{{ $t('category_id_help') }}</p>
         </div>
 
         <!-- Author -->

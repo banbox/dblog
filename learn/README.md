@@ -382,3 +382,15 @@ Claude：实现了对应vue版本的publish页面，但样式失效
 
 #### 2025-12-05 14:20 配置@nuxt/ui
 参考[文档](https://ui.nuxt.com/docs/getting-started/installation/nuxt)配置`app/assets/css/main.css`和`nuxt.config.ts`和`app.vue`重启后样式恢复
+
+#### 2025-12-05 14:40 多语言key优化
+frontend/AGENTS.md 当前的多语言部分并未遵循给定的要求，请阅读 frontend\i18n\locales\cn.json 和使用的页面 frontend\app\pages\publish.vue 了解需要用到的所有字段，然后根据要求，对多语言字段的key和内容进行重构，确保减少冗余信息，方便维护  
+Claude：重新整理多语言key，更易维护。
+
+#### 2025-12-05 15:30 文章分类维护
+帮我在 frontend\app\composables 新增一个data.ts用于维护各种固定数据；然后在其中先维护一些文章分类的key，思考各种文章和新闻等一般可以分为哪些分类，覆盖应该足够全；然后把所有分类都维护到多语言文件中，在data.ts中只维护分类的key（数组形式），第一个分类应当是“其他”；然后在frontend\app\pages\publish.vue中导入分类枚举，在用户设置分类的组件处，应当使用可输入搜索的多选组件；只可选择一个；在分类数组中的索引。 @AGENTS.md  
+Claude: 创建了`frontend\app\composables\data.ts`文件，更新了2个多语言文件，更新了publish页面
+
+#### 2025-12-05 15:50 分类组件提取为可搜索单选
+frontend\app\pages\publish.vue 帮我把247行开始的分类部分，提取为一个通用的搜索下拉选择组件；各项数据和回调函数可传入；当前搜索了没结果，无法取消选择，同时帮我修复。  
+Claude: 创建`frontend\app\components\SearchSelect.vue`
