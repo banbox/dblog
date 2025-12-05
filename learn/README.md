@@ -421,3 +421,25 @@ Claude：Irys使用了Node.js的Buffer，浏览器环境中不存在。需安装
 这次遇到了新的错误 Error when uploading image: TypeError: (0 , import_crypto3.randomBytes) is not a function upload.ts:87:19。似乎感觉irys内部是走的node.js逻辑，而非浏览器端逻辑？请帮我检查irys当前安装的依赖版本是否正确，查询官方文档，确认。并搜索相关资料，深入分析具体原因  
 Claude: Irys SDK (irys/web-upload) 内部依赖 Node.js 的 crypto 模块，特别是 randomBytes 函数。在浏览器环境中，这些 Node.js 内置模块不存在，导致运行时错误。安装vite-plugin-node-polyfills解决。  
 开发者：在[irys文档](https://docs.irys.xyz/build/d/irys-in-the-browser)中找到需要安装vite-plugin-node-polyfills等依赖，全部安装。
+
+#### 2025-12-05 17:50  解决上传是viem错误
+```log
+Error publishing to contract: AccountNotFoundError: Could not find an Account to execute with this Action.
+Please provide an Account with the account argument on the Action, or by supplying an account to the Client.
+Docs: https://viem.sh/docs/contract/writeContract#account
+Version: viem@2.41.2
+    at writeContract.internal (viem.js?v=42760433:2232:13)
+    at writeContract (viem.js?v=42760433:2226:24)
+    at Object.writeContract (viem.js?v=42760433:13480:30)
+    at publishToContract (contracts.ts:91:37)
+    at async publishArticle (publish.ts:85:18)
+    at async handleSubmit (publish.vue:125:20)
+```
+我点击发布文章后，唤起了浏览器Metamask，进行了2次签名，然后出现了这个错误，请帮我分析问题原因，搜索相关资料，进行解决  
+Claude: 在 contracts.ts 的 getWalletClient() 函数中，创建 walletClient 时没有传入 account 参数。已解决  
+开发者：在frontend\app\composables\contracts.ts中替换BLOGHUB_CONTRACT_ADDRESS为合约地址，重新提交  
+
+#### 2025-12-05 18:10  解决Metamask网络与dapp要求网络不一致
+Error: Failed to publish to contract: The current chain of the wallet (id: 1) does not match the target chain for the transaction (id: 11155420 – OP Sepolia).
+又遇到了上面错误，似乎是钱包的网络和当前dapp要求网络不匹配导致的。一般如何解决这个问题？是否有最佳实践？比如能通过viem修改钱包当前激活的网络吗？  
+Claude: 最佳实践是交易前自动请求切换网络。已添加对应逻辑到 frontend\app\composables\contracts.ts

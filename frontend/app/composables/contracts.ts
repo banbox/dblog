@@ -25,8 +25,76 @@ const BLOGHUB_ABI = [
 ] as const
 
 // BlogHub contract address (Optimism Sepolia testnet)
-// TODO: Replace with your actual contract address
-const BLOGHUB_CONTRACT_ADDRESS = '0x' as `0x${string}`
+const BLOGHUB_CONTRACT_ADDRESS = '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9' as `0x${string}`
+
+/**
+ * Get Ethereum account from wallet
+ */
+async function getEthereumAccount(): Promise<`0x${string}`> {
+	if (typeof window === 'undefined' || !window.ethereum) {
+		throw new Error('Ethereum provider not found. Please install MetaMask or another wallet.')
+	}
+	const accounts = (await window.ethereum.request({ method: 'eth_requestAccounts' })) as `0x${string}`[]
+	const account = accounts?.[0]
+	if (!account) {
+		throw new Error('No accounts found. Please connect your wallet.')
+	}
+	return account
+}
+
+/**
+ * Ensure wallet is connected to the correct chain, switch if necessary
+ */
+async function ensureCorrectChain(): Promise<void> {
+	if (typeof window === 'undefined' || !window.ethereum) {
+		throw new Error('Ethereum provider not found. Please install MetaMask or another wallet.')
+	}
+
+	const targetChainId = optimismSepolia.id
+	const targetChainIdHex = `0x${targetChainId.toString(16)}`
+
+	try {
+		// Get current chain ID
+		const currentChainIdHex = (await window.ethereum.request({ method: 'eth_chainId' })) as string
+		const currentChainId = parseInt(currentChainIdHex, 16)
+
+		if (currentChainId === targetChainId) {
+			return // Already on correct chain
+		}
+
+		console.log(`Switching from chain ${currentChainId} to ${targetChainId} (${optimismSepolia.name})`)
+
+		// Try to switch to the target chain
+		try {
+			await window.ethereum.request({
+				method: 'wallet_switchEthereumChain',
+				params: [{ chainId: targetChainIdHex }]
+			})
+		} catch (switchError: unknown) {
+			// Chain not added to wallet, try to add it
+			if ((switchError as { code?: number })?.code === 4902) {
+				await window.ethereum.request({
+					method: 'wallet_addEthereumChain',
+					params: [
+						{
+							chainId: targetChainIdHex,
+							chainName: optimismSepolia.name,
+							nativeCurrency: optimismSepolia.nativeCurrency,
+							rpcUrls: [optimismSepolia.rpcUrls.default.http[0]],
+							blockExplorerUrls: [optimismSepolia.blockExplorers?.default.url]
+						}
+					]
+				})
+			} else {
+				throw switchError
+			}
+		}
+	} catch (error) {
+		throw new Error(
+			`Failed to switch to ${optimismSepolia.name}: ${error instanceof Error ? error.message : 'User rejected or unknown error'}`
+		)
+	}
+}
 
 /**
  * Get wallet client for contract interaction
@@ -36,7 +104,13 @@ async function getWalletClient() {
 		throw new Error('Ethereum provider not found. Please install MetaMask or another wallet.')
 	}
 
+	// Ensure we're on the correct chain before creating client
+	await ensureCorrectChain()
+
+	const account = await getEthereumAccount()
+
 	return createWalletClient({
+		account,
 		chain: optimismSepolia,
 		transport: custom(window.ethereum)
 	})
