@@ -119,5 +119,17 @@
 	"retry": "重试",
 	"no_articles": "暂无文章",
 	"be_first_to_publish": "成为第一个发布者！",
-	"no_more_articles": "没有更多文章了"
+	"no_more_articles": "没有更多文章了",
+	"back_to_home": "返回首页",
+	"loading_content": "加载内容中...",
+	"no_content": "暂无内容",
+	"view_on_arweave": "在 Arweave 上查看",
+	"published_by": "发布者",
+	"min_read": "分钟阅读",
+	"likes": "喜欢",
+	"share": "分享",
+	"link_copied": "链接已复制！",
+	"article_id": "文章 ID",
+	"block": "区块",
+	"transaction": "交易"
 }

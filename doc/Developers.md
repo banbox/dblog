@@ -687,103 +687,32 @@ Irys 有两个 Bundler 网络：
 
 > 📁 **实现文件**: [frontend/src/lib/arweave/fetch.ts](../frontend/src/lib/arweave/fetch.ts)
 
-```typescript
-// frontend/src/lib/arweave/fetch.ts
-import { getArweaveGateways } from '$lib/config';
-import type { ArticleMetadata } from './types';
+提供以下函数：
+- `fetchArticleContent(arweaveId)` - 获取文章 JSON 内容
+- `getImageUrl(arweaveId)` - 获取图片 URL
+- `getArweaveUrl(arweaveId, gateway?)` - 获取 Arweave 内容 URL
+- `fetchRawContent(arweaveId)` - 获取原始二进制数据
+- `fetchTextContent(arweaveId)` - 获取文本内容
+- `checkContentExists(arweaveId)` - 检查内容是否存在
 
-// 从 Arweave 获取文章内容
-export async function fetchArticleContent(arweaveId: string): Promise<ArticleMetadata> {
-  const gateways = getArweaveGateways();
-  
-  for (const gateway of gateways) {
-    try {
-      const response = await fetch(`${gateway}/${arweaveId}`);
-      if (response.ok) {
-        return await response.json();
-      }
-    } catch (error) {
-      console.warn(`Failed to fetch from ${gateway}:`, error);
-    }
-  }
-  
-  throw new Error('Failed to fetch article from all gateways');
-}
-
-// 获取图片 URL
-export function getImageUrl(arweaveId: string): string {
-  const gateways = getArweaveGateways();
-  return `${gateways[0]}/${arweaveId}`;
-}
-```
+所有函数支持多网关自动切换容错。
 
 ### 12.2 客户端缓存策略
 
 > 📁 **实现文件**: [frontend/src/lib/arweave/cache.ts](../frontend/src/lib/arweave/cache.ts)
 
-```typescript
-// frontend/src/lib/arweave/cache.ts
-import { browser } from '$app/environment';
-import { fetchArticleContent } from './fetch';
-import type { ArticleMetadata, CachedArticle } from './types';
-
-const CACHE_PREFIX = 'dblog_article_';
-const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
-
-export function getCachedArticle(arweaveId: string): ArticleMetadata | null {
-  if (!browser) return null;
-  
-  const cached = localStorage.getItem(CACHE_PREFIX + arweaveId);
-  if (!cached) return null;
-  
-  const data: CachedArticle = JSON.parse(cached);
-  if (Date.now() - data.cachedAt > CACHE_DURATION) {
-    localStorage.removeItem(CACHE_PREFIX + arweaveId);
-    return null;
-  }
-  
-  return data.article;
-}
-
-export async function getArticleWithCache(arweaveId: string): Promise<ArticleMetadata> {
-  const cached = getCachedArticle(arweaveId);
-  if (cached) return cached;
-  
-  const article = await fetchArticleContent(arweaveId);
-  setCachedArticle(arweaveId, article);
-  return article;
-}
-```
+基于 localStorage 的缓存策略，24 小时 TTL：
+- `getCachedArticle(arweaveId)` - 从缓存获取
+- `setCachedArticle(arweaveId, data)` - 存入缓存
+- `getArticleWithCache(arweaveId, forceRefresh?)` - 带缓存的获取
+- `getArticlesWithCache(arweaveIds)` - 批量获取（并行）
+- `clearAllCache()` / `clearOldCache()` - 清理缓存
 
 ### 12.3 模块导出索引
 
 > 📁 **实现文件**: [frontend/src/lib/arweave/index.ts](../frontend/src/lib/arweave/index.ts)
 
-```typescript
-// frontend/src/lib/arweave/index.ts
-// 类型导出
-export type {
-  ArticleMetadata,
-  ArticleBundle,
-  IrysTag,
-  UploadReceipt,
-  CachedArticle,
-  IrysNetwork,
-  IrysConfig
-} from './types';
-
-// Irys 客户端
-export { createIrysUploader, getIrysBalance, fundIrys, getUploadPrice } from './irys';
-
-// 上传功能
-export { uploadArticle, uploadImage, uploadData } from './upload';
-
-// 获取内容
-export { fetchArticleContent, getImageUrl, getArweaveUrl, checkContentExists } from './fetch';
-
-// 缓存功能
-export { getCachedArticle, setCachedArticle, getArticleWithCache, clearAllCache } from './cache';
-```
+统一导出 Arweave 模块的所有类型和函数。
 
 ---
 
@@ -845,6 +774,9 @@ frontend/
 │   ├── routes/               # 页面路由
 │   │   ├── +layout.svelte    # 全局布局
 │   │   ├── +page.svelte      # 首页
+│   │   ├── a/[id]/           # 文章详情页 (/a/1, /a/2, ...)
+│   │   │   ├── +page.ts      # 数据加载
+│   │   │   └── +page.svelte  # 页面组件
 │   │   └── publish/
 │   │       └── +page.svelte  # 发布文章页
 │   ├── app.html              # HTML 模板
@@ -892,104 +824,16 @@ SvelteKit 前端使用 viem 直接与钱包和合约交互，无需 wagmi 封装
 
 > 📁 **实现文件**: [frontend/src/lib/config.ts](../frontend/src/lib/config.ts)
 
-```typescript
-// frontend/src/lib/config.ts
-const defaults = {
-  blogHubContractAddress: '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9' as `0x${string}`,
-  sessionKeyManagerAddress: '0x0000000000000000000000000000000000000000' as `0x${string}`,
-  rpcUrl: 'https://sepolia.optimism.io',
-  irysNetwork: 'devnet' as 'mainnet' | 'devnet',
-  appName: 'DBlog',
-  appVersion: '1.0.0',
-  arweaveGateways: ['https://gateway.irys.xyz', 'https://arweave.net', 'https://arweave.dev']
-};
-
-export function getBlogHubContractAddress(): `0x${string}` {
-  return getConfig().blogHubContractAddress;
-}
-
-export function getSessionKeyManagerAddress(): `0x${string}` {
-  return getConfig().sessionKeyManagerAddress;
-}
-```
+通过环境变量配置，提供以下 getter 函数：
+- `getBlogHubContractAddress()` - BlogHub 合约地址
+- `getSessionKeyManagerAddress()` - SessionKeyManager 合约地址
+- `getRpcUrl()` - RPC URL
+- `getIrysNetwork()` - Irys 网络（mainnet/devnet）
+- `getArweaveGateways()` - Arweave 网关列表
 
 ### 14.2 钱包连接组件
 
 > 📁 **实现文件**: [frontend/src/lib/components/WalletButton.svelte](../frontend/src/lib/components/WalletButton.svelte)
-
-```svelte
-<!-- frontend/src/lib/components/WalletButton.svelte -->
-<script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
-  import { optimismSepolia } from 'viem/chains';
-  import * as m from '$lib/paraglide/messages';
-
-  let address = $state<string | undefined>();
-  let isConnected = $state(false);
-  let isLoading = $state(false);
-
-  let displayAddress = $derived(
-    address ? `${address.slice(0, 6)}...${address.slice(-4)}` : ''
-  );
-
-  async function handleConnect() {
-    if (typeof window === 'undefined' || !window.ethereum) {
-      alert('Please install MetaMask or another Ethereum wallet');
-      return;
-    }
-
-    isLoading = true;
-    try {
-      const accounts = await window.ethereum.request({
-        method: 'eth_requestAccounts'
-      }) as string[];
-      if (accounts.length > 0) {
-        address = accounts[0];
-        isConnected = true;
-      }
-      await ensureCorrectChain();
-    } catch (error) {
-      console.error('Failed to connect:', error);
-    } finally {
-      isLoading = false;
-    }
-  }
-
-  async function ensureCorrectChain() {
-    const targetChainIdHex = `0x${optimismSepolia.id.toString(16)}`;
-    try {
-      await window.ethereum.request({
-        method: 'wallet_switchEthereumChain',
-        params: [{ chainId: targetChainIdHex }]
-      });
-    } catch (switchError: unknown) {
-      if ((switchError as { code?: number })?.code === 4902) {
-        await window.ethereum.request({
-          method: 'wallet_addEthereumChain',
-          params: [{
-            chainId: targetChainIdHex,
-            chainName: optimismSepolia.name,
-            nativeCurrency: optimismSepolia.nativeCurrency,
-            rpcUrls: [optimismSepolia.rpcUrls.default.http[0]],
-            blockExplorerUrls: [optimismSepolia.blockExplorers?.default.url]
-          }]
-        });
-      }
-    }
-  }
-</script>
-
-{#if isConnected}
-  <button class="..." onclick={handleDisconnect}>
-    <span class="h-2 w-2 rounded-full bg-green-400"></span>
-    {displayAddress}
-  </button>
-{:else}
-  <button class="..." disabled={isLoading} onclick={handleConnect}>
-    {isLoading ? '...' : m.connect_wallet()}
-  </button>
-{/if}
-```
 
 功能：
 - 连接/断开钱包
@@ -1001,46 +845,6 @@ export function getSessionKeyManagerAddress(): `0x${string}` {
 ### 14.3 合约交互封装
 
 > 📁 **实现文件**: [frontend/src/lib/contracts.ts](../frontend/src/lib/contracts.ts)
-
-```typescript
-// frontend/src/lib/contracts.ts
-import { createWalletClient, createPublicClient, custom, http } from 'viem';
-import { optimismSepolia } from 'viem/chains';
-import { getBlogHubContractAddress } from '$lib/config';
-
-// 获取钱包客户端
-async function getWalletClient() {
-  if (typeof window === 'undefined' || !window.ethereum) {
-    throw new Error('Ethereum provider not found');
-  }
-  await ensureCorrectChain();
-  const account = await getEthereumAccount();
-  return createWalletClient({
-    account,
-    chain: optimismSepolia,
-    transport: custom(window.ethereum)
-  });
-}
-
-// 发布文章到合约
-export async function publishToContract(
-  arweaveId: string,
-  categoryId: bigint,
-  royaltyBps: bigint,
-  originalAuthor: string = '',
-  title: string = '',
-  coverImage: string = ''
-): Promise<string> {
-  const walletClient = await getWalletClient();
-  const txHash = await walletClient.writeContract({
-    address: getBlogHubContractAddress(),
-    abi: BLOGHUB_ABI,
-    functionName: 'publish',
-    args: [arweaveId, categoryId, royaltyBps, originalAuthor, title, coverImage]
-  });
-  return txHash;
-}
-```
 
 包含以下功能：
 - `publishToContract()` - 发布文章到合约
@@ -1060,72 +864,6 @@ Session Key 允许用户授权临时密钥执行特定操作，实现无感交�
 ### 15.1 Session Key 管理
 
 > 📁 **实现文件**: [frontend/src/lib/sessionKey.ts](../frontend/src/lib/sessionKey.ts)
-
-```typescript
-// frontend/src/lib/sessionKey.ts
-import { createWalletClient, custom } from 'viem';
-import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
-import { optimismSepolia } from 'viem/chains';
-import { browser } from '$app/environment';
-
-const SESSION_KEY_STORAGE = 'dblog_session_key';
-const SESSION_KEY_DURATION = 7 * 24 * 60 * 60; // 7 days
-
-export interface StoredSessionKey {
-  address: string;
-  privateKey: string;
-  owner: string;
-  validUntil: number;
-}
-
-// 获取存储的 Session Key
-export function getStoredSessionKey(): StoredSessionKey | null {
-  if (!browser) return null;
-  const stored = localStorage.getItem(SESSION_KEY_STORAGE);
-  if (!stored) return null;
-  
-  const data: StoredSessionKey = JSON.parse(stored);
-  if (Date.now() / 1000 > data.validUntil) {
-    localStorage.removeItem(SESSION_KEY_STORAGE);
-    return null;
-  }
-  return data;
-}
-
-// 生成并注册新的 Session Key
-export async function createSessionKey(): Promise<StoredSessionKey> {
-  const account = await getEthereumAccount();
-  const privateKey = generatePrivateKey();
-  const sessionKeyAccount = privateKeyToAccount(privateKey);
-  
-  const validAfter = Math.floor(Date.now() / 1000);
-  const validUntil = validAfter + SESSION_KEY_DURATION;
-  
-  const walletClient = await getWalletClient();
-  await walletClient.writeContract({
-    address: getSessionKeyManagerAddress(),
-    abi: SESSION_KEY_MANAGER_ABI,
-    functionName: 'registerSessionKey',
-    args: [
-      sessionKeyAccount.address,
-      validAfter,
-      validUntil,
-      getBlogHubContractAddress(),
-      ALLOWED_SELECTORS,
-      DEFAULT_SPENDING_LIMIT
-    ]
-  });
-  
-  const sessionKeyData: StoredSessionKey = {
-    address: sessionKeyAccount.address,
-    privateKey: privateKey,
-    owner: account,
-    validUntil
-  };
-  localStorage.setItem(SESSION_KEY_STORAGE, JSON.stringify(sessionKeyData));
-  return sessionKeyData;
-}
-```
 
 包含以下功能：
 - `StoredSessionKey` - Session Key 数据结构接口
@@ -1158,58 +896,6 @@ const DEFAULT_SPENDING_LIMIT = BigInt('10000000000000000000');
 
 > 📁 **实现文件**: [frontend/src/routes/+layout.svelte](../frontend/src/routes/+layout.svelte)
 
-```svelte
-<!-- frontend/src/routes/+layout.svelte -->
-<script lang="ts">
-  import './layout.css';
-  import WalletButton from '$lib/components/WalletButton.svelte';
-  import * as m from '$lib/paraglide/messages';
-  import { page } from '$app/state';
-  import { locales, getLocale, localizeHref } from '$lib/paraglide/runtime';
-
-  let { children } = $props();
-</script>
-
-<div class="flex min-h-screen flex-col bg-gray-50">
-  <!-- Header -->
-  <header class="sticky top-0 z-50 border-b border-gray-200 bg-white/80 backdrop-blur-sm">
-    <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
-      <a href="/" class="flex items-center gap-2">
-        <span class="text-xl font-bold text-gray-900">DBlog</span>
-      </a>
-
-      <div class="flex items-center gap-4">
-        <!-- Language Switcher -->
-        <div class="flex items-center gap-1 rounded-lg bg-gray-100 p-1">
-          {#each locales as locale}
-            <a
-              href={localizeHref(page.url.pathname, { locale })}
-              class="rounded-md px-3 py-1.5 text-sm font-medium"
-              class:bg-white={getLocale() === locale}
-            >
-              {locale === 'en-us' ? 'EN' : '中'}
-            </a>
-          {/each}
-        </div>
-        <WalletButton />
-      </div>
-    </div>
-  </header>
-
-  <!-- Main Content -->
-  <main class="flex-1">
-    {@render children()}
-  </main>
-
-  <!-- Footer -->
-  <footer class="border-t border-gray-200 bg-white">
-    <div class="mx-auto max-w-7xl px-4 py-8 text-center text-gray-500">
-      {m.tagline()} | Powered by Optimism + Arweave
-    </div>
-  </footer>
-</div>
-```
-
 功能：
 - 响应式布局，支持移动端
 - 粘性导航栏带模糊背景
@@ -1219,130 +905,6 @@ const DEFAULT_SPENDING_LIMIT = BigInt('10000000000000000000');
 ### 16.2 发布文章页面
 
 > 📁 **实现文件**: [frontend/src/routes/publish/+page.svelte](../frontend/src/routes/publish/+page.svelte)
-
-```svelte
-<!-- frontend/src/routes/publish/+page.svelte -->
-<script lang="ts">
-  import * as m from '$lib/paraglide/messages';
-  import { publishArticle } from '$lib/publish';
-  import { ContractError } from '$lib/contracts';
-  import { CATEGORY_KEYS } from '$lib/data';
-  import SearchSelect from '$lib/components/SearchSelect.svelte';
-
-  // Form state using Svelte 5 runes
-  let title = $state('');
-  let summary = $state('');
-  let content = $state('');
-  let selectedCategory = $state<bigint | null>(null);
-  let coverImageFile = $state<File | null>(null);
-  let coverImagePreview = $state<string | null>(null);
-  let royaltyBps = $state<bigint>(500n);
-
-  // Submit state
-  let isSubmitting = $state(false);
-  let submitStatus = $state<'idle' | 'uploading' | 'success' | 'error'>('idle');
-  let statusMessage = $state('');
-
-  // Handle form submission
-  async function handleSubmit() {
-    if (isSubmitting) return;
-    
-    try {
-      isSubmitting = true;
-      submitStatus = 'uploading';
-      statusMessage = m.uploading_to_arweave();
-
-      const result = await publishArticle({
-        title: title.trim(),
-        summary: summary.trim(),
-        content: content.trim(),
-        tags: [],
-        coverImage: coverImageFile,
-        categoryId: selectedCategory ?? 0n,
-        royaltyBps: royaltyBps
-      });
-
-      submitStatus = 'success';
-      statusMessage = m.publish_success({ 
-        arweaveId: result.arweaveId, 
-        txHash: result.txHash 
-      });
-    } catch (error) {
-      submitStatus = 'error';
-      if (error instanceof ContractError) {
-        statusMessage = m[`error_${error.code}`]?.() ?? error.message;
-      } else {
-        statusMessage = m.publish_failed({ 
-          error: error instanceof Error ? error.message : String(error) 
-        });
-      }
-    } finally {
-      isSubmitting = false;
-    }
-  }
-</script>
-
-<div class="min-h-screen bg-white">
-  <div class="mx-auto max-w-3xl px-6 py-12">
-    <header class="mb-12">
-      <h1 class="mb-2 text-4xl font-light">{m.publish_article()}</h1>
-      <p class="text-gray-500">{m.share_thoughts()}</p>
-    </header>
-
-    <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }} class="space-y-8">
-      <!-- Title -->
-      <div>
-        <label for="title" class="mb-2 block text-sm font-medium">
-          {m.title()} *
-        </label>
-        <input
-          id="title"
-          bind:value={title}
-          type="text"
-          placeholder={m.input_article_title()}
-          class="w-full rounded-lg border px-4 py-3"
-          disabled={isSubmitting}
-        />
-      </div>
-
-      <!-- Content (Markdown) -->
-      <div>
-        <label for="content" class="mb-2 block text-sm font-medium">
-          {m.content()} ({m.markdown_supported()}) *
-        </label>
-        <textarea
-          id="content"
-          bind:value={content}
-          placeholder={m.write_article_here()}
-          rows="12"
-          class="w-full rounded-lg border px-4 py-3 font-mono text-sm"
-          disabled={isSubmitting}
-        ></textarea>
-      </div>
-
-      <!-- Status Message -->
-      {#if submitStatus !== 'idle'}
-        <div class="rounded-lg px-4 py-3 text-sm"
-          class:bg-green-50={submitStatus === 'success'}
-          class:bg-red-50={submitStatus === 'error'}
-          class:bg-blue-50={submitStatus === 'uploading'}
-        >
-          {statusMessage}
-        </div>
-      {/if}
-
-      <!-- Submit Button -->
-      <button
-        type="submit"
-        disabled={isSubmitting}
-        class="w-full rounded-lg bg-gray-900 px-6 py-3 font-medium text-white disabled:opacity-50"
-      >
-        {isSubmitting ? m.uploading_to_arweave() : m.publish_article()}
-      </button>
-    </form>
-  </div>
-</div>
-```
 
 功能：
 - 使用 Svelte 5 runes (`$state`, `$derived`) 管理表单状态
@@ -1357,53 +919,37 @@ const DEFAULT_SPENDING_LIMIT = BigInt('10000000000000000000');
 
 > 📁 **实现文件**: [frontend/src/lib/publish.ts](../frontend/src/lib/publish.ts)
 
-```typescript
-// frontend/src/lib/publish.ts
-import { uploadArticle, uploadImage } from '$lib/arweave';
-import { publishToContract } from '$lib/contracts';
+发布流程分三步：
+1. 上传封面图片到 Arweave（如有）
+2. 上传文章内容到 Arweave
+3. 调用合约 `publish()` 方法记录链上
 
-export interface PublishArticleParams {
-  title: string;
-  summary: string;
-  content: string;
-  tags: string[];
-  coverImage: File | null;
-  categoryId: bigint;
-  royaltyBps: bigint;
-  originalAuthor?: string;
-}
+### 16.4 文章详情页
 
-export async function publishArticle(params: PublishArticleParams) {
-  const { title, summary, content, tags, coverImage, categoryId, royaltyBps, originalAuthor = '' } = params;
+> 📁 **实现文件**: 
+> - [frontend/src/routes/a/[id]/+page.svelte](../frontend/src/routes/a/[id]/+page.svelte) - 页面组件
+> - [frontend/src/routes/a/[id]/+page.ts](../frontend/src/routes/a/[id]/+page.ts) - 数据加载
 
-  // Step 1: Upload cover image if provided
-  let coverImageHash: string | undefined;
-  if (coverImage) {
-    coverImageHash = await uploadImage(coverImage, 'devnet');
-  }
+**URL 设计**: `/a/[id]` - 使用最短路径，其中 `id` 为文章的链上 ID
 
-  // Step 2: Upload article to Arweave
-  const arweaveId = await uploadArticle({
-    title: title.trim(),
-    summary: summary.trim(),
-    content: content.trim(),
-    coverImage: coverImageHash,
-    tags
-  }, 'devnet');
+功能：
+- 从 SubSquid 获取文章元数据（标题、作者、统计等）
+- 从 Arweave 获取文章内容（带本地缓存）
+- 响应式布局，支持移动端
+- 显示封面图、分类、作者信息
+- 文章统计（点赞、踩、打赏）
+- 分享功能（Web Share API / 复制链接）
+- 链上信息展示（区块号、交易哈希）
 
-  // Step 3: Publish to blockchain
-  const txHash = await publishToContract(
-    arweaveId,
-    categoryId,
-    royaltyBps,
-    originalAuthor,
-    title.trim(),
-    coverImageHash || ''
-  );
+### 16.5 GraphQL 查询
 
-  return { arweaveId, txHash };
-}
-```
+> 📁 **实现文件**: [frontend/src/lib/graphql/queries.ts](../frontend/src/lib/graphql/queries.ts)
+
+包含以下查询：
+- `ARTICLES_QUERY` - 分页获取文章列表（带分类过滤）
+- `ALL_ARTICLES_QUERY` - 分页获取所有文章
+- `ARTICLE_BY_ID_QUERY` - 根据 ID 获取单篇文章详情
+- `ARTICLE_COUNT_QUERY` - 获取文章总数
 
 ---
 

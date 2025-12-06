@@ -57,7 +57,7 @@
 </script>
 
 <a
-	href="/article/{article.id}"
+	href="/a/{article.id}"
 	class="group block overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all hover:border-gray-300 hover:shadow-md"
 >
 	<!-- Cover Image -->

@@ -107,3 +107,48 @@ export interface ArticleCountResult {
 		totalCount: number;
 	};
 }
+
+/**
+ * Get single article by ID
+ */
+export const ARTICLE_BY_ID_QUERY = gql`
+	query ArticleById($id: String!) {
+		articleById(id: $id) {
+			id
+			arweaveId
+			author {
+				id
+			}
+			originalAuthor
+			title
+			coverImage
+			categoryId
+			royaltyBps
+			likes
+			dislikes
+			totalTips
+			createdAt
+			blockNumber
+			txHash
+		}
+	}
+`;
+
+export interface ArticleDetailData {
+	id: string;
+	arweaveId: string;
+	author: {
+		id: string;
+	};
+	originalAuthor: string | null;
+	title: string;
+	coverImage: string | null;
+	categoryId: string;
+	royaltyBps: number;
+	likes: number;
+	dislikes: number;
+	totalTips: string;
+	createdAt: string;
+	blockNumber: number;
+	txHash: string;
+}

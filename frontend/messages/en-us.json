@@ -119,5 +119,17 @@
 	"retry": "Retry",
 	"no_articles": "No articles yet",
 	"be_first_to_publish": "Be the first to publish!",
-	"no_more_articles": "No more articles"
+	"no_more_articles": "No more articles",
+	"back_to_home": "Back to Home",
+	"loading_content": "Loading content...",
+	"no_content": "No content available",
+	"view_on_arweave": "View on Arweave",
+	"published_by": "Published by",
+	"min_read": "min read",
+	"likes": "Likes",
+	"share": "Share",
+	"link_copied": "Link copied!",
+	"article_id": "Article ID",
+	"block": "Block",
+	"transaction": "Tx"
 }
