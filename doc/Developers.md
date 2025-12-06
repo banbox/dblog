@@ -792,26 +792,55 @@ frontend/
 
 ### 13.4 环境变量配置
 
+项目提供三套环境配置文件，根据开发阶段选择使用：
+
+| 环境 | 配置文件 | 区块链 | SubSquid | Irys/Arweave |
+|------|----------|--------|----------|--------------|
+| **dev** | `.env.dev` | 本地 Anvil (31337) | 本地 localhost:4350 | Devnet (测试) |
+| **test** | `.env.test` | Optimism Sepolia (11155420) | SubSquid Cloud (测试) | Devnet (测试) |
+| **prod** | `.env.prod` | Optimism Mainnet (10) | SubSquid Cloud (生产) | Mainnet (永久) |
+
+**切换环境：**
+
+```bash
+# 开发环境（本地 Anvil + 本地 SubSquid）
+cp .env.dev .env
+
+# 测试环境（Optimism Sepolia + SubSquid Cloud 测试）
+cp .env.test .env
+
+# 生产环境（Optimism Mainnet + SubSquid Cloud 生产）
+cp .env.prod .env
+```
+
+**环境变量说明：**
+
 ```bash
 # frontend/.env
-# BlogHub Contract Address (Optimism Sepolia)
+# =============================================================================
+# Blockchain Configuration
+# =============================================================================
 PUBLIC_BLOG_HUB_CONTRACT_ADDRESS=0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9
-
-# Session Key Manager Contract Address
 PUBLIC_SESSION_KEY_MANAGER_ADDRESS=0x5FbDB2315678afecb367f032d93F642f64180aa3
+PUBLIC_RPC_URL=http://localhost:8545
+PUBLIC_CHAIN_ID=31337  # 31337=Anvil, 11155420=OP Sepolia, 10=OP Mainnet
 
-# RPC URL for blockchain interactions
-PUBLIC_RPC_URL=https://sepolia.optimism.io
+# =============================================================================
+# Storage Configuration (Irys/Arweave)
+# =============================================================================
+PUBLIC_IRYS_NETWORK=devnet  # devnet (测试, ~60天) 或 mainnet (永久)
+PUBLIC_ARWEAVE_GATEWAYS=https://gateway.irys.xyz,https://arweave.net,https://arweave.dev
 
-# Irys Network: 'mainnet' (permanent storage) or 'devnet' (test, ~60 days)
-PUBLIC_IRYS_NETWORK=devnet
+# =============================================================================
+# SubSquid GraphQL API
+# =============================================================================
+PUBLIC_SUBSQUID_ENDPOINT=http://localhost:4350/graphql
 
+# =============================================================================
 # Application Info
+# =============================================================================
 PUBLIC_APP_NAME=DBlog
 PUBLIC_APP_VERSION=1.0.0
-
-# Arweave Gateways (comma-separated)
-PUBLIC_ARWEAVE_GATEWAYS=https://gateway.irys.xyz,https://arweave.net,https://arweave.dev
 ```
 
 ---
@@ -828,8 +857,10 @@ SvelteKit 前端使用 viem 直接与钱包和合约交互，无需 wagmi 封装
 - `getBlogHubContractAddress()` - BlogHub 合约地址
 - `getSessionKeyManagerAddress()` - SessionKeyManager 合约地址
 - `getRpcUrl()` - RPC URL
+- `getChainId()` - 链 ID
 - `getIrysNetwork()` - Irys 网络（mainnet/devnet）
 - `getArweaveGateways()` - Arweave 网关列表
+- `getSubsquidEndpoint()` - SubSquid GraphQL 端点
 
 ### 14.2 钱包连接组件
 

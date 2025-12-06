@@ -1,80 +1,85 @@
 /**
  * Application configuration
- * In SvelteKit, we use environment variables via $env/static/public
- * For client-side access, variables must be prefixed with PUBLIC_
+ * SvelteKit best practice: use $env/static/public for PUBLIC_ prefixed env vars
+ * These are replaced at build time for optimal performance
  */
+import {
+	PUBLIC_BLOG_HUB_CONTRACT_ADDRESS,
+	PUBLIC_SESSION_KEY_MANAGER_ADDRESS,
+	PUBLIC_RPC_URL,
+	PUBLIC_CHAIN_ID,
+	PUBLIC_IRYS_NETWORK,
+	PUBLIC_APP_NAME,
+	PUBLIC_APP_VERSION,
+	PUBLIC_ARWEAVE_GATEWAYS,
+	PUBLIC_SUBSQUID_ENDPOINT
+} from '$env/static/public';
 
-// Default configuration values
+// Default values (used when env vars are not set)
 const defaults = {
-	blogHubContractAddress: '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9' as `0x${string}`,
-	sessionKeyManagerAddress: '0x0000000000000000000000000000000000000000' as `0x${string}`,
-	rpcUrl: 'https://sepolia.optimism.io',
-	irysNetwork: 'devnet' as 'mainnet' | 'devnet',
+	blogHubContractAddress: '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9',
+	sessionKeyManagerAddress: '0x5FbDB2315678afecb367f032d93F642f64180aa3',
+	rpcUrl: 'http://localhost:8545',
+	chainId: 31337, // Anvil default
+	irysNetwork: 'devnet' as const,
 	appName: 'DBlog',
 	appVersion: '1.0.0',
-	arweaveGateways: ['https://gateway.irys.xyz', 'https://arweave.net', 'https://arweave.dev']
+	arweaveGateways: ['https://gateway.irys.xyz', 'https://arweave.net', 'https://arweave.dev'],
+	subsquidEndpoint: 'http://localhost:4350/graphql'
 };
 
 /**
- * Get configuration from environment variables or defaults
- * This function works in browser context
+ * Parsed configuration from environment variables with fallbacks
  */
-export function getConfig() {
-	// In browser, we can't access import.meta.env directly in a reactive way
-	// So we use a function that reads from window or defaults
-	if (typeof window !== 'undefined' && (window as unknown as { __APP_CONFIG__?: typeof defaults }).__APP_CONFIG__) {
-		return (window as unknown as { __APP_CONFIG__: typeof defaults }).__APP_CONFIG__;
-	}
-	return defaults;
-}
+export const config = {
+	blogHubContractAddress: (PUBLIC_BLOG_HUB_CONTRACT_ADDRESS || defaults.blogHubContractAddress) as `0x${string}`,
+	sessionKeyManagerAddress: (PUBLIC_SESSION_KEY_MANAGER_ADDRESS || defaults.sessionKeyManagerAddress) as `0x${string}`,
+	rpcUrl: PUBLIC_RPC_URL || defaults.rpcUrl,
+	chainId: PUBLIC_CHAIN_ID ? parseInt(PUBLIC_CHAIN_ID, 10) : defaults.chainId,
+	irysNetwork: (PUBLIC_IRYS_NETWORK || defaults.irysNetwork) as 'mainnet' | 'devnet',
+	appName: PUBLIC_APP_NAME || defaults.appName,
+	appVersion: PUBLIC_APP_VERSION || defaults.appVersion,
+	arweaveGateways: PUBLIC_ARWEAVE_GATEWAYS
+		? PUBLIC_ARWEAVE_GATEWAYS.split(',').map((g: string) => g.trim())
+		: defaults.arweaveGateways,
+	subsquidEndpoint: PUBLIC_SUBSQUID_ENDPOINT || defaults.subsquidEndpoint
+} as const;
 
-/**
- * Get BlogHub contract address
- */
+// Helper functions for backward compatibility
 export function getBlogHubContractAddress(): `0x${string}` {
-	return getConfig().blogHubContractAddress;
+	return config.blogHubContractAddress;
 }
 
-/**
- * Get Session Key Manager contract address
- */
 export function getSessionKeyManagerAddress(): `0x${string}` {
-	return getConfig().sessionKeyManagerAddress;
+	return config.sessionKeyManagerAddress;
 }
 
-/**
- * Get RPC URL
- */
 export function getRpcUrl(): string {
-	return getConfig().rpcUrl;
+	return config.rpcUrl;
 }
 
-/**
- * Get Irys network
- */
+export function getChainId(): number {
+	return config.chainId;
+}
+
 export function getIrysNetwork(): 'mainnet' | 'devnet' {
-	return getConfig().irysNetwork;
+	return config.irysNetwork;
 }
 
-/**
- * Get app name
- */
 export function getAppName(): string {
-	return getConfig().appName;
+	return config.appName;
 }
 
-/**
- * Get app version
- */
 export function getAppVersion(): string {
-	return getConfig().appVersion;
+	return config.appVersion;
 }
 
-/**
- * Get Arweave gateways
- */
 export function getArweaveGateways(): string[] {
-	return getConfig().arweaveGateways;
+	return config.arweaveGateways;
+}
+
+export function getSubsquidEndpoint(): string {
+	return config.subsquidEndpoint;
 }
 
 export { defaults as defaultConfig };

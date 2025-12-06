@@ -1,4 +1,5 @@
-export { client, getSubsquidEndpoint } from './client';
+export { client } from './client';
+export { getSubsquidEndpoint } from '$lib/config';
 export {
 	ARTICLES_QUERY,
 	ALL_ARTICLES_QUERY,

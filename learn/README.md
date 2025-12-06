@@ -524,3 +524,11 @@ Claude：$effect立即执行和onMount 中的滚动监听可能立即触发，�
 #### 2025-12-06 16:05  实现文章详情页 
 帮我在前端frontend中实现文章详情页面，确保url尽可能短，参考 @Developers.md 中所有需要的逻辑，放在前端项目的合适位置维护，然后从开发文档中删除冗余的代码，改为路径引用说明即可；
 详情页面风格简单大方，使用tailwindcss  
+
+#### 2025-12-06 16:25  前端配置优化
+frontend\src\lib\config.ts 这是前端项目的配置，frontend\.env.example这是旧的nuxt.js的配置，可能被复制过来并未使用，请按照sveltekit的最佳实践，帮我管理前端的所有重要配置，在合适的位置。  
+Claude：sveltekit中最佳实践是使用 $env/static/public 或 $env/dynamic/public 读取 PUBLIC_ 前缀的环境变量，已改
+
+#### 2025-12-06 16:35  配置分为3个环节维护
+frontend\.env.example frontend\src\lib\config.ts  doc\Developers.md 当前是开发阶段，我希望使用的是本地anvil链，本地的SubSquid服务，以及测试网的Arweave+irys；请帮我分为三个环节：dev，test，prod；创建3个不同版本的配置文件，方便我随时切换。并针对每个配置，使用正确的配置结果，不确定的暂时使用占位符  
+claude: 已完成

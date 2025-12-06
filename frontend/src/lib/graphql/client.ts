@@ -2,15 +2,9 @@
  * GraphQL client configuration for SubSquid
  */
 import { Client, cacheExchange, fetchExchange } from '@urql/svelte';
-
-// SubSquid GraphQL endpoint - update this to your deployed squid URL
-const SUBSQUID_ENDPOINT = import.meta.env.VITE_SUBSQUID_ENDPOINT || 'http://localhost:4350/graphql';
+import { getSubsquidEndpoint } from '$lib/config';
 
 export const client = new Client({
-	url: SUBSQUID_ENDPOINT,
+	url: getSubsquidEndpoint(),
 	exchanges: [cacheExchange, fetchExchange]
 });
-
-export function getSubsquidEndpoint(): string {
-	return SUBSQUID_ENDPOINT;
-}
