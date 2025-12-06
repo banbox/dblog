@@ -4,19 +4,6 @@
 
 ---
 
-## 项目进度概览
-
-| 模块 | 状态 | 说明 |
-|------|------|------|
-| 智能合约 | ✅ 已完成 | BlogHub, BlogPaymaster, BlogTokenPaymaster, SessionKeyManager |
-| 单元测试 | ✅ 已完成 | 全部测试通过 |
-| 部署脚本 | ✅ 已完成 | 支持本地/测试网/主网部署 |
-| SubSquid 索引 | 🔨 开发中 | ABI 已生成，Processor 已配置，待本地测试 |
-| Irys + Arweave | 🔲 待开发 | 文章内容永久存储 |
-| SvelteKit 前端 | ✅ 已完成 | 用户界面、钱包集成、i18n 国际化 |
-
----
-
 ## 目录
 
 **Part 1: 智能合约（已完成）**
@@ -122,23 +109,11 @@ cast call 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512 "sessionKeyManager()(addres
 ### 3.1 发布文章
 
 ```bash
-# 使用 User1 发布文章（自己是作者）
+# 代发文章（记录真实作者，带封面图片）
 # publish(string arweaveId, uint64 categoryId, uint96 royaltyBps, string originalAuthor, string title, string coverImage)
 # originalAuthor 为空字符串表示发布者即作者
 # title 为文章标题（最大128字节）
 # coverImage 为封面图片 Arweave Hash（可为空，最大64字节）
-cast send 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9 \
-  "publish(string,uint64,uint96,string,string,string)(uint256)" \
-  "QmTestArweaveHash123456789" \
-  1 \
-  500 \
-  "" \
-  "My First Article" \
-  "" \
-  --private-key 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d \
-  --rpc-url http://localhost:8545
-
-# 代发文章（记录真实作者，带封面图片）
 cast send 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9 \
   "publish(string,uint64,uint96,string,string,string)(uint256)" \
   "QmTestArweaveHash987654321" \
@@ -541,7 +516,7 @@ npx tsc
 ```bash
 # 从 contracts 目录复制 ABI
 mkdir -p src/abi
-cp ../../contracts/out/BlogHub.sol/BlogHub.json src/abi/
+cp ../contracts/out/BlogHub.sol/BlogHub.json src/abi/
 
 # 生成类型安全的事件解码器
 npx squid-evm-typegen src/abi src/abi/BlogHub.json

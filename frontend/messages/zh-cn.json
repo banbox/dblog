@@ -111,5 +111,13 @@
 	"tagline": "去中心化博客平台",
 	"docs": "文档",
 	"about": "关于",
-	"rights_reserved": "保留所有权利"
+	"rights_reserved": "保留所有权利",
+	"all": "全部",
+	"show_more": "更多",
+	"show_less": "收起",
+	"loading": "加载中...",
+	"retry": "重试",
+	"no_articles": "暂无文章",
+	"be_first_to_publish": "成为第一个发布者！",
+	"no_more_articles": "没有更多文章了"
 }

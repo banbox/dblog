@@ -22,6 +22,12 @@ export class Article {
     @StringColumn_({nullable: true})
     originalAuthor!: string | undefined | null
 
+    @StringColumn_({nullable: false})
+    title!: string
+
+    @StringColumn_({nullable: true})
+    coverImage!: string | undefined | null
+
     @BigIntColumn_({nullable: false})
     categoryId!: bigint
 

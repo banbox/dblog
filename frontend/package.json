@@ -46,6 +46,7 @@
 		"@irys/web-upload": "^0.0.15",
 		"@irys/web-upload-ethereum": "^0.0.16",
 		"@irys/web-upload-ethereum-viem-v2": "^0.0.17",
+		"@urql/svelte": "^4.2.1",
 		"viem": "^2.41.2"
 	}
 }

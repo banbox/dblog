@@ -111,5 +111,13 @@
 	"tagline": "Decentralized Blogging Platform",
 	"docs": "Docs",
 	"about": "About",
-	"rights_reserved": "All rights reserved"
+	"rights_reserved": "All rights reserved",
+	"all": "All",
+	"show_more": "More",
+	"show_less": "Less",
+	"loading": "Loading...",
+	"retry": "Retry",
+	"no_articles": "No articles yet",
+	"be_first_to_publish": "Be the first to publish!",
+	"no_more_articles": "No more articles"
 }
