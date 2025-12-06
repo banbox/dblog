@@ -546,3 +546,8 @@ Anvil 默认使用 chainId 31337（0x7a69）;
 两者 RPC URL 相同（http://localhost:8545），但 chainId 不同;
 MetaMask 拒绝添加指向相同 RPC 的不同 chainId 网络;
 手动从Metamask删除网络，重新添加即可
+
+#### 2025-12-06 18:23  已登录账户无法切换
+当前连接钱包组件，退出后，点击连接时，自动恢复了之前的钱包账户；但我实际上是想重新使用当前Metamask的激活账户，目前Metamask的激活账户并不是连接钱包登录的账户；请帮我查看相关逻辑，考虑合适的处理方案并进行修改。  
+Claude：handleConnect使用的eth_requestAccounts会直接返回之前已授权账户列表，不会弹出账户选择器；已改为强制弹出。
+
