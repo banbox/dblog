@@ -64,6 +64,7 @@ export const functions = {
     platformTreasury: viewFun("0xe138818c", "platformTreasury()", {}, p.address),
     proxiableUUID: viewFun("0x52d1902d", "proxiableUUID()", {}, p.bytes32),
     publish: fun("0xacb9420e", "publish(string,uint64,uint96,string,string,string)", {"_arweaveId": p.string, "_categoryId": p.uint64, "_royaltyBps": p.uint96, "_originalAuthor": p.string, "_title": p.string, "_coverImage": p.string}, p.uint256),
+    publishWithSessionKey: fun("0xbc802e55", "publishWithSessionKey(address,address,string,uint64,uint96,string,string,string,uint256,bytes)", {"owner": p.address, "sessionKey": p.address, "_arweaveId": p.string, "_categoryId": p.uint64, "_royaltyBps": p.uint96, "_originalAuthor": p.string, "_title": p.string, "_coverImage": p.string, "deadline": p.uint256, "signature": p.bytes}, p.uint256),
     renounceRole: fun("0x36568abe", "renounceRole(bytes32,address)", {"role": p.bytes32, "callerConfirmation": p.address}, ),
     revokeRole: fun("0xd547741f", "revokeRole(bytes32,address)", {"role": p.bytes32, "account": p.address}, ),
     royaltyInfo: viewFun("0x2a55205a", "royaltyInfo(uint256,uint256)", {"tokenId": p.uint256, "salePrice": p.uint256}, {"receiver": p.address, "amount": p.uint256}),
@@ -326,6 +327,9 @@ export type ProxiableUUIDReturn = FunctionReturn<typeof functions.proxiableUUID>
 
 export type PublishParams = FunctionArguments<typeof functions.publish>
 export type PublishReturn = FunctionReturn<typeof functions.publish>
+
+export type PublishWithSessionKeyParams = FunctionArguments<typeof functions.publishWithSessionKey>
+export type PublishWithSessionKeyReturn = FunctionReturn<typeof functions.publishWithSessionKey>
 
 export type RenounceRoleParams = FunctionArguments<typeof functions.renounceRole>
 export type RenounceRoleReturn = FunctionReturn<typeof functions.renounceRole>

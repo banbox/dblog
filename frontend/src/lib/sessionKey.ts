@@ -50,7 +50,8 @@ const SESSION_KEY_MANAGER_ABI = [
 const ALLOWED_SELECTORS: `0x${string}`[] = [
 	'0xff1f090a', // evaluate
 	'0xdffd40f2', // likeComment
-	'0x63c3cc16' // follow
+	'0x63c3cc16', // follow
+	'0xacb9420e' // publish
 ];
 
 // Default spending limit (10 ETH)

@@ -2,8 +2,14 @@
  * Arweave 上传功能
  */
 import { getIrysUploader, getIrysUploaderDevnet, type IrysUploader } from './irys';
+import {
+	getSessionKeyIrysUploader,
+	getSessionKeyIrysUploaderDevnet,
+	isSessionKeyValid
+} from './irys-session';
 import type { ArticleMetadata, IrysTag, IrysNetwork } from './types';
 import { getAppName, getAppVersion } from '$lib/config';
+import type { StoredSessionKey } from '$lib/sessionKey';
 
 /**
  * 上传文章到 Arweave
@@ -121,6 +127,97 @@ export async function uploadData(
 		return receipt.id;
 	} catch (e) {
 		console.error('Error when uploading data:', e);
+		throw e;
+	}
+}
+
+// ============================================================
+//                  Session Key 上传功能
+// ============================================================
+
+/**
+ * 使用 Session Key 上传文章到 Arweave（无需 MetaMask 签名）
+ * @param sessionKey - 存储的 Session Key 数据
+ * @param metadata - 文章元数据
+ * @param network - 网络类型（默认 devnet）
+ */
+export async function uploadArticleWithSessionKey(
+	sessionKey: StoredSessionKey,
+	metadata: Omit<ArticleMetadata, 'createdAt' | 'version'>,
+	network: IrysNetwork = 'devnet'
+): Promise<string> {
+	if (!isSessionKeyValid(sessionKey)) {
+		throw new Error('Session key is invalid or expired');
+	}
+
+	const uploader =
+		network === 'mainnet'
+			? await getSessionKeyIrysUploader(sessionKey)
+			: await getSessionKeyIrysUploaderDevnet(sessionKey);
+
+	return uploadArticleWithUploader(uploader, metadata);
+}
+
+/**
+ * 使用 Session Key 上传图片到 Arweave（无需 MetaMask 签名）
+ * @param sessionKey - 存储的 Session Key 数据
+ * @param file - 图片文件
+ * @param network - 网络类型（默认 devnet）
+ */
+export async function uploadImageWithSessionKey(
+	sessionKey: StoredSessionKey,
+	file: File,
+	network: IrysNetwork = 'devnet'
+): Promise<string> {
+	if (!isSessionKeyValid(sessionKey)) {
+		throw new Error('Session key is invalid or expired');
+	}
+
+	const uploader =
+		network === 'mainnet'
+			? await getSessionKeyIrysUploader(sessionKey)
+			: await getSessionKeyIrysUploaderDevnet(sessionKey);
+
+	return uploadImageWithUploader(uploader, file);
+}
+
+/**
+ * 使用 Session Key 上传任意数据到 Arweave（无需 MetaMask 签名）
+ * @param sessionKey - 存储的 Session Key 数据
+ * @param data - 数据（字符串或 Buffer）
+ * @param contentType - 内容类型
+ * @param customTags - 自定义标签
+ * @param network - 网络类型（默认 devnet）
+ */
+export async function uploadDataWithSessionKey(
+	sessionKey: StoredSessionKey,
+	data: string | Buffer,
+	contentType: string,
+	customTags: IrysTag[] = [],
+	network: IrysNetwork = 'devnet'
+): Promise<string> {
+	if (!isSessionKeyValid(sessionKey)) {
+		throw new Error('Session key is invalid or expired');
+	}
+
+	const uploader =
+		network === 'mainnet'
+			? await getSessionKeyIrysUploader(sessionKey)
+			: await getSessionKeyIrysUploaderDevnet(sessionKey);
+
+	const appName = getAppName();
+	const tags: IrysTag[] = [
+		{ name: 'Content-Type', value: contentType },
+		{ name: 'App-Name', value: appName },
+		...customTags
+	];
+
+	try {
+		const receipt = await uploader.upload(data, { tags });
+		console.log(`Data uploaded with session key ==> https://gateway.irys.xyz/${receipt.id}`);
+		return receipt.id;
+	} catch (e) {
+		console.error('Error when uploading data with session key:', e);
 		throw e;
 	}
 }

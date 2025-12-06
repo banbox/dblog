@@ -47,8 +47,21 @@ export {
 	uploadArticleWithUploader,
 	uploadImage,
 	uploadImageWithUploader,
-	uploadData
+	uploadData,
+	// Session Key 上传功能
+	uploadArticleWithSessionKey,
+	uploadImageWithSessionKey,
+	uploadDataWithSessionKey
 } from './upload';
+
+// Session Key Irys 客户端
+export {
+	createSessionKeyIrysUploader,
+	getSessionKeyIrysUploader,
+	getSessionKeyIrysUploaderDevnet,
+	isSessionKeyValid,
+	type SessionKeyIrysUploader
+} from './irys-session';
 
 // 获取内容
 export {

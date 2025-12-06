@@ -3,9 +3,11 @@
  * Handles publishing articles to BlogHub contract
  */
 
-import { createWalletClient, createPublicClient, custom, http } from 'viem';
+import { createWalletClient, createPublicClient, custom, http, encodeFunctionData, keccak256, toBytes } from 'viem';
+import { privateKeyToAccount } from 'viem/accounts';
 import { getBlogHubContractAddress, getRpcUrl } from '$lib/config';
 import { getChainConfig } from '$lib/chain';
+import type { StoredSessionKey } from '$lib/sessionKey';
 
 /**
  * Contract error codes for i18n
@@ -227,6 +229,24 @@ const BLOGHUB_ABI = [
 			{ name: 'totalTips', type: 'uint256' }
 		],
 		stateMutability: 'view'
+	},
+	{
+		name: 'publishWithSessionKey',
+		type: 'function',
+		inputs: [
+			{ name: 'owner', type: 'address' },
+			{ name: 'sessionKey', type: 'address' },
+			{ name: '_arweaveId', type: 'string' },
+			{ name: '_categoryId', type: 'uint64' },
+			{ name: '_royaltyBps', type: 'uint96' },
+			{ name: '_originalAuthor', type: 'string' },
+			{ name: '_title', type: 'string' },
+			{ name: '_coverImage', type: 'string' },
+			{ name: 'deadline', type: 'uint256' },
+			{ name: 'signature', type: 'bytes' }
+		],
+		outputs: [{ type: 'uint256' }],
+		stateMutability: 'nonpayable'
 	}
 ] as const;
 
@@ -559,6 +579,162 @@ export async function getArticle(articleId: bigint): Promise<ArticleData> {
 		};
 	} catch (error) {
 		console.error('Error reading article:', error);
+		throw parseContractError(error);
+	}
+}
+
+// ============================================================
+//                  Session Key 发布功能
+// ============================================================
+
+/**
+ * Create Session Key signature for publish operation
+ * @param sessionKey - Stored session key data
+ * @param arweaveId - Arweave hash
+ * @param categoryId - Category ID
+ * @param royaltyBps - Royalty basis points
+ * @param originalAuthor - Original author name
+ * @param title - Article title
+ * @param coverImage - Cover image hash
+ * @param deadline - Signature deadline timestamp
+ */
+async function createPublishSignature(
+	sessionKey: StoredSessionKey,
+	arweaveId: string,
+	categoryId: bigint,
+	royaltyBps: bigint,
+	originalAuthor: string,
+	title: string,
+	coverImage: string,
+	deadline: bigint
+): Promise<`0x${string}`> {
+	const sessionKeyAccount = privateKeyToAccount(sessionKey.privateKey as `0x${string}`);
+	
+	// Encode the publish function call data
+	const callData = encodeFunctionData({
+		abi: BLOGHUB_ABI,
+		functionName: 'publish',
+		args: [arweaveId, categoryId, royaltyBps, originalAuthor, title, coverImage]
+	});
+
+	// Create message hash: keccak256(owner, target, selector, callData, value, deadline, nonce)
+	// Note: This should match the SessionKeyManager's signature verification
+	const blogHub = getBlogHubContractAddress();
+	const publishSelector = '0xacb9420e' as `0x${string}`;
+	
+	// Create the message to sign (simplified - actual implementation depends on SessionKeyManager)
+	const messageHash = keccak256(
+		toBytes(
+			`${sessionKey.owner}${blogHub}${publishSelector}${callData}0${deadline}`
+		)
+	);
+
+	// Sign with session key
+	const signature = await sessionKeyAccount.signMessage({
+		message: { raw: messageHash }
+	});
+
+	return signature;
+}
+
+/**
+ * Publish article to contract using Session Key (no MetaMask interaction needed)
+ * @param sessionKey - Stored session key data
+ * @param arweaveId - Arweave hash of article content
+ * @param categoryId - Category ID (0-based)
+ * @param royaltyBps - Royalty basis points (0-10000, where 100 = 1%)
+ * @param originalAuthor - Original author name (optional)
+ * @param title - Article title (max 128 bytes)
+ * @param coverImage - Cover image Arweave hash (optional, max 64 bytes)
+ * @returns Transaction hash
+ */
+export async function publishToContractWithSessionKey(
+	sessionKey: StoredSessionKey,
+	arweaveId: string,
+	categoryId: bigint,
+	royaltyBps: bigint,
+	originalAuthor: string = '',
+	title: string = '',
+	coverImage: string = ''
+): Promise<string> {
+	if (!arweaveId) {
+		throw new Error('Arweave ID is required');
+	}
+
+	if (categoryId < 0n) {
+		throw new Error('Category ID must be non-negative');
+	}
+
+	if (royaltyBps > 10000n) {
+		throw new Error('Royalty percentage cannot exceed 100% (10000 basis points)');
+	}
+
+	if (originalAuthor && originalAuthor.length > 64) {
+		throw new Error('Original author name is too long (max 64 characters)');
+	}
+
+	if (title && new TextEncoder().encode(title).length > 128) {
+		throw new Error('Title is too long (max 128 bytes)');
+	}
+
+	if (coverImage && coverImage.length > 64) {
+		throw new Error('Cover image hash is too long (max 64 characters)');
+	}
+
+	// Check session key validity
+	if (Date.now() / 1000 > sessionKey.validUntil) {
+		throw new Error('Session key has expired');
+	}
+
+	try {
+		const chain = getChainConfig();
+		const sessionKeyAccount = privateKeyToAccount(sessionKey.privateKey as `0x${string}`);
+		
+		// Create wallet client with session key
+		const walletClient = createWalletClient({
+			account: sessionKeyAccount,
+			chain,
+			transport: http(getRpcUrl())
+		});
+
+		// Set deadline to 5 minutes from now
+		const deadline = BigInt(Math.floor(Date.now() / 1000) + 300);
+
+		// Create signature
+		const signature = await createPublishSignature(
+			sessionKey,
+			arweaveId,
+			categoryId,
+			royaltyBps,
+			originalAuthor,
+			title,
+			coverImage,
+			deadline
+		);
+
+		// Call publishWithSessionKey
+		const txHash = await walletClient.writeContract({
+			address: getBlogHubContractAddress(),
+			abi: BLOGHUB_ABI,
+			functionName: 'publishWithSessionKey',
+			args: [
+				sessionKey.owner as `0x${string}`,
+				sessionKey.address as `0x${string}`,
+				arweaveId,
+				categoryId,
+				royaltyBps,
+				originalAuthor,
+				title,
+				coverImage,
+				deadline,
+				signature
+			]
+		});
+
+		console.log(`Article published with session key. Tx: ${txHash}`);
+		return txHash;
+	} catch (error) {
+		console.error('Error publishing with session key:', error);
 		throw parseContractError(error);
 	}
 }

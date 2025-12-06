@@ -704,6 +704,100 @@ contract BlogHub is
         emit SessionKeyOperationExecuted(owner, sessionKey, this.follow.selector);
     }
 
+    /**
+     * @notice 使用 Session Key 发布文章（无感交互）
+     * @dev 允许用户通过 Session Key 发布文章，无需每次签名
+     * @param owner 主账户地址（文章作者）
+     * @param sessionKey Session Key 地址
+     * @param _arweaveId Arweave 存储哈希
+     * @param _categoryId 分类ID
+     * @param _royaltyBps 版税比例 (basis points)
+     * @param _originalAuthor 真实作者名称
+     * @param _title 文章标题
+     * @param _coverImage 封面图片 Arweave Hash
+     * @param deadline 签名过期时间
+     * @param signature Session Key 签名
+     * @return articleId 新创建的文章ID
+     */
+    function publishWithSessionKey(
+        address owner,
+        address sessionKey,
+        string calldata _arweaveId,
+        uint64 _categoryId,
+        uint96 _royaltyBps,
+        string calldata _originalAuthor,
+        string calldata _title,
+        string calldata _coverImage,
+        uint256 deadline,
+        bytes calldata signature
+    ) external whenNotPaused returns (uint256) {
+        if (address(sessionKeyManager) == address(0)) revert SessionKeyManagerNotSet();
+        if (_royaltyBps > 10000) revert RoyaltyTooHigh();
+        if (bytes(_originalAuthor).length > MAX_ORIGINAL_AUTHOR_LENGTH) revert OriginalAuthorTooLong();
+        if (bytes(_title).length > MAX_TITLE_LENGTH) revert TitleTooLong();
+        if (bytes(_coverImage).length > MAX_COVER_IMAGE_LENGTH) revert CoverImageTooLong();
+
+        // 构建 callData 用于验证
+        bytes memory callData = abi.encodeWithSelector(
+            this.publish.selector,
+            _arweaveId,
+            _categoryId,
+            _royaltyBps,
+            _originalAuthor,
+            _title,
+            _coverImage
+        );
+
+        // 验证 Session Key
+        bool valid = sessionKeyManager.validateAndUseSessionKey(
+            owner,
+            sessionKey,
+            address(this),
+            this.publish.selector,
+            callData,
+            0, // publish 操作不需要支付
+            deadline,
+            signature
+        );
+
+        if (!valid) revert SessionKeyValidationFailed();
+
+        // 执行发布操作（以 owner 身份）
+        uint256 newId = nextArticleId++;
+
+        // 存储文章元数据
+        articles[newId] = Article({
+            arweaveHash: _arweaveId,
+            author: owner,
+            originalAuthor: _originalAuthor,
+            title: _title,
+            coverImage: _coverImage,
+            categoryId: _categoryId,
+            timestamp: uint64(block.timestamp)
+        });
+
+        // 铸造 NFT (初始归作者所有)
+        _mint(owner, newId, 1, "");
+
+        // 设置独立的 ERC2981 版税 (归作者所有)
+        _setTokenRoyalty(newId, owner, _royaltyBps);
+
+        emit ArticlePublished(
+            newId,
+            owner,
+            _categoryId,
+            _arweaveId,
+            _originalAuthor,
+            _title,
+            _coverImage,
+            block.timestamp
+        );
+
+        emit SessionKeyOperationExecuted(owner, sessionKey, this.publish.selector);
+
+        return newId;
+    }
+
     // =============================================================
     //                      底层 Override (必须实现)
     // =============================================================
