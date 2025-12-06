@@ -1,8 +1,6 @@
 {
 	"$schema": "https://inlang.com/schema/inlang-message-format",
 	"publish_article": "Publish Article",
-	"publish": "Publish",
-	"article": "Article",
 	"category": "Category",
 	"select_category": "Select a category",
 	"search": "Search",
@@ -48,7 +46,7 @@
 	"home": "Home & Living",
 	"agriculture": "Agriculture",
 	"no_results": "No results found",
-	"selection": "Selection",
+	"clear_selection": "Clear selection",
 	"max_selection_reached": "Max selection reached",
 	"share_thoughts": "Share your thoughts with the world",
 	"title": "Title",

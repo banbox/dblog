@@ -237,7 +237,7 @@
 <div class="min-h-screen bg-white">
 	<div class="mx-auto max-w-3xl px-6 py-12">
 		<header class="mb-12">
-			<h1 class="mb-2 text-4xl font-light tracking-tight">{m.publish()} {m.article()}</h1>
+			<h1 class="mb-2 text-4xl font-light tracking-tight">{m.publish_article()}</h1>
 			<p class="text-gray-500">{m.share_thoughts()}</p>
 		</header>
 

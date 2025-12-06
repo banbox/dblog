@@ -362,10 +362,20 @@ Builder.IO: 生成`frontend\src\routes\publish\+page.svelte`
 Builder.IO：更新`frontend\messages`下文件，并更新publis页面。  
 到这里新用户积分用完了，后续改为windsurf继续  
 
-#### 2025-12-05 11:00 app.js:22 TypeError: Class extends value undefined is not a constructor or null
+#### 2025-12-05 11:00 app.js:22 TypeError: Class extends value undefined is not a constructor or null【忽略】
 publish页面后正常显示1s，然后就显示“500 Internal Error”，控制台显示上面错误，AI尝试很多次无法解决；
-经过分段注释排查，发现是只要导入了`import { WebUploader } from '@irys/web-upload'`就会出现这个错误；可能irys和sveltekit兼容性有问题；
-改为使用`nuxt.js`框架后可正常导入。注意初始化项目时启用`@nuxt/ui`
+经过分段注释排查，发现是只要导入了`import { WebUploader } from '@irys/web-upload'`就会出现这个错误；可能irys和sveltekit兼容性有问题；  
+改为使用`nuxt.js`框架后可正常导入。注意初始化项目时启用`@nuxt/ui`  
+
+**请勿切换为nuxt.js。**后面又从nuxt.js切换回sveltekit了，所以后续关于nuxt.js的全部忽略，自动使用对应sveltekit相关命令；之所以上面错误，是因irys依赖node.js的相关包，而vite.js并未提供导致，可执行下面命令安装(参考[文档](https://docs.irys.xyz/build/d/irys-in-the-browser))：
+```shell
+npm install --save-dev \
+    crypto-browserify \
+    stream-browserify \
+    os-browserify \
+    path-browserify \
+    vite-plugin-node-polyfills
+```
 
 #### 2025-12-05 11:30 Nuxt.js安装i18n错误：ReferenceError: __dirname is not defined in ES module scope
 [错误信息] + 这是在一个nuxt.js项目中添加i18n依赖的错误，帮我分析上面问题出现的原因，如何解决？  
@@ -481,6 +491,6 @@ Claude: 优化了多语言key
 #### 2025-12-06 10:35  迁移到sveltekit
 背景：之前改为nuxt.js是因为导入irys错误，在nuxt.js中通过安装node.js核心包解决，所以创建了个空sveltekit验证确实也能解决；因nuxt.js编译慢，决定迁移到sveltekit。  
 frontend是旧的前端项目，使用nuxt.js构建；现在我想全部迁移到frontend2中，使用sveltekit构建； 请参考frontend\README.md这个概要说明，阅读所有必要的源代码文件，对ts等业务逻辑文件复制过去，并修改其中不兼容的地方，对其他页面和配置等进行等价迁移，确保业务流程和显示效果前后一致；  
-Claude：迁移完成
+Claude：迁移完成  
 开发者：[文档](https://inlang.com/m/gerre34r/library-inlang-paraglideJs/sveltekit#static-site-generation-ssg) frontend2\src\routes\+layout.svelte 上面是正确的多语言设置方法，请参考上面代码，帮我修正母版页中多语言的错误
  

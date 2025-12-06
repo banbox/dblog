@@ -1,8 +1,6 @@
 {
 	"$schema": "https://inlang.com/schema/inlang-message-format",
 	"publish_article": "发布文章",
-	"publish": "发布",
-	"article": "文章",
 	"category": "分类",
 	"select_category": "选择分类",
 	"search": "搜索",
@@ -48,7 +46,7 @@
 	"home": "家居",
 	"agriculture": "农业",
 	"no_results": "未找到结果",
-	"selection": "选择",
+	"clear_selection": "清空选择",
 	"max_selection_reached": "已达最大选择数量",
 	"share_thoughts": "与世界分享你的想法",
 	"title": "标题",

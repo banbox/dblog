@@ -253,7 +253,7 @@
 								d="M6 18L18 6M6 6l12 12"
 							/>
 						</svg>
-						{m.clear()} {m.selection()}
+						{m.clear_selection()}
 					</span>
 				</div>
 			{/if}
