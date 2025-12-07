@@ -4,18 +4,19 @@
  * 使用示例:
  *
  * ```typescript
- * import { uploadArticle, getArticleWithCache, getIrysBalance } from '$lib/arweave'
+ * import { uploadArticleFolder, getArticleWithCache, getIrysBalance } from '$lib/arweave'
  *
- * // 上传文章
- * const arweaveId = await uploadArticle({
+ * // 上传文章（文件夹格式）
+ * const result = await uploadArticleFolder({
  *   title: 'My Article',
  *   summary: 'A brief summary',
  *   content: '# Hello World',
- *   tags: ['web3', 'blog']
+ *   tags: ['web3', 'blog'],
+ *   coverImage: file // 可选
  * })
  *
  * // 获取文章（带缓存）
- * const article = await getArticleWithCache(arweaveId)
+ * const article = await getArticleWithCache(result.manifestId)
  * ```
  */
 
@@ -27,7 +28,10 @@ export type {
 	UploadReceipt,
 	CachedArticle,
 	IrysNetwork,
-	IrysConfig
+	IrysConfig,
+	ArticleFolderManifest,
+	ArticleFolderUploadParams,
+	ArticleFolderUploadResult
 } from './types';
 
 // Irys 客户端
@@ -53,7 +57,11 @@ export {
 	// Session Key 上传功能
 	uploadArticleWithSessionKey,
 	uploadImageWithSessionKey,
-	uploadDataWithSessionKey
+	uploadDataWithSessionKey,
+	// 文章文件夹上传功能
+	uploadArticleFolder,
+	uploadArticleFolderWithUploader,
+	uploadArticleFolderWithSessionKey
 } from './upload';
 
 // Session Key Irys 客户端
@@ -72,7 +80,12 @@ export {
 	fetchTextContent,
 	getImageUrl,
 	getArweaveUrl,
-	checkContentExists
+	checkContentExists,
+	// 文章文件夹获取功能
+	fetchFromFolder,
+	fetchArticleMarkdown,
+	getFolderCoverImageUrl,
+	getFolderFileUrl
 } from './fetch';
 
 // 缓存功能
@@ -85,3 +98,20 @@ export {
 	getArticleWithCache,
 	getArticlesWithCache
 } from './cache';
+
+// 文章文件夹功能
+export {
+	ARTICLE_INDEX_FILE,
+	ARTICLE_COVER_IMAGE_FILE,
+	downloadManifest,
+	createArticleFolderManifest,
+	appendToManifest,
+	uploadManifest,
+	uploadUpdatedManifest,
+	getMutableFolderUrl,
+	getStaticFolderUrl,
+	getArticleContentUrl,
+	getCoverImageUrl,
+	parseArticleFolderManifest,
+	fetchArticleFromFolder
+} from './folder';

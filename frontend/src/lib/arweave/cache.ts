@@ -1,7 +1,7 @@
 /**
  * 客户端缓存策略
  */
-import { fetchArticleContent } from './fetch';
+import { fetchArticleMarkdown } from './fetch';
 import type { ArticleMetadata, CachedArticle } from './types';
 import { browser } from '$app/environment';
 
@@ -113,39 +113,67 @@ export function clearOldCache(): void {
 }
 
 /**
- * 带缓存的获取文章函数
- * @param arweaveId - Arweave 交易 ID
+ * 从文件夹格式获取文章内容
+ * @param manifestId - Manifest ID
+ */
+async function fetchArticleFromFolder(manifestId: string): Promise<ArticleMetadata> {
+	// 获取 markdown 内容
+	const content = await fetchArticleMarkdown(manifestId, false);
+	
+	// 从内容中提取标题（第一个 # 开头的行）
+	let title = '';
+	const lines = content.split('\n');
+	for (const line of lines) {
+		if (line.startsWith('# ')) {
+			title = line.substring(2).trim();
+			break;
+		}
+	}
+	
+	return {
+		title: title || 'Untitled',
+		summary: content.substring(0, 200),
+		content,
+		tags: [],
+		createdAt: Date.now(),
+		version: '2.0.0'
+	};
+}
+
+/**
+ * 带缓存的获取文章函数（文件夹格式）
+ * @param manifestId - 文章文件夹的 Manifest ID
  * @param forceRefresh - 强制刷新（跳过缓存）
  */
 export async function getArticleWithCache(
-	arweaveId: string,
+	manifestId: string,
 	forceRefresh: boolean = false
 ): Promise<ArticleMetadata> {
 	// 先检查缓存（除非强制刷新）
 	if (!forceRefresh) {
-		const cached = getCachedArticle(arweaveId);
+		const cached = getCachedArticle(manifestId);
 		if (cached) return cached;
 	}
 
-	// 从 Arweave 获取
-	const data = await fetchArticleContent(arweaveId);
+	// 从文件夹获取文章内容
+	const data = await fetchArticleFromFolder(manifestId);
 
 	// 存入缓存
-	setCachedArticle(arweaveId, data);
+	setCachedArticle(manifestId, data);
 
 	return data;
 }
 
 /**
  * 批量获取文章（带缓存）
- * @param arweaveIds - Arweave 交易 ID 数组
+ * @param manifestIds - 文章文件夹的 Manifest ID 数组
  */
-export async function getArticlesWithCache(arweaveIds: string[]): Promise<Map<string, ArticleMetadata>> {
+export async function getArticlesWithCache(manifestIds: string[]): Promise<Map<string, ArticleMetadata>> {
 	const results = new Map<string, ArticleMetadata>();
 	const toFetch: string[] = [];
 
 	// 先从缓存获取
-	for (const id of arweaveIds) {
+	for (const id of manifestIds) {
 		const cached = getCachedArticle(id);
 		if (cached) {
 			results.set(id, cached);
@@ -158,7 +186,7 @@ export async function getArticlesWithCache(arweaveIds: string[]): Promise<Map<st
 	if (toFetch.length > 0) {
 		const fetchPromises = toFetch.map(async (id) => {
 			try {
-				const data = await fetchArticleContent(id);
+				const data = await fetchArticleFromFolder(id);
 				setCachedArticle(id, data);
 				results.set(id, data);
 			} catch (e) {

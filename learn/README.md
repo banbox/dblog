@@ -581,4 +581,16 @@ upload.ts:97 Error when uploading image: Error: 402 error: Not enough balance fo
 开发者：这是目前的错误，似乎是在irys时也缺少余额，请帮我在irys上传时也检查余额并转入  
 Claude：检查irys余额，不足时充值； 
 开发者：我发现充值的余额太少了，充值0.005，但网络费是0.08，这是测试网络；请帮我在irys和sepolia网络上都强制要求，最低充值不低于十倍网络费；默认按30倍网络费充值；做成可配置的。  
-Claude：新增了两个可配置变量；
+Claude：新增了两个可配置变量；  
+开发者：排查是之前上传小图片不足100KB免费，这次较大IRYS需要付费
+
+#### 2025-12-07 12:00  Session Key原理澄清
+对于dapp，常见使用Session key，可以避免频繁请求用户授权签名；那么一般需要在Session key的临时钱包中充值余额吗？如果充值，是只充值gas费即可？如果智能合约支持Session Key；临时钱包在智能合约中能否直接使用用户钱包余额支付（非智能合约中的余额）；一般完整的流程和细节是怎样的？  
+Gemini：无需充值，详见[10_session_key.md](./10_session_key.md)
+
+#### 2025-12-07 14:00  IRYS文档阅读
+因频繁遇到问题，可能使用有误，感觉先通读一遍irys文档，了解其能力和支持特性，在当前项目中如何使用为好。[笔记](../doc/IRYS.md)
+
+#### 2025-12-07 18:30  改为使用irys链上文件夹
+前端使用irys存储图片和文章，一个文章包含封面图片和文章内容，目前是每个文件上传一次，是分离无关联的；请帮我改为使用irys的链上可更新文件夹形式存储，文章固定用index.md，封面图片固定用coverImage名称；参考文档 doc\irys\features\onchain-folders.mdx 帮我进行改造，修改frontend中的相关逻辑；无需支持旧格式，强制一种新格式  
+Claude：重点更新了`frontend\src\lib\arweave`下的几个文件

@@ -46,3 +46,27 @@ export interface IrysConfig {
 	network: IrysNetwork;
 	rpcUrl?: string;
 }
+
+/** 文章文件夹 Manifest 解析结果 */
+export interface ArticleFolderManifest {
+	manifestId: string;
+	indexTxId?: string;      // index.md 的交易 ID
+	coverImageTxId?: string; // coverImage 的交易 ID
+	allFiles: Record<string, string>; // 所有文件映射 (文件名 -> 交易ID)
+}
+
+/** 文章文件夹上传参数 */
+export interface ArticleFolderUploadParams {
+	title: string;
+	summary: string;
+	content: string;         // Markdown 内容
+	coverImage?: File;       // 封面图片文件
+	tags: string[];
+}
+
+/** 文章文件夹上传结果 */
+export interface ArticleFolderUploadResult {
+	manifestId: string;      // 文件夹 manifest ID（用于访问文章）
+	indexTxId: string;       // index.md 的交易 ID
+	coverImageTxId?: string; // coverImage 的交易 ID（如果有）
+}

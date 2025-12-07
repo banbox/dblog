@@ -112,3 +112,77 @@ export async function checkContentExists(arweaveId: string): Promise<boolean> {
 
 	return false;
 }
+
+// ============================================================
+//                  文章文件夹获取功能
+// ============================================================
+
+/**
+ * 从文章文件夹获取内容（支持可变 URL）
+ * @param manifestId - 文章文件夹的 manifest ID
+ * @param fileName - 文件名
+ * @param useMutable - 是否使用可变 URL（默认 true）
+ */
+export async function fetchFromFolder(
+	manifestId: string,
+	fileName: string,
+	useMutable = true
+): Promise<Response> {
+	const gateways = getArweaveGateways();
+	const pathPrefix = useMutable ? 'mutable/' : '';
+
+	for (const gateway of gateways) {
+		try {
+			const url = `${gateway}/${pathPrefix}${manifestId}/${fileName}`;
+			const response = await fetch(url);
+
+			if (response.ok) {
+				return response;
+			}
+		} catch (error) {
+			console.warn(`Gateway ${gateway} failed to fetch from folder:`, error);
+		}
+	}
+
+	throw new Error(`Failed to fetch ${fileName} from folder ${manifestId}`);
+}
+
+/**
+ * 从文章文件夹获取 Markdown 内容
+ * @param manifestId - 文章文件夹的 manifest ID
+ * @param useMutable - 是否使用可变 URL（默认 true）
+ */
+export async function fetchArticleMarkdown(
+	manifestId: string,
+	useMutable = true
+): Promise<string> {
+	const response = await fetchFromFolder(manifestId, 'index.md', useMutable);
+	return await response.text();
+}
+
+/**
+ * 获取文章文件夹中封面图片的 URL
+ * @param manifestId - 文章文件夹的 manifest ID
+ * @param useMutable - 是否使用可变 URL（默认 true）
+ */
+export function getFolderCoverImageUrl(manifestId: string, useMutable = true): string {
+	const gateways = getArweaveGateways();
+	const pathPrefix = useMutable ? 'mutable/' : '';
+	return `${gateways[0]}/${pathPrefix}${manifestId}/coverImage`;
+}
+
+/**
+ * 获取文章文件夹中任意文件的 URL
+ * @param manifestId - 文章文件夹的 manifest ID
+ * @param fileName - 文件名
+ * @param useMutable - 是否使用可变 URL（默认 true）
+ */
+export function getFolderFileUrl(
+	manifestId: string,
+	fileName: string,
+	useMutable = true
+): string {
+	const gateways = getArweaveGateways();
+	const pathPrefix = useMutable ? 'mutable/' : '';
+	return `${gateways[0]}/${pathPrefix}${manifestId}/${fileName}`;
+}

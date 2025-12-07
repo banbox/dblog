@@ -7,9 +7,15 @@ import {
 	getSessionKeyIrysUploaderDevnet,
 	isSessionKeyValid
 } from './irys-session';
-import type { ArticleMetadata, IrysTag, IrysNetwork } from './types';
+import type { ArticleMetadata, IrysTag, IrysNetwork, ArticleFolderUploadParams, ArticleFolderUploadResult } from './types';
 import { getAppName, getAppVersion } from '$lib/config';
 import type { StoredSessionKey } from '$lib/sessionKey';
+import {
+	createArticleFolderManifest,
+	uploadManifest,
+	ARTICLE_INDEX_FILE,
+	ARTICLE_COVER_IMAGE_FILE
+} from './folder';
 
 /**
  * 上传文章到 Arweave
@@ -241,4 +247,185 @@ export async function uploadDataWithSessionKey(
 		console.error('Error when uploading data with session key:', e);
 		throw e;
 	}
+}
+
+// ============================================================
+//                  文章文件夹上传功能
+// ============================================================
+
+/**
+ * 上传 Markdown 内容到 Arweave（作为 index.md）
+ * @param uploader - Irys uploader 实例
+ * @param content - Markdown 内容
+ * @param title - 文章标题（用于标签）
+ * @param articleTags - 文章标签
+ */
+async function uploadMarkdownContent(
+	uploader: IrysUploader,
+	content: string,
+	title: string,
+	articleTags: string[]
+): Promise<string> {
+	const appName = getAppName();
+	const appVersion = getAppVersion();
+	const dataSize = new TextEncoder().encode(content).length;
+
+	// 确保 Irys 余额充足
+	const hasBalance = await ensureIrysBalance(uploader, dataSize);
+	if (!hasBalance) {
+		throw new Error('Failed to fund Irys for markdown content. Please try again.');
+	}
+
+	const tags: IrysTag[] = [
+		{ name: 'Content-Type', value: 'text/markdown' },
+		{ name: 'App-Name', value: appName },
+		{ name: 'App-Version', value: appVersion },
+		{ name: 'Type', value: 'article-content' },
+		{ name: 'Title', value: title },
+		...articleTags.map((tag) => ({ name: 'Tag', value: tag }))
+	];
+
+	try {
+		const receipt = await uploader.upload(content, { tags });
+		console.log(`Markdown content uploaded ==> https://gateway.irys.xyz/${receipt.id}`);
+		return receipt.id;
+	} catch (e) {
+		console.error('Error when uploading markdown content:', e);
+		throw e;
+	}
+}
+
+/**
+ * 上传封面图片到 Arweave（作为 coverImage）
+ * @param uploader - Irys uploader 实例
+ * @param file - 图片文件
+ */
+async function uploadCoverImageFile(
+	uploader: IrysUploader,
+	file: File
+): Promise<string> {
+	const appName = getAppName();
+
+	// 确保 Irys 余额充足
+	const hasBalance = await ensureIrysBalance(uploader, file.size);
+	if (!hasBalance) {
+		throw new Error('Failed to fund Irys for cover image. Please try again.');
+	}
+
+	const tags: IrysTag[] = [
+		{ name: 'Content-Type', value: file.type },
+		{ name: 'App-Name', value: appName },
+		{ name: 'Type', value: 'article-cover' }
+	];
+
+	try {
+		const receipt = await uploader.uploadFile(file, { tags });
+		console.log(`Cover image uploaded ==> https://gateway.irys.xyz/${receipt.id}`);
+		return receipt.id;
+	} catch (e) {
+		console.error('Error when uploading cover image:', e);
+		throw e;
+	}
+}
+
+/**
+ * 使用指定 uploader 上传文章文件夹
+ * 将文章内容和封面图片打包为一个链上文件夹
+ * 
+ * @param uploader - Irys uploader 实例
+ * @param params - 文章文件夹上传参数
+ */
+export async function uploadArticleFolderWithUploader(
+	uploader: IrysUploader,
+	params: ArticleFolderUploadParams
+): Promise<ArticleFolderUploadResult> {
+	const { title, summary, content, coverImage, tags: articleTags } = params;
+
+	// Step 1: 上传文章内容（index.md）
+	console.log('Uploading article content (index.md)...');
+	const indexTxId = await uploadMarkdownContent(uploader, content, title, articleTags);
+
+	// Step 2: 上传封面图片（如果有）
+	let coverImageTxId: string | undefined;
+	if (coverImage) {
+		console.log('Uploading cover image...');
+		coverImageTxId = await uploadCoverImageFile(uploader, coverImage);
+	}
+
+	// Step 3: 创建文件夹 manifest
+	console.log('Creating article folder manifest...');
+	const files = new Map<string, string>();
+	files.set(ARTICLE_INDEX_FILE, indexTxId);
+	if (coverImageTxId) {
+		files.set(ARTICLE_COVER_IMAGE_FILE, coverImageTxId);
+	}
+
+	const manifest = createArticleFolderManifest(files);
+
+	// Step 4: 上传 manifest，添加文章元数据标签
+	const manifestTags: IrysTag[] = [
+		{ name: 'Article-Title', value: title },
+		{ name: 'Article-Summary', value: summary.substring(0, 200) }, // 限制长度
+		...articleTags.map((tag) => ({ name: 'Article-Tag', value: tag }))
+	];
+
+	// 计算 manifest 大小并确保余额
+	const manifestData = JSON.stringify(manifest);
+	const manifestSize = new TextEncoder().encode(manifestData).length;
+	const hasBalance = await ensureIrysBalance(uploader, manifestSize);
+	if (!hasBalance) {
+		throw new Error('Failed to fund Irys for manifest. Please try again.');
+	}
+
+	const manifestId = await uploadManifest(uploader, manifest, manifestTags);
+
+	console.log(`Article folder created:`);
+	console.log(`  - Manifest: https://gateway.irys.xyz/${manifestId}`);
+	console.log(`  - Content:  https://gateway.irys.xyz/${manifestId}/${ARTICLE_INDEX_FILE}`);
+	if (coverImageTxId) {
+		console.log(`  - Cover:    https://gateway.irys.xyz/${manifestId}/${ARTICLE_COVER_IMAGE_FILE}`);
+	}
+
+	return {
+		manifestId,
+		indexTxId,
+		coverImageTxId
+	};
+}
+
+/**
+ * 上传文章文件夹到 Arweave
+ * @param params - 文章文件夹上传参数
+ * @param network - 网络类型（默认 devnet）
+ */
+export async function uploadArticleFolder(
+	params: ArticleFolderUploadParams,
+	network: IrysNetwork = 'devnet'
+): Promise<ArticleFolderUploadResult> {
+	const uploader = network === 'mainnet' ? await getIrysUploader() : await getIrysUploaderDevnet();
+	return uploadArticleFolderWithUploader(uploader, params);
+}
+
+/**
+ * 使用 Session Key 上传文章文件夹到 Arweave（无需 MetaMask 签名）
+ * @param sessionKey - 存储的 Session Key 数据
+ * @param params - 文章文件夹上传参数
+ * @param network - 网络类型（默认 devnet）
+ */
+export async function uploadArticleFolderWithSessionKey(
+	sessionKey: StoredSessionKey,
+	params: ArticleFolderUploadParams,
+	network: IrysNetwork = 'devnet'
+): Promise<ArticleFolderUploadResult> {
+	if (!isSessionKeyValid(sessionKey)) {
+		throw new Error('Session key is invalid or expired');
+	}
+
+	const uploader =
+		network === 'mainnet'
+			? await getSessionKeyIrysUploader(sessionKey)
+			: await getSessionKeyIrysUploaderDevnet(sessionKey);
+
+	// Session Key uploader 类型与 IrysUploader 兼容
+	return uploadArticleFolderWithUploader(uploader as unknown as IrysUploader, params);
 }

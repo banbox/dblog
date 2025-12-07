@@ -4,13 +4,13 @@
  */
 
 import {
-	uploadArticle,
-	uploadImage,
-	uploadArticleWithSessionKey,
-	uploadImageWithSessionKey
+	uploadArticleFolder,
+	uploadArticleFolderWithSessionKey,
+	getCoverImageUrl,
+	ARTICLE_COVER_IMAGE_FILE
 } from '$lib/arweave';
+import type { ArticleFolderUploadParams } from '$lib/arweave';
 import { publishToContract, publishToContractWithSessionKey } from '$lib/contracts';
-import type { ArticleMetadata } from '$lib/arweave';
 import { getStoredSessionKey, ensureSessionKeyBalance, type StoredSessionKey } from '$lib/sessionKey';
 
 export interface PublishArticleParams {
@@ -77,36 +77,37 @@ export async function publishArticle(params: PublishArticleParams): Promise<Publ
 		// Fallback to traditional publishing with MetaMask
 		console.log('Using MetaMask for publishing...');
 
-		// Step 1: Upload cover image if provided
-		let coverImageHash: string | undefined;
-		if (coverImage) {
-			console.log('Step 1: Uploading cover image...');
-			coverImageHash = await uploadImage(coverImage, 'devnet');
-			console.log(`Cover image uploaded: ${coverImageHash}`);
-		}
-
-		// Step 2: Upload article to Arweave
-		console.log('Step 2: Uploading article to Arweave...');
-		const articleMetadata: Omit<ArticleMetadata, 'createdAt' | 'version'> = {
+		// Step 1: Upload article folder (content + cover image)
+		console.log('Step 1: Uploading article folder to Arweave...');
+		const folderParams: ArticleFolderUploadParams = {
 			title: title.trim(),
 			summary: summary.trim(),
 			content: content.trim(),
-			coverImage: coverImageHash,
+			coverImage: coverImage || undefined,
 			tags
 		};
 
-		const arweaveId = await uploadArticle(articleMetadata, 'devnet');
-		console.log(`Article uploaded to Arweave: ${arweaveId}`);
+		const folderResult = await uploadArticleFolder(folderParams, 'devnet');
+		console.log(`Article folder uploaded: ${folderResult.manifestId}`);
 
-		// Step 3: Publish to blockchain
-		console.log('Step 3: Publishing to blockchain...');
+		// 使用 manifest ID 作为 arweaveId（文章的唯一标识）
+		const arweaveId = folderResult.manifestId;
+
+		// 封面图片 URL：使用文件夹内的 coverImage 路径
+		// 格式: manifestId/coverImage
+		const coverImageForContract = folderResult.coverImageTxId
+			? `${arweaveId}/${ARTICLE_COVER_IMAGE_FILE}`
+			: '';
+
+		// Step 2: Publish to blockchain
+		console.log('Step 2: Publishing to blockchain...');
 		const txHash = await publishToContract(
 			arweaveId,
 			categoryId,
 			royaltyBps,
 			originalAuthor,
 			title.trim(),
-			coverImageHash || ''
+			coverImageForContract
 		);
 		console.log(`Article published to blockchain: ${txHash}`);
 
@@ -148,29 +149,29 @@ async function publishArticleWithSessionKeyInternal(
 		throw new Error('Failed to fund session key. Please try again or use MetaMask.');
 	}
 
-	// Step 1: Upload cover image with session key if provided
-	let coverImageHash: string | undefined;
-	if (coverImage) {
-		console.log('Step 1: Uploading cover image with Session Key...');
-		coverImageHash = await uploadImageWithSessionKey(sessionKey, coverImage, 'devnet');
-		console.log(`Cover image uploaded: ${coverImageHash}`);
-	}
-
-	// Step 2: Upload article to Arweave with session key
-	console.log('Step 2: Uploading article to Arweave with Session Key...');
-	const articleMetadata: Omit<ArticleMetadata, 'createdAt' | 'version'> = {
+	// Step 1: Upload article folder with session key (content + cover image)
+	console.log('Step 1: Uploading article folder to Arweave with Session Key...');
+	const folderParams: ArticleFolderUploadParams = {
 		title: title.trim(),
 		summary: summary.trim(),
 		content: content.trim(),
-		coverImage: coverImageHash,
+		coverImage: coverImage || undefined,
 		tags
 	};
 
-	const arweaveId = await uploadArticleWithSessionKey(sessionKey, articleMetadata, 'devnet');
-	console.log(`Article uploaded to Arweave: ${arweaveId}`);
+	const folderResult = await uploadArticleFolderWithSessionKey(sessionKey, folderParams, 'devnet');
+	console.log(`Article folder uploaded: ${folderResult.manifestId}`);
 
-	// Step 3: Publish to blockchain with session key
-	console.log('Step 3: Publishing to blockchain with Session Key...');
+	// 使用 manifest ID 作为 arweaveId（文章的唯一标识）
+	const arweaveId = folderResult.manifestId;
+
+	// 封面图片 URL：使用文件夹内的 coverImage 路径
+	const coverImageForContract = folderResult.coverImageTxId
+		? `${arweaveId}/${ARTICLE_COVER_IMAGE_FILE}`
+		: '';
+
+	// Step 2: Publish to blockchain with session key
+	console.log('Step 2: Publishing to blockchain with Session Key...');
 	const txHash = await publishToContractWithSessionKey(
 		sessionKey,
 		arweaveId,
@@ -178,7 +179,7 @@ async function publishArticleWithSessionKeyInternal(
 		royaltyBps,
 		originalAuthor,
 		title.trim(),
-		coverImageHash || ''
+		coverImageForContract
 	);
 	console.log(`Article published to blockchain: ${txHash}`);
 
