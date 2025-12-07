@@ -594,3 +594,7 @@ Gemini：无需充值，详见[10_session_key.md](./10_session_key.md)
 #### 2025-12-07 18:30  改为使用irys链上文件夹
 前端使用irys存储图片和文章，一个文章包含封面图片和文章内容，目前是每个文件上传一次，是分离无关联的；请帮我改为使用irys的链上可更新文件夹形式存储，文章固定用index.md，封面图片固定用coverImage名称；参考文档 doc\irys\features\onchain-folders.mdx 帮我进行改造，修改frontend中的相关逻辑；无需支持旧格式，强制一种新格式  
 Claude：重点更新了`frontend\src\lib\arweave`下的几个文件
+
+#### 2025-12-07 19:00  智能合约更新
+文章内容和图片等的存储改为使用irys的链上可变文件夹，前端frontend已完成修改，自动对封面图片、文章内容，文章内图片等进行关联；所以智能合约中无需再存储coverImage，只存储文章ID即arweaveHash即可，文章固定子路径index.md，封面图片固定coverImage；合约中的uri也需要更新，使用irys的预览URL格式；请阅读 doc\irys\features\onchain-folders.mdx ，和前端相关内容，然后对 contracts\src\BlogHub.sol 中的相关代码进行修改，无需考虑历史兼容性；然后对智能合约测试代码，以及部署代码等相关的地方也进行修改，最后对squid中相关的索引等内容一并进行更新  
+Claude: 已更新contracts和squid中的若干文件

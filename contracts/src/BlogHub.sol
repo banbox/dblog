@@ -47,8 +47,7 @@ contract BlogHub is
     error SessionKeyManagerNotSet();
     error OriginalAuthorTooLong();
     error TitleTooLong();
-    error CoverImageTooLong();
-
+    
     // 定义常量：最大评论长度（字节）
     // 140单词英文大约 700-1000 字节，中文约 400 汉字 = 1200 字节
     uint256 public constant MAX_COMMENT_LENGTH = 1024;
@@ -62,11 +61,10 @@ contract BlogHub is
 
     // --- 结构体 ---
     struct Article {
-        string arweaveHash;
+        string arweaveHash;    // Irys 可变文件夹的 manifest ID
         address author;
         string originalAuthor; // 真实作者（用于代发场景，最大64字节）
         string title;          // 文章标题（最大128字节，用于列表展示）
-        string coverImage;     // 封面图片 Arweave Hash（最大64字节）
         uint64 categoryId;
         uint64 timestamp;
     }
@@ -75,8 +73,6 @@ contract BlogHub is
     uint256 public constant MAX_ORIGINAL_AUTHOR_LENGTH = 64;
     // 最大标题长度（128字节，约40个中文字符或128个英文字符）
     uint256 public constant MAX_TITLE_LENGTH = 128;
-    // 最大封面图片 Hash 长度（64字节，足够存储 Arweave TX ID）
-    uint256 public constant MAX_COVER_IMAGE_LENGTH = 64;
 
     // --- 状态变量 ---
     uint256 public nextArticleId;
@@ -101,10 +97,9 @@ contract BlogHub is
         uint256 indexed articleId,
         address indexed author,
         uint256 indexed categoryId,
-        string arweaveId,
+        string arweaveId,       // Irys 可变文件夹的 manifest ID
         string originalAuthor,
         string title,
-        string coverImage,
         uint256 timestamp
     );
 
@@ -371,25 +366,22 @@ contract BlogHub is
     /**
      * @dev 发布文章 (铸造 NFT)
      * 支持 meta-transactions (使用 _msgSender())
-     * @param _arweaveId Arweave 存储哈希
+     * @param _arweaveId Irys 可变文件夹的 manifest ID（文章内容固定路径 index.md，封面图片固定路径 coverImage）
      * @param _categoryId 分类ID
      * @param _royaltyBps 版税比例 (basis points)
      * @param _originalAuthor 真实作者名称（用于代发场景，为空则表示发布者即作者）
      * @param _title 文章标题（用于列表展示，最大128字节）
-     * @param _coverImage 封面图片 Arweave Hash（可为空，最大64字节）
      */
     function publish(
         string calldata _arweaveId,
         uint64 _categoryId,
         uint96 _royaltyBps,
         string calldata _originalAuthor,
-        string calldata _title,
-        string calldata _coverImage
+        string calldata _title
     ) external whenNotPaused returns (uint256) {
         if (_royaltyBps > 10000) revert RoyaltyTooHigh();
         if (bytes(_originalAuthor).length > MAX_ORIGINAL_AUTHOR_LENGTH) revert OriginalAuthorTooLong();
         if (bytes(_title).length > MAX_TITLE_LENGTH) revert TitleTooLong();
-        if (bytes(_coverImage).length > MAX_COVER_IMAGE_LENGTH) revert CoverImageTooLong();
         
         address author = _msgSender();
         uint256 newId = nextArticleId++;
@@ -400,7 +392,6 @@ contract BlogHub is
             author: author,
             originalAuthor: _originalAuthor,
             title: _title,
-            coverImage: _coverImage,
             categoryId: _categoryId,
             timestamp: uint64(block.timestamp)
         });
@@ -418,7 +409,6 @@ contract BlogHub is
             _arweaveId,
             _originalAuthor,
             _title,
-            _coverImage,
             block.timestamp
         );
         return newId;
@@ -475,16 +465,19 @@ contract BlogHub is
     // =============================================================
 
     /**
-     * @dev 重写 uri 函数，使其返回真实可用的 Metadata URL
-     * 格式: https://arweave.net/{hash}
+     * @dev 重写 uri 函数，使其返回 Irys 可变文件夹的预览 URL
+     * 格式: https://gateway.irys.xyz/mutable/{manifestId}/index.md
+     * 文章内容固定路径: index.md
+     * 封面图片固定路径: coverImage
      */
     function uri(uint256 _id) public view override returns (string memory) {
         if (_id == 0 || _id >= nextArticleId) revert ArticleNotFound();
         return
             string(
                 abi.encodePacked(
-                    "https://arweave.net/",
-                    articles[_id].arweaveHash
+                    "https://gateway.irys.xyz/mutable/",
+                    articles[_id].arweaveHash,
+                    "/index.md"
                 )
             );
     }
@@ -709,12 +702,11 @@ contract BlogHub is
      * @dev 允许用户通过 Session Key 发布文章，无需每次签名
      * @param owner 主账户地址（文章作者）
      * @param sessionKey Session Key 地址
-     * @param _arweaveId Arweave 存储哈希
+     * @param _arweaveId Irys 可变文件夹的 manifest ID
      * @param _categoryId 分类ID
      * @param _royaltyBps 版税比例 (basis points)
      * @param _originalAuthor 真实作者名称
      * @param _title 文章标题
-     * @param _coverImage 封面图片 Arweave Hash
      * @param deadline 签名过期时间
      * @param signature Session Key 签名
      * @return articleId 新创建的文章ID
@@ -727,7 +719,6 @@ contract BlogHub is
         uint96 _royaltyBps,
         string calldata _originalAuthor,
         string calldata _title,
-        string calldata _coverImage,
         uint256 deadline,
         bytes calldata signature
     ) external whenNotPaused returns (uint256) {
@@ -735,7 +726,6 @@ contract BlogHub is
         if (_royaltyBps > 10000) revert RoyaltyTooHigh();
         if (bytes(_originalAuthor).length > MAX_ORIGINAL_AUTHOR_LENGTH) revert OriginalAuthorTooLong();
         if (bytes(_title).length > MAX_TITLE_LENGTH) revert TitleTooLong();
-        if (bytes(_coverImage).length > MAX_COVER_IMAGE_LENGTH) revert CoverImageTooLong();
 
         // 构建 callData 用于验证
         bytes memory callData = abi.encodeWithSelector(
@@ -744,8 +734,7 @@ contract BlogHub is
             _categoryId,
             _royaltyBps,
             _originalAuthor,
-            _title,
-            _coverImage
+            _title
         );
 
         // 验证 Session Key
@@ -771,7 +760,6 @@ contract BlogHub is
             author: owner,
             originalAuthor: _originalAuthor,
             title: _title,
-            coverImage: _coverImage,
             categoryId: _categoryId,
             timestamp: uint64(block.timestamp)
         });
@@ -789,7 +777,6 @@ contract BlogHub is
             _arweaveId,
             _originalAuthor,
             _title,
-            _coverImage,
             block.timestamp
         );
 

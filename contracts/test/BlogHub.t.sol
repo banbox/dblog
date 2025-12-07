@@ -17,7 +17,6 @@ contract BlogHubTest is BaseTest {
         string arweaveId,
         string originalAuthor,
         string title,
-        string coverImage,
         uint256 timestamp
     );
 
@@ -72,25 +71,23 @@ contract BlogHubTest is BaseTest {
         uint64 categoryId = 1;
         uint96 royaltyBps = 500;
         string memory originalAuthor = "";
+        string memory title = "Test Article Title";
 
         vm.expectEmit(true, true, true, true);
-        string memory title = "Test Article Title";
-        string memory coverImage = "cover-hash-123";
-        emit ArticlePublished(1, user1, categoryId, arweaveHash, originalAuthor, title, coverImage, block.timestamp);
+        emit ArticlePublished(1, user1, categoryId, arweaveHash, originalAuthor, title, block.timestamp);
 
         vm.prank(user1);
-        uint256 articleId = blogHub.publish(arweaveHash, categoryId, royaltyBps, originalAuthor, title, coverImage);
+        uint256 articleId = blogHub.publish(arweaveHash, categoryId, royaltyBps, originalAuthor, title);
 
         assertEq(articleId, 1);
         assertEq(blogHub.nextArticleId(), 2);
         
         // 验证文章数据
-        (string memory hash, address author, string memory origAuthor, string memory storedTitle, string memory storedCover, uint64 catId, uint64 timestamp) = blogHub.articles(articleId);
+        (string memory hash, address author, string memory origAuthor, string memory storedTitle, uint64 catId, uint64 timestamp) = blogHub.articles(articleId);
         assertEq(hash, arweaveHash);
         assertEq(author, user1);
         assertEq(origAuthor, originalAuthor);
         assertEq(storedTitle, title);
-        assertEq(storedCover, coverImage);
         assertEq(catId, categoryId);
         assertEq(timestamp, block.timestamp);
 
@@ -104,21 +101,19 @@ contract BlogHubTest is BaseTest {
         uint96 royaltyBps = 500;
         string memory originalAuthor = "RealAuthor.eth";
         string memory title = "Another Article";
-        string memory coverImage = "";
 
         vm.expectEmit(true, true, true, true);
-        emit ArticlePublished(1, user1, categoryId, arweaveHash, originalAuthor, title, coverImage, block.timestamp);
+        emit ArticlePublished(1, user1, categoryId, arweaveHash, originalAuthor, title, block.timestamp);
 
         vm.prank(user1);
-        uint256 articleId = blogHub.publish(arweaveHash, categoryId, royaltyBps, originalAuthor, title, coverImage);
+        uint256 articleId = blogHub.publish(arweaveHash, categoryId, royaltyBps, originalAuthor, title);
 
         // 验证文章数据
-        (string memory hash, address author, string memory origAuthor, string memory storedTitle, string memory storedCover, uint64 catId, uint64 timestamp) = blogHub.articles(articleId);
+        (string memory hash, address author, string memory origAuthor, string memory storedTitle, uint64 catId, uint64 timestamp) = blogHub.articles(articleId);
         assertEq(hash, arweaveHash);
         assertEq(author, user1); // 发布者是 user1
         assertEq(origAuthor, originalAuthor); // 真实作者是 RealAuthor.eth
         assertEq(storedTitle, title);
-        assertEq(storedCover, coverImage);
         assertEq(catId, categoryId);
         assertEq(timestamp, block.timestamp);
     }
@@ -132,20 +127,20 @@ contract BlogHubTest is BaseTest {
 
         vm.prank(user1);
         vm.expectRevert(BlogHub.OriginalAuthorTooLong.selector);
-        blogHub.publish("hash", 1, 500, string(longAuthor), "Title", "");
+        blogHub.publish("hash", 1, 500, string(longAuthor), "Title");
     }
 
     function test_Publish_RevertRoyaltyTooHigh() public {
         vm.prank(user1);
         vm.expectRevert(BlogHub.RoyaltyTooHigh.selector);
-        blogHub.publish("hash", 1, 10001, "", "Title", ""); // 超过 100%
+        blogHub.publish("hash", 1, 10001, "", "Title"); // 超过 100%
     }
 
     function test_Publish_MultipleArticles() public {
         vm.startPrank(user1);
-        uint256 id1 = blogHub.publish("hash1", 1, 500, "", "Title1", "");
-        uint256 id2 = blogHub.publish("hash2", 2, 300, "Author2", "Title2", "cover2");
-        uint256 id3 = blogHub.publish("hash3", 1, 1000, "Author3.eth", "Title3", "cover3");
+        uint256 id1 = blogHub.publish("hash1", 1, 500, "", "Title1");
+        uint256 id2 = blogHub.publish("hash2", 2, 300, "Author2", "Title2");
+        uint256 id3 = blogHub.publish("hash3", 1, 1000, "Author3.eth", "Title3");
         vm.stopPrank();
 
         assertEq(id1, 1);
@@ -341,9 +336,10 @@ contract BlogHubTest is BaseTest {
     function test_Uri_Success() public {
         string memory arweaveHash = "abc123xyz";
         vm.prank(user1);
-        uint256 articleId = blogHub.publish(arweaveHash, 1, 500, "", "Test Article", "");
+        uint256 articleId = blogHub.publish(arweaveHash, 1, 500, "", "Test Article");
 
-        string memory expectedUri = string(abi.encodePacked("https://arweave.net/", arweaveHash));
+        // URI 现在使用 Irys 可变文件夹格式
+        string memory expectedUri = string(abi.encodePacked("https://gateway.irys.xyz/mutable/", arweaveHash, "/index.md"));
         assertEq(blogHub.uri(articleId), expectedUri);
     }
 
@@ -385,7 +381,7 @@ contract BlogHubTest is BaseTest {
 
         vm.prank(user1);
         vm.expectRevert();
-        blogHub.publish("hash", 1, 500, "", "Title", "");
+        blogHub.publish("hash", 1, 500, "", "Title");
     }
 
     // ============ 管理功能测试 ============

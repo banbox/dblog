@@ -202,9 +202,9 @@ contract BlogHubSessionKeyTest is BaseTest {
             deadline
         );
 
-        uint256 user1BalanceBefore = user1.balance;
-
+        // 0 金额评价会触发 SpamProtection 错误（当有评论内容时）
         vm.prank(owner);
+        vm.expectRevert(BlogHub.SpamProtection.selector);
         blogHub.evaluateWithSessionKey(
             user1,
             sessionKey,
@@ -216,9 +216,6 @@ contract BlogHubSessionKeyTest is BaseTest {
             deadline,
             signature
         );
-
-        // 余额不变（没有代付）
-        assertEq(user1.balance, user1BalanceBefore);
     }
 
     function test_EvaluateWithSessionKey_RevertSessionKeyManagerNotSet() public {

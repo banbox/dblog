@@ -13,7 +13,7 @@ export class Article {
     id!: string
 
     @StringColumn_({nullable: false})
-    arweaveId!: string
+    arweaveId!: string  // Irys 可变文件夹的 manifest ID（文章内容: index.md，封面图片: coverImage）
 
     @Index_()
     @ManyToOne_(() => User, {nullable: true})
@@ -24,9 +24,6 @@ export class Article {
 
     @StringColumn_({nullable: false})
     title!: string
-
-    @StringColumn_({nullable: true})
-    coverImage!: string | undefined | null
 
     @BigIntColumn_({nullable: false})
     categoryId!: bigint

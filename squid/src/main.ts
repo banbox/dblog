@@ -42,13 +42,14 @@ processor.run(new TypeormDatabase(), async (ctx) => {
                 usersToUpdate.set(user.id, user)
 
                 // 创建文章（注意：royaltyBps 不在事件中，需要通过合约调用获取或设为默认值）
+                // arweaveId 现在是 Irys 可变文件夹的 manifest ID
+                // 文章内容固定路径: index.md，封面图片固定路径: coverImage
                 const article = new Article({
                     id: event.articleId.toString(),
                     arweaveId: event.arweaveId,
                     author: user,
                     originalAuthor: event.originalAuthor || null,
                     title: event.title,
-                    coverImage: event.coverImage || null,
                     categoryId: event.categoryId,
                     royaltyBps: 0, // 事件中不包含此字段，可通过合约查询或前端处理
                     likes: 0,

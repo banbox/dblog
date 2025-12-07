@@ -14,11 +14,10 @@ type User @entity {
 # 文章实体
 type Article @entity {
   id: ID!                          # articleId
-  arweaveId: String!               # Arweave 存储 Hash
+  arweaveId: String!               # Irys 可变文件夹的 manifest ID（文章内容: index.md，封面图片: coverImage）
   author: User!                    # 作者地址
   originalAuthor: String           # 原始作者（代发时记录）
   title: String!                   # 文章标题（用于列表展示）
-  coverImage: String               # 封面图片 Arweave Hash（可为空）
   categoryId: BigInt!
   royaltyBps: Int!
   likes: Int!

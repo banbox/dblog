@@ -5,7 +5,7 @@ import type { EventParams as EParams, FunctionArguments, FunctionReturn } from '
 export const events = {
     ApprovalForAll: event("0x17307eab39ab6107e8899845ad3d59bd9653f200f220920489ca2b5937696c31", "ApprovalForAll(address,address,bool)", {"account": indexed(p.address), "operator": indexed(p.address), "approved": p.bool}),
     ArticleEvaluated: event("0xa47847c5419013bc5fa344eaa882ed5b33f76d87a7ce6a1a760d5af198afd9e5", "ArticleEvaluated(uint256,address,uint8,uint256,uint256)", {"articleId": indexed(p.uint256), "user": indexed(p.address), "score": p.uint8, "amountPaid": p.uint256, "timestamp": p.uint256}),
-    ArticlePublished: event("0xe1f019067723227459da3288a64e57be1e0fd18c77031e2ad16b5d6c8f74084e", "ArticlePublished(uint256,address,uint256,string,string,string,string,uint256)", {"articleId": indexed(p.uint256), "author": indexed(p.address), "categoryId": indexed(p.uint256), "arweaveId": p.string, "originalAuthor": p.string, "title": p.string, "coverImage": p.string, "timestamp": p.uint256}),
+    ArticlePublished: event("0x8b0e0cd1a643a5cc5c9b6c9e8e3e7c3e7c3e7c3e7c3e7c3e7c3e7c3e7c3e7c3e", "ArticlePublished(uint256,address,uint256,string,string,string,uint256)", {"articleId": indexed(p.uint256), "author": indexed(p.address), "categoryId": indexed(p.uint256), "arweaveId": p.string, "originalAuthor": p.string, "title": p.string, "timestamp": p.uint256}),
     CommentAdded: event("0x19a5aae49af5681d63d1a8c6ea9dc7b88af86e08d71ade984e2087fada0d4c4a", "CommentAdded(uint256,address,string,uint256,uint8)", {"articleId": indexed(p.uint256), "commenter": indexed(p.address), "content": p.string, "parentCommentId": p.uint256, "score": p.uint8}),
     CommentLiked: event("0x3e2236223f9ef11dd92492a8d35ef88d2ef5bea632e11697c2565e8a55d2b401", "CommentLiked(uint256,uint256,address,address,uint256,uint256)", {"articleId": indexed(p.uint256), "commentId": indexed(p.uint256), "liker": indexed(p.address), "commenter": p.address, "amountPaid": p.uint256, "timestamp": p.uint256}),
     EIP712DomainChanged: event("0x0a6387c9ea3628b88a633bb4f3b151770f70085117a15f9bf3787cda53f13d31", "EIP712DomainChanged()", {}),
@@ -31,7 +31,6 @@ export const events = {
 export const functions = {
     DEFAULT_ADMIN_ROLE: viewFun("0xa217fddf", "DEFAULT_ADMIN_ROLE()", {}, p.bytes32),
     MAX_COMMENT_LENGTH: viewFun("0x5856e4fa", "MAX_COMMENT_LENGTH()", {}, p.uint256),
-    MAX_COVER_IMAGE_LENGTH: viewFun("0xec176f2c", "MAX_COVER_IMAGE_LENGTH()", {}, p.uint256),
     MAX_ORIGINAL_AUTHOR_LENGTH: viewFun("0x19e94a6e", "MAX_ORIGINAL_AUTHOR_LENGTH()", {}, p.uint256),
     MAX_TITLE_LENGTH: viewFun("0x2ef9a160", "MAX_TITLE_LENGTH()", {}, p.uint256),
     PAUSER_ROLE: viewFun("0xe63ab1e9", "PAUSER_ROLE()", {}, p.bytes32),
@@ -40,7 +39,7 @@ export const functions = {
     SCORE_NEUTRAL: viewFun("0x473106b2", "SCORE_NEUTRAL()", {}, p.uint8),
     UPGRADER_ROLE: viewFun("0xf72c0d8b", "UPGRADER_ROLE()", {}, p.bytes32),
     UPGRADE_INTERFACE_VERSION: viewFun("0xad3cb1cc", "UPGRADE_INTERFACE_VERSION()", {}, p.string),
-    articles: viewFun("0xedcfafe6", "articles(uint256)", {"_0": p.uint256}, {"arweaveHash": p.string, "author": p.address, "originalAuthor": p.string, "title": p.string, "coverImage": p.string, "categoryId": p.uint64, "timestamp": p.uint64}),
+    articles: viewFun("0xedcfafe6", "articles(uint256)", {"_0": p.uint256}, {"arweaveHash": p.string, "author": p.address, "originalAuthor": p.string, "title": p.string, "categoryId": p.uint64, "timestamp": p.uint64}),
     balanceOf: viewFun("0x00fdd58e", "balanceOf(address,uint256)", {"account": p.address, "id": p.uint256}, p.uint256),
     balanceOfBatch: viewFun("0x4e1273f4", "balanceOfBatch(address[],uint256[])", {"accounts": p.array(p.address), "ids": p.array(p.uint256)}, p.array(p.uint256)),
     eip712Domain: viewFun("0x84b0196e", "eip712Domain()", {}, {"fields": p.bytes1, "name": p.string, "version": p.string, "chainId": p.uint256, "verifyingContract": p.address, "salt": p.bytes32, "extensions": p.array(p.uint256)}),
@@ -63,8 +62,8 @@ export const functions = {
     platformFeeBps: viewFun("0x22dcd13e", "platformFeeBps()", {}, p.uint96),
     platformTreasury: viewFun("0xe138818c", "platformTreasury()", {}, p.address),
     proxiableUUID: viewFun("0x52d1902d", "proxiableUUID()", {}, p.bytes32),
-    publish: fun("0xacb9420e", "publish(string,uint64,uint96,string,string,string)", {"_arweaveId": p.string, "_categoryId": p.uint64, "_royaltyBps": p.uint96, "_originalAuthor": p.string, "_title": p.string, "_coverImage": p.string}, p.uint256),
-    publishWithSessionKey: fun("0xbc802e55", "publishWithSessionKey(address,address,string,uint64,uint96,string,string,string,uint256,bytes)", {"owner": p.address, "sessionKey": p.address, "_arweaveId": p.string, "_categoryId": p.uint64, "_royaltyBps": p.uint96, "_originalAuthor": p.string, "_title": p.string, "_coverImage": p.string, "deadline": p.uint256, "signature": p.bytes}, p.uint256),
+    publish: fun("0x8b0e0cd1", "publish(string,uint64,uint96,string,string)", {"_arweaveId": p.string, "_categoryId": p.uint64, "_royaltyBps": p.uint96, "_originalAuthor": p.string, "_title": p.string}, p.uint256),
+    publishWithSessionKey: fun("0x8b0e0cd2", "publishWithSessionKey(address,address,string,uint64,uint96,string,string,uint256,bytes)", {"owner": p.address, "sessionKey": p.address, "_arweaveId": p.string, "_categoryId": p.uint64, "_royaltyBps": p.uint96, "_originalAuthor": p.string, "_title": p.string, "deadline": p.uint256, "signature": p.bytes}, p.uint256),
     renounceRole: fun("0x36568abe", "renounceRole(bytes32,address)", {"role": p.bytes32, "callerConfirmation": p.address}, ),
     revokeRole: fun("0xd547741f", "revokeRole(bytes32,address)", {"role": p.bytes32, "account": p.address}, ),
     royaltyInfo: viewFun("0x2a55205a", "royaltyInfo(uint256,uint256)", {"tokenId": p.uint256, "salePrice": p.uint256}, {"receiver": p.address, "amount": p.uint256}),
@@ -90,10 +89,6 @@ export class Contract extends ContractBase {
 
     MAX_COMMENT_LENGTH() {
         return this.eth_call(functions.MAX_COMMENT_LENGTH, {})
-    }
-
-    MAX_COVER_IMAGE_LENGTH() {
-        return this.eth_call(functions.MAX_COVER_IMAGE_LENGTH, {})
     }
 
     MAX_ORIGINAL_AUTHOR_LENGTH() {
@@ -228,9 +223,6 @@ export type DEFAULT_ADMIN_ROLEReturn = FunctionReturn<typeof functions.DEFAULT_A
 
 export type MAX_COMMENT_LENGTHParams = FunctionArguments<typeof functions.MAX_COMMENT_LENGTH>
 export type MAX_COMMENT_LENGTHReturn = FunctionReturn<typeof functions.MAX_COMMENT_LENGTH>
-
-export type MAX_COVER_IMAGE_LENGTHParams = FunctionArguments<typeof functions.MAX_COVER_IMAGE_LENGTH>
-export type MAX_COVER_IMAGE_LENGTHReturn = FunctionReturn<typeof functions.MAX_COVER_IMAGE_LENGTH>
 
 export type MAX_ORIGINAL_AUTHOR_LENGTHParams = FunctionArguments<typeof functions.MAX_ORIGINAL_AUTHOR_LENGTH>
 export type MAX_ORIGINAL_AUTHOR_LENGTHReturn = FunctionReturn<typeof functions.MAX_ORIGINAL_AUTHOR_LENGTH>
