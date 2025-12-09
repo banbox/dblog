@@ -7,431 +7,54 @@
 ## 目录
 
 **Part 1: 智能合约（已完成）**
-1. [环境准备](#1-环境准备)
-2. [本地部署验证](#2-本地部署验证)
-3. [合约调用测试](#3-合约调用测试)
-4. [Session Key 配置与测试](#4-session-key-配置与测试)
-5. [Paymaster 配置](#5-paymaster-配置)
+- 详见 [contracts.md](contracts.md) - 包含环境准备、本地部署、合约调用、Session Key、Paymaster 配置、测试网/主网部署、问题排查
 
-**Part 2: SubSquid 索引（待开发）**
-6. [SubSquid 项目初始化](#6-subsquid-项目初始化)
-7. [Schema 定义与实体映射](#7-schema-定义与实体映射)
-8. [Processor 事件处理](#8-processor-事件处理)
-9. [GraphQL API 与查询](#9-graphql-api-与查询)
+**Part 2: SubSquid 索引（已完成）**
+1. [SubSquid 项目初始化](#1-subsquid-项目初始化)
+2. [Schema 定义与实体映射](#2-schema-定义与实体映射)
+3. [Processor 事件处理](#3-processor-事件处理)
+4. [GraphQL API 与查询](#4-graphql-api-与查询)
 
-**Part 3: Irys + Arweave 存储（待开发）**
-10. [Irys SDK 集成](#10-irys-sdk-集成)
-11. [文章上传与元数据](#11-文章上传与元数据)
-12. [内容获取与缓存](#12-内容获取与缓存)
+**Part 3: Irys + Arweave 存储（已完成）**
+5. [Irys SDK 集成](#5-irys-sdk-集成)
+6. [文章上传与元数据](#6-文章上传与元数据)
+7. [内容获取与缓存](#7-内容获取与缓存)
 
 **Part 4: SvelteKit 前端（已完成）**
-13. [前端项目初始化](#13-前端项目初始化)
-14. [钱包连接与合约交互](#14-钱包连接与合约交互)
-15. [Session Key 无感交互](#15-session-key-无感交互)
-16. [页面与组件开发](#16-页面与组件开发)
-
-**Part 5: 部署与运维**
-17. [测试网部署](#17-测试网部署)
-18. [主网部署检查清单](#18-主网部署检查清单)
-19. [常见问题排查](#19-常见问题排查)
+8. [前端项目初始化](#8-前端项目初始化)
+9. [钱包连接与合约交互](#9-钱包连接与合约交互)
+10. [Session Key 无感交互](#10-session-key-无感交互)
+11. [页面与组件开发](#11-页面与组件开发)
 
 ---
 
-## 1. 环境准备
-
-### 1.1 部署合约地址（本地 Anvil）
-
-```
-SessionKeyManager: 0x5FbDB2315678afecb367f032d93F642f64180aa3
-BlogPaymaster:     0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512
-BlogHub Impl:      0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0
-BlogHub Proxy:     0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9
-EntryPoint:        0x0000000071727De22E5E9d8BAf0edAc6f37da032
-```
-
-### 1.2 测试账户（Anvil 默认）
-
-```bash
-# Account #0 (Deployer/Owner)
-Address: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
-Private Key: 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-
-# Account #1 (User1 - 作者)
-Address: 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
-Private Key: 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d
-
-# Account #2 (User2 - 读者)
-Address: 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC
-Private Key: 0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a
-```
-
----
-
-## 2. 本地部署验证
-
-### 2.1 启动本地链
-
-```bash
-# 终端 1: 启动 Anvil（保持运行）
-cd contracts
-anvil --dump-state cache/anvil.json --load-state cache/anvil.json
-```
-
-### 2.2 验证合约部署
-
-```bash
-cd contracts
-
-export PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-forge script script/Deploy.s.sol --fork-url http://localhost:8545 --broadcast --tc DeployScript
-
-# 升级智能合约
-export BLOG_HUB_PROXY=0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9
-forge script script/Deploy.s.sol --fork-url http://localhost:8545 --broadcast --tc UpgradeBlogHub
-
-# 检查 BlogHub Proxy 是否正确初始化
-cast call 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9 "platformTreasury()(address)" --rpc-url http://localhost:8545
-
-# 检查 platformFeeBps (默认 250 = 2.5%)
-cast call 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9 "platformFeeBps()(uint96)" --rpc-url http://localhost:8545
-
-# 检查 SessionKeyManager 是否已设置
-cast call 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9 "sessionKeyManager()(address)" --rpc-url http://localhost:8545
-
-# 检查 Paymaster 的 SessionKeyManager
-cast call 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512 "sessionKeyManager()(address)" --rpc-url http://localhost:8545
-```
-
----
-
-## 3. 合约调用测试
-
-### 3.1 发布文章
-
-```bash
-# 代发文章（记录真实作者，带封面图片）
-# publish(string arweaveId, uint64 categoryId, uint96 royaltyBps, string originalAuthor, string title, string coverImage)
-# originalAuthor 为空字符串表示发布者即作者
-# title 为文章标题（最大128字节）
-# coverImage 为封面图片 Arweave Hash（可为空，最大64字节）
-cast send 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9 \
-  "publish(string,uint64,uint96,string,string,string)(uint256)" \
-  "QmTestArweaveHash987654321" \
-  1 \
-  500 \
-  "RealAuthor.eth" \
-  "Web3 Development Guide" \
-  "QmCoverImageHash123" \
-  --private-key 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d \
-  --rpc-url http://localhost:8545
-
-# 验证文章创建
-cast call 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9 "nextArticleId()(uint256)" --rpc-url http://localhost:8545
-# 应返回 2（下一个文章ID）
-
-# 查看文章详情（包含 originalAuthor, title, coverImage 字段）
-cast call 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9 \
-  "articles(uint256)(string,address,string,string,string,uint64,uint64)" \
-  1 \
-  --rpc-url http://localhost:8545
-```
-
-### 3.2 评价文章（带打赏）
-
-```bash
-# 使用 User2 评价文章（喜欢 + 打赏 0.01 ETH）
-# evaluate(uint256 articleId, uint8 score, string content, address referrer, uint256 parentCommentId)
-# score: 0=中立, 1=喜欢, 2=不喜欢
-cast send 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9 \
-  "evaluate(uint256,uint8,string,address,uint256)" \
-  1 \
-  1 \
-  "Great article!" \
-  0x0000000000000000000000000000000000000000 \
-  0 \
-  --value 0.01ether \
-  --private-key 0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a \
-  --rpc-url http://localhost:8545
-
-# 注意：打赏金额会直接转账给作者，无需提取
-```
-
-### 3.3 纯评论（无打赏）
-
-```bash
-# 纯评论需要 score=0 且有内容
-cast send 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9 \
-  "evaluate(uint256,uint8,string,address,uint256)" \
-  1 \
-  0 \
-  "This is a comment without tip" \
-  0x0000000000000000000000000000000000000000 \
-  0 \
-  --private-key 0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a \
-  --rpc-url http://localhost:8545
-```
-
-### 3.4 关注用户
-
-```bash
-# User2 关注 User1
-cast send 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9 \
-  "follow(address,bool)" \
-  0x70997970C51812dc3A010C7d01b50e0d17dc79C8 \
-  true \
-  --private-key 0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a \
-  --rpc-url http://localhost:8545
-```
-
----
-
-## 4. Session Key 配置与测试
-
-Session Key 允许用户授权临时密钥执行特定操作，实现无感交互体验。
-
-### 4.1 生成 Session Key
-
-```javascript
-// 前端代码示例 (ethers.js v6)
-import { Wallet } from 'ethers';
-
-// 生成临时密钥对
-const sessionKeyWallet = Wallet.createRandom();
-console.log('Session Key Address:', sessionKeyWallet.address);
-console.log('Session Key Private Key:', sessionKeyWallet.privateKey);
-
-// 保存到 localStorage
-localStorage.setItem('sessionKey', JSON.stringify({
-  address: sessionKeyWallet.address,
-  privateKey: sessionKeyWallet.privateKey
-}));
-```
-
-### 4.2 注册 Session Key（主钱包签名）
-
-```bash
-# 假设生成的 Session Key 地址为: 0x1234567890123456789012345678901234567890
-
-# 使用 User1 注册 Session Key
-# registerSessionKey(address sessionKey, uint48 validAfter, uint48 validUntil, address allowedContract, bytes4[] allowedSelectors, uint256 spendingLimit)
-
-# 获取当前时间戳
-CURRENT_TIME=$(cast block latest --rpc-url http://localhost:8545 | grep timestamp | awk '{print $2}')
-VALID_UNTIL=$((CURRENT_TIME + 86400))  # 24小时后过期
-
-# 函数选择器:
-# evaluate: 0xff1f090a
-# likeComment: 0xdffd40f2
-# follow: 0x63c3cc16
-
-cast send 0x5FbDB2315678afecb367f032d93F642f64180aa3 \
-  "registerSessionKey(address,uint48,uint48,address,bytes4[],uint256)" \
-  0x1234567890123456789012345678901234567890 \
-  $CURRENT_TIME \
-  $VALID_UNTIL \
-  0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9 \
-  "[0xff1f090a,0xdffd40f2,0x63c3cc16]" \
-  1000000000000000000 \
-  --private-key 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d \
-  --rpc-url http://localhost:8545
-```
-
-### 4.3 查询 Session Key 状态
-
-```bash
-# 检查 Session Key 是否激活
-cast call 0x5FbDB2315678afecb367f032d93F642f64180aa3 \
-  "isSessionKeyActive(address,address)(bool)" \
-  0x70997970C51812dc3A010C7d01b50e0d17dc79C8 \
-  0x1234567890123456789012345678901234567890 \
-  --rpc-url http://localhost:8545
-
-# 获取 Session Key 详细数据
-cast call 0x5FbDB2315678afecb367f032d93F642f64180aa3 \
-  "getSessionKeyData(address,address)" \
-  0x70997970C51812dc3A010C7d01b50e0d17dc79C8 \
-  0x1234567890123456789012345678901234567890 \
-  --rpc-url http://localhost:8545
-
-# 查询剩余消费额度
-cast call 0x5FbDB2315678afecb367f032d93F642f64180aa3 \
-  "getRemainingSpendingLimit(address,address)(uint256)" \
-  0x70997970C51812dc3A010C7d01b50e0d17dc79C8 \
-  0x1234567890123456789012345678901234567890 \
-  --rpc-url http://localhost:8545
-```
-
-### 4.4 使用 Session Key 执行操作
-
-Session Key 操作需要构建 EIP-712 签名，通常由前端完成：
-
-```typescript
-// 前端代码示例
-import { ethers } from 'ethers';
-
-const DOMAIN = {
-  name: 'SessionKeyManager',
-  version: '1',
-  chainId: 31337, // Anvil chainId
-  verifyingContract: '0x5FbDB2315678afecb367f032d93F642f64180aa3'
-};
-
-const TYPES = {
-  SessionOperation: [
-    { name: 'owner', type: 'address' },
-    { name: 'sessionKey', type: 'address' },
-    { name: 'target', type: 'address' },
-    { name: 'selector', type: 'bytes4' },
-    { name: 'callData', type: 'bytes' },
-    { name: 'value', type: 'uint256' },
-    { name: 'nonce', type: 'uint256' },
-    { name: 'deadline', type: 'uint256' }
-  ]
-};
-
-async function signSessionOperation(
-  sessionKeyWallet: ethers.Wallet,
-  owner: string,
-  target: string,
-  selector: string,
-  callData: string,
-  value: bigint,
-  nonce: bigint,
-  deadline: bigint
-) {
-  const message = {
-    owner,
-    sessionKey: sessionKeyWallet.address,
-    target,
-    selector,
-    callData,
-    value,
-    nonce,
-    deadline
-  };
-  
-  return await sessionKeyWallet.signTypedData(DOMAIN, TYPES, message);
-}
-```
-
-### 4.5 撤销 Session Key
-
-```bash
-# 主账户撤销 Session Key
-cast send 0x5FbDB2315678afecb367f032d93F642f64180aa3 \
-  "revokeSessionKey(address)" \
-  0x1234567890123456789012345678901234567890 \
-  --private-key 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d \
-  --rpc-url http://localhost:8545
-```
-
----
-
-## 5. Paymaster 配置
-
-Paymaster 负责 ERC-4337 的 Gas 代付功能。
-
-### 5.1 向 EntryPoint 存款
-
-```bash
-# Paymaster 需要在 EntryPoint 有存款才能工作
-# 使用 Owner 账户操作
-cast send 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512 \
-  "depositToEntryPoint()" \
-  --value 1ether \
-  --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-  --rpc-url http://localhost:8545
-
-# 查看 EntryPoint 存款余额
-cast call 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512 \
-  "getEntryPointDeposit()(uint256)" \
-  --rpc-url http://localhost:8545
-```
-
-### 5.2 添加 Stake
-
-```bash
-# Paymaster 必须有 stake 才能工作
-# unstakeDelaySec: 解锁延迟时间（秒），建议至少 1 天 = 86400
-cast send 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512 \
-  "addStake(uint32)" \
-  86400 \
-  --value 0.5ether \
-  --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-  --rpc-url http://localhost:8545
-
-# 查看完整存款信息
-cast call 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512 \
-  "getDepositInfo()(uint256,bool,uint112,uint32,uint48)" \
-  --rpc-url http://localhost:8545
-```
-
-### 5.3 用户存款到 Paymaster
-
-```bash
-# 项目方/赞助商存款
-cast send 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512 \
-  "deposit()" \
-  --value 1ether \
-  --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-  --rpc-url http://localhost:8545
-
-# 查看余额
-cast call 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512 \
-  "balanceOf(address)(uint256)" \
-  0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
-  --rpc-url http://localhost:8545
-```
-
-### 5.4 授权用户使用 Gas
-
-```bash
-# 项目方授权 User1 使用其余额支付 Gas
-# approve(address spender, uint256 amount)
-# type(uint256).max = 无限授权
-cast send 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512 \
-  "approve(address,uint256)" \
-  0x70997970C51812dc3A010C7d01b50e0d17dc79C8 \
-  115792089237316195423570985008687907853269984665640564039457584007913129639935 \
-  --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-  --rpc-url http://localhost:8545
-
-# 检查授权额度
-cast call 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512 \
-  "allowance(address,address)(uint256)" \
-  0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
-  0x70997970C51812dc3A010C7d01b50e0d17dc79C8 \
-  --rpc-url http://localhost:8545
-
-# 检查是否可以赞助
-cast call 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512 \
-  "canSponsor(address,address,uint256)(bool)" \
-  0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
-  0x70997970C51812dc3A010C7d01b50e0d17dc79C8 \
-  100000000000000000 \
-  --rpc-url http://localhost:8545
-```
-
-### 5.5 使用脚本配置 Paymaster
-
-```bash
-# 使用部署脚本中的 ConfigurePaymaster
-PAYMASTER=0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512 \
-DEPOSIT_AMOUNT=1000000000000000000 \
-STAKE_AMOUNT=500000000000000000 \
-UNSTAKE_DELAY=86400 \
-forge script script/Deploy.s.sol --fork-url http://localhost:8545 --broadcast --tc ConfigurePaymaster
-```
+# Part 1: 智能合约
+
+> **完整文档**: [contracts.md](contracts.md)
+
+智能合约部分包含以下内容：
+
+| 章节 | 说明 |
+|------|------|
+| [环境准备](contracts.md#1-环境准备) | 合约地址、测试账户 |
+| [本地部署验证](contracts.md#2-本地部署验证) | Anvil 启动、部署、升级 |
+| [合约调用测试](contracts.md#3-合约调用测试) | 发布文章、评价、关注 |
+| [Session Key 配置](contracts.md#4-session-key-配置与测试) | 生成、注册、查询、撤销 |
+| [Paymaster 配置](contracts.md#5-paymaster-配置) | EntryPoint 存款、Stake、授权 |
+| [测试网部署](contracts.md#6-测试网部署) | Optimism Sepolia 部署 |
+| [主网部署检查清单](contracts.md#7-主网部署检查清单) | 部署前/后检查、监控 |
+| [常见问题排查](contracts.md#8-常见问题排查) | 交易失败、Session Key、Paymaster 问题 |
+| [附录：速查表](contracts.md#9-附录速查表) | 函数选择器、事件签名、Cast 命令 |
 
 ---
 
 # Part 2: SubSquid 索引
 
-## 6. SubSquid 项目初始化
+## 1. SubSquid 项目初始化
 
 SubSquid 是去中心化的区块链索引服务，用于索引链上事件并提供 GraphQL API。
 
-### 6.1 安装 Squid CLI
+### 1.1 安装 Squid CLI
 
 ```bash
 # 全局安装 Squid CLI
@@ -441,7 +64,7 @@ npm install -g @subsquid/cli
 sqd --version
 ```
 
-### 6.2 创建 Squid 项目
+### 1.2 创建 Squid 项目
 
 ```bash
 # 使用 EVM 模板初始化
@@ -454,7 +77,7 @@ cd squid
 npm install
 ```
 
-### 6.3 项目结构
+### 1.3 项目结构
 
 ```
 squid/
@@ -468,7 +91,7 @@ squid/
 └── commands.json         # CLI 命令配置
 ```
 
-### 6.4 配置数据源
+### 1.4 配置数据源
 
 编辑 `squid.yaml`：
 
@@ -494,13 +117,13 @@ deploy:
 
 ---
 
-## 7. Schema 定义与实体映射
+## 2. Schema 定义与实体映射
 
-### 7.1 定义 GraphQL Schema
+### 2.1 定义 GraphQL Schema
 
 编辑 `schema.graphql`
 
-### 7.2 生成 TypeORM 实体
+### 2.2 生成 TypeORM 实体
 
 ```bash
 # 根据 schema.graphql 生成实体类
@@ -511,7 +134,7 @@ npx tsc
 
 ```
 
-### 7.3 复制合约 ABI
+### 2.3 复制合约 ABI
 
 ```bash
 # 从 contracts 目录复制 ABI
@@ -524,9 +147,9 @@ npx squid-evm-typegen src/abi src/abi/BlogHub.json
 
 ---
 
-## 8. Processor 事件处理
+## 3. Processor 事件处理
 
-### 8.1 事件处理逻辑
+### 3.1 事件处理逻辑
 
 事件处理代码位于 `src/main.ts`，处理以下事件：
 
@@ -537,7 +160,7 @@ npx squid-evm-typegen src/abi src/abi/BlogHub.json
 
 Processor 配置位于 `src/processor.ts`，订阅 BlogHub 合约的上述事件。
 
-### 8.2 本地运行测试
+### 3.2 本地运行测试
 
 ```bash
 # 启动本地 PostgreSQL（使用 Docker）
@@ -560,13 +183,13 @@ npx squid-graphql-server
 
 ---
 
-## 9. GraphQL API 与查询
+## 4. GraphQL API 与查询
 
-### 9.1 常用查询示例
+### 4.1 常用查询示例
 可在浏览器端打开`http://localhost:4350/graphql`测试graphql。
 语句示例参考[graphsql_example.md](graphsql_example.md)
 
-### 9.2 部署到 SubSquid Cloud
+### 4.2 部署到 SubSquid Cloud
 
 ```bash
 # 登录 SubSquid Cloud
@@ -576,7 +199,7 @@ sqd auth -k YOUR_DEPLOYMENT_KEY
 sqd deploy .
 ```
 
-### 9.3 前端集成
+### 4.3 前端集成
 
 ```shell
 # 创建 SvelteKit 项目
@@ -586,56 +209,16 @@ npm install
 npm run dev
 ```
 
-SvelteKit 前端使用原生 fetch 调用 GraphQL API：
-
-```typescript
-// frontend/src/lib/graphql.ts
-const GRAPHQL_URL = 'http://localhost:4350/graphql';
-
-export async function queryGraphQL<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
-  const response = await fetch(GRAPHQL_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, variables })
-  });
-  
-  const result = await response.json();
-  if (result.errors) {
-    throw new Error(result.errors[0].message);
-  }
-  return result.data;
-}
-
-// 使用示例
-export async function getLatestArticles(limit: number = 20, offset: number = 0) {
-  return queryGraphQL<{ articles: Article[] }>(`
-    query LatestArticles($limit: Int!, $offset: Int!) {
-      articles(orderBy: createdAt_DESC, limit: $limit, offset: $offset) {
-        id
-        arweaveId
-        author { id }
-        originalAuthor
-        likes
-        dislikes
-        totalTips
-        createdAt
-      }
-    }
-  `, { limit, offset });
-}
-```
-
----
 
 # Part 3: Irys + Arweave 存储
 
-## 10. Irys SDK 集成
+## 5. Irys SDK 集成
 
 Irys 是 Arweave 的上传层，提供快速、可靠的永久存储服务。Irys 提供两套 SDK：
 - **服务端 SDK**：`@irys/upload` - 用于 Node.js 环境
 - **浏览器端 SDK**：`@irys/web-upload` - 用于浏览器环境
 
-### 10.1 安装依赖
+### 5.1 安装依赖
 
 **浏览器端（使用 Viem v2）：**
 
@@ -644,13 +227,13 @@ cd frontend
 npm install @irys/web-upload @irys/web-upload-ethereum @irys/web-upload-ethereum-viem-v2 viem
 ```
 
-### 10.2 初始化 Irys 客户端
+### 5.2 初始化 Irys 客户端
 
 **浏览器端（Viem v2 + @wagmi/core）：**
 
 [frontend\src\lib\arweave\irys.ts](frontend\src\lib\arweave\irys.ts)
 
-### 10.3 网络说明
+### 5.3 网络说明
 
 Irys 有两个 Bundler 网络：
 
@@ -665,25 +248,25 @@ Irys 有两个 Bundler 网络：
 
 ---
 
-## 11. 文章上传与元数据
+## 6. 文章上传与元数据
 
-### 11.1 文章数据结构
+### 6.1 文章数据结构
 
 [frontend\src\lib\arweave\types.ts](frontend\src\lib\arweave\types.ts)
 
-### 11.2 上传文章到 Arweave
+### 6.2 上传文章到 Arweave
 
 [frontend\src\lib\arweave\upload.ts](frontend\src\lib\arweave\upload.ts)
 
-### 11.3 完整发布流程
+### 6.3 完整发布流程
 
 [upload_example.ts](../learn/09_upload_example.ts)
 
 ---
 
-## 12. 内容获取与缓存
+## 7. 内容获取与缓存
 
-### 12.1 从 Arweave 获取内容
+### 7.1 从 Arweave 获取内容
 
 > 📁 **实现文件**: [frontend/src/lib/arweave/fetch.ts](../frontend/src/lib/arweave/fetch.ts)
 
@@ -697,7 +280,7 @@ Irys 有两个 Bundler 网络：
 
 所有函数支持多网关自动切换容错。
 
-### 12.2 客户端缓存策略
+### 7.2 客户端缓存策略
 
 > 📁 **实现文件**: [frontend/src/lib/arweave/cache.ts](../frontend/src/lib/arweave/cache.ts)
 
@@ -708,7 +291,7 @@ Irys 有两个 Bundler 网络：
 - `getArticlesWithCache(arweaveIds)` - 批量获取（并行）
 - `clearAllCache()` / `clearOldCache()` - 清理缓存
 
-### 12.3 模块导出索引
+### 7.3 模块导出索引
 
 > 📁 **实现文件**: [frontend/src/lib/arweave/index.ts](../frontend/src/lib/arweave/index.ts)
 
@@ -718,9 +301,9 @@ Irys 有两个 Bundler 网络：
 
 # Part 4: SvelteKit 前端
 
-## 13. 前端项目初始化
+## 8. 前端项目初始化
 
-### 13.1 创建 SvelteKit 项目
+### 8.1 创建 SvelteKit 项目
 
 ```bash
 # 在项目根目录
@@ -732,7 +315,7 @@ npm install
 # Tailwind CSS v4 已集成，无需额外配置
 ```
 
-### 13.2 安装依赖
+### 8.2 安装依赖
 
 ```bash
 # Web3 相关
@@ -751,7 +334,7 @@ npm install -D mdsvex
 npm install -D @tailwindcss/typography @tailwindcss/vite
 ```
 
-### 13.3 项目结构
+### 8.3 项目结构
 
 ```
 frontend/
@@ -790,7 +373,7 @@ frontend/
 └── package.json
 ```
 
-### 13.4 环境变量配置
+### 8.4 环境变量配置
 
 项目提供三套环境配置文件，根据开发阶段选择使用：
 
@@ -813,43 +396,13 @@ cp .env.test .env
 cp .env.prod .env
 ```
 
-**环境变量说明：**
-
-```bash
-# frontend/.env
-# =============================================================================
-# Blockchain Configuration
-# =============================================================================
-PUBLIC_BLOG_HUB_CONTRACT_ADDRESS=0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9
-PUBLIC_SESSION_KEY_MANAGER_ADDRESS=0x5FbDB2315678afecb367f032d93F642f64180aa3
-PUBLIC_RPC_URL=http://localhost:8545
-PUBLIC_CHAIN_ID=31337  # 31337=Anvil, 11155420=OP Sepolia, 10=OP Mainnet
-
-# =============================================================================
-# Storage Configuration (Irys/Arweave)
-# =============================================================================
-PUBLIC_IRYS_NETWORK=devnet  # devnet (测试, ~60天) 或 mainnet (永久)
-PUBLIC_ARWEAVE_GATEWAYS=https://gateway.irys.xyz,https://arweave.net,https://arweave.dev
-
-# =============================================================================
-# SubSquid GraphQL API
-# =============================================================================
-PUBLIC_SUBSQUID_ENDPOINT=http://localhost:4350/graphql
-
-# =============================================================================
-# Application Info
-# =============================================================================
-PUBLIC_APP_NAME=DBlog
-PUBLIC_APP_VERSION=1.0.0
-```
-
 ---
 
-## 14. 钱包连接与合约交互
+## 9. 钱包连接与合约交互
 
 SvelteKit 前端使用 viem 直接与钱包和合约交互，无需 wagmi 封装。
 
-### 14.1 配置文件
+### 9.1 配置文件
 
 > 📁 **实现文件**: [frontend/src/lib/config.ts](../frontend/src/lib/config.ts)
 
@@ -862,7 +415,7 @@ SvelteKit 前端使用 viem 直接与钱包和合约交互，无需 wagmi 封装
 - `getArweaveGateways()` - Arweave 网关列表
 - `getSubsquidEndpoint()` - SubSquid GraphQL 端点
 
-### 14.2 钱包连接组件
+### 9.2 钱包连接组件
 
 > 📁 **实现文件**: [frontend/src/lib/components/WalletButton.svelte](../frontend/src/lib/components/WalletButton.svelte)
 
@@ -873,7 +426,7 @@ SvelteKit 前端使用 viem 直接与钱包和合约交互，无需 wagmi 封装
 - 监听账户和链变化事件
 - 支持 i18n 多语言 (Paraglide)
 
-### 14.3 合约交互封装
+### 9.3 合约交互封装
 
 > 📁 **实现文件**: [frontend/src/lib/contracts.ts](../frontend/src/lib/contracts.ts)
 
@@ -888,11 +441,11 @@ SvelteKit 前端使用 viem 直接与钱包和合约交互，无需 wagmi 封装
 
 ---
 
-## 15. Session Key 无感交互
+## 10. Session Key 无感交互
 
 Session Key 允许用户授权临时密钥执行特定操作，实现无感交互体验。
 
-### 15.1 Session Key 管理
+### 10.1 Session Key 管理
 
 > 📁 **实现文件**: [frontend/src/lib/sessionKey.ts](../frontend/src/lib/sessionKey.ts)
 
@@ -905,7 +458,7 @@ Session Key 允许用户授权临时密钥执行特定操作，实现无感交�
 - `clearLocalSessionKey()` - 清除本地存储的 Session Key
 - `getSessionKeyAccount()` - 获取 Session Key 账户实例用于签名
 
-### 15.2 允许的函数选择器
+### 10.2 允许的函数选择器
 
 ```typescript
 // 允许 Session Key 调用的函数
@@ -921,9 +474,9 @@ const DEFAULT_SPENDING_LIMIT = BigInt('10000000000000000000');
 
 ---
 
-## 16. 页面与组件开发
+## 11. 页面与组件开发
 
-### 16.1 全局布局
+### 11.1 全局布局
 
 > 📁 **实现文件**: [frontend/src/routes/+layout.svelte](../frontend/src/routes/+layout.svelte)
 
@@ -933,7 +486,7 @@ const DEFAULT_SPENDING_LIMIT = BigInt('10000000000000000000');
 - 集成语言切换器 (Paraglide i18n)
 - 钱包连接按钮
 
-### 16.2 发布文章页面
+### 11.2 发布文章页面
 
 > 📁 **实现文件**: [frontend/src/routes/publish/+page.svelte](../frontend/src/routes/publish/+page.svelte)
 
@@ -946,7 +499,7 @@ const DEFAULT_SPENDING_LIMIT = BigInt('10000000000000000000');
 - i18n 国际化支持
 - 合约错误处理与友好提示
 
-### 16.3 发布流程编排
+### 11.3 发布流程编排
 
 > 📁 **实现文件**: [frontend/src/lib/publish.ts](../frontend/src/lib/publish.ts)
 
@@ -955,7 +508,7 @@ const DEFAULT_SPENDING_LIMIT = BigInt('10000000000000000000');
 2. 上传文章内容到 Arweave
 3. 调用合约 `publish()` 方法记录链上
 
-### 16.4 文章详情页
+### 11.4 文章详情页
 
 > 📁 **实现文件**: 
 > - [frontend/src/routes/a/[id]/+page.svelte](../frontend/src/routes/a/[id]/+page.svelte) - 页面组件
@@ -972,7 +525,7 @@ const DEFAULT_SPENDING_LIMIT = BigInt('10000000000000000000');
 - 分享功能（Web Share API / 复制链接）
 - 链上信息展示（区块号、交易哈希）
 
-### 16.5 GraphQL 查询
+### 11.5 GraphQL 查询
 
 > 📁 **实现文件**: [frontend/src/lib/graphql/queries.ts](../frontend/src/lib/graphql/queries.ts)
 
@@ -1006,241 +559,13 @@ cat out/BlogHub.sol/BlogHub.json | jq '.abi' > ../frontend/src/lib/abi/BlogHub.j
 
 ---
 
-# Part 5: 部署与运维
+# 部署与运维
 
-## 17. 测试网部署
+智能合约的部署与运维相关内容已迁移至 [contracts.md](contracts.md)：
 
-### 17.1 准备工作
-
-```bash
-# 1. 获取测试币
-# Optimism Sepolia Faucet: https://www.alchemy.com/faucets/optimism-sepolia
-
-# 2. 设置环境变量
-export PRIVATE_KEY=your_private_key_here
-export OP_SEPOLIA_RPC=https://sepolia.optimism.io
-export ETHERSCAN_API_KEY=your_etherscan_api_key
-
-# 3. 验证余额
-cast balance $(cast wallet address --private-key $PRIVATE_KEY) --rpc-url $OP_SEPOLIA_RPC
-```
-
-### 17.2 部署到 Optimism Sepolia
-
-```bash
-cd contracts
-
-# 部署所有合约
-forge script script/Deploy.s.sol \
-  --rpc-url $OP_SEPOLIA_RPC \
-  --broadcast \
-  --verify \
-  --etherscan-api-key $ETHERSCAN_API_KEY \
-  --tc DeployScript
-
-# 配置 Paymaster
-PAYMASTER=<deployed_paymaster_address> \
-DEPOSIT_AMOUNT=100000000000000000 \
-STAKE_AMOUNT=100000000000000000 \
-UNSTAKE_DELAY=86400 \
-forge script script/Deploy.s.sol \
-  --rpc-url $OP_SEPOLIA_RPC \
-  --broadcast \
-  --tc ConfigurePaymaster
-```
-
-### 17.3 验证部署
-
-```bash
-# 检查合约是否正确部署
-cast call <BLOG_HUB_PROXY> "platformTreasury()(address)" --rpc-url $OP_SEPOLIA_RPC
-cast call <BLOG_HUB_PROXY> "sessionKeyManager()(address)" --rpc-url $OP_SEPOLIA_RPC
-cast call <PAYMASTER> "getEntryPointDeposit()(uint256)" --rpc-url $OP_SEPOLIA_RPC
-```
-
----
-
-## 18. 主网部署检查清单
-
-### 18.1 部署前检查
-
-- [ ] 所有单元测试通过: `forge test`
-- [ ] 代码审计完成
-- [ ] 多签钱包准备就绪（用于 Owner 权限）
-- [ ] Treasury 地址确认
-- [ ] Gas 预算充足
-- [ ] 监控和告警系统就绪
-
-### 18.2 部署参数确认
-
-```solidity
-// 推荐的主网参数
-platformFeeBps = 250;        // 2.5% 平台费
-defaultRoyaltyBps = 500;     // 5% 默认版税
-maxRoyaltyBps = 10000;       // 最高 100% 版税
-unstakeDelaySec = 86400;     // 1 天解锁延迟
-sessionKeyMaxDuration = 7 days;
-```
-
-### 18.3 部署后操作
-
-```bash
-# 1. 验证合约源码
-forge verify-contract <CONTRACT_ADDRESS> <CONTRACT_NAME> \
-  --chain optimism \
-  --etherscan-api-key $ETHERSCAN_API_KEY
-
-# 2. 转移 Owner 权限到多签
-cast send <BLOG_HUB_PROXY> \
-  "grantRole(bytes32,address)" \
-  0x0000000000000000000000000000000000000000000000000000000000000000 \
-  <MULTISIG_ADDRESS> \
-  --private-key $PRIVATE_KEY \
-  --rpc-url $OP_MAINNET_RPC
-
-# 3. 放弃部署者权限
-cast send <BLOG_HUB_PROXY> \
-  "renounceRole(bytes32,address)" \
-  0x0000000000000000000000000000000000000000000000000000000000000000 \
-  <DEPLOYER_ADDRESS> \
-  --private-key $PRIVATE_KEY \
-  --rpc-url $OP_MAINNET_RPC
-```
-
-### 18.4 监控指标
-
-- Paymaster EntryPoint 余额
-- Paymaster Stake 状态
-- 合约暂停状态
-- 异常大额交易
-- Gas 价格波动
-
----
-
-## 19. 常见问题排查
-
-### 19.1 交易失败
-
-```bash
-# 检查合约是否暂停
-cast call <BLOG_HUB_PROXY> "paused()(bool)" --rpc-url <RPC_URL>
-
-# 检查文章是否存在
-cast call <BLOG_HUB_PROXY> "nextArticleId()(uint256)" --rpc-url <RPC_URL>
-```
-
-### 19.2 Session Key 问题
-
-```bash
-# 检查 Session Key 是否激活
-cast call <SESSION_KEY_MANAGER> \
-  "isSessionKeyActive(address,address)(bool)" \
-  <OWNER> <SESSION_KEY> \
-  --rpc-url <RPC_URL>
-
-# 检查剩余消费额度
-cast call <SESSION_KEY_MANAGER> \
-  "getRemainingSpendingLimit(address,address)(uint256)" \
-  <OWNER> <SESSION_KEY> \
-  --rpc-url <RPC_URL>
-
-# 检查允许的函数选择器
-cast call <SESSION_KEY_MANAGER> \
-  "getAllowedSelectors(address,address)(bytes4[])" \
-  <OWNER> <SESSION_KEY> \
-  --rpc-url <RPC_URL>
-```
-
-### 19.3 Paymaster 问题
-
-```bash
-# 检查 EntryPoint 存款
-cast call <PAYMASTER> "getEntryPointDeposit()(uint256)" --rpc-url <RPC_URL>
-
-# 检查 Stake 状态
-cast call <PAYMASTER> "getDepositInfo()(uint256,bool,uint112,uint32,uint48)" --rpc-url <RPC_URL>
-
-# 检查用户余额和授权
-cast call <PAYMASTER> \
-  "getUserInfo(address,address)(uint256,uint256)" \
-  <SPONSOR> <SPENDER> \
-  --rpc-url <RPC_URL>
-```
-
-### 19.4 升级合约
-
-```bash
-# 部署新实现
-forge script script/Deploy.s.sol \
-  --rpc-url <RPC_URL> \
-  --broadcast \
-  --tc DeployBlogHub
-
-# 升级代理
-BLOG_HUB_PROXY=<PROXY_ADDRESS> \
-forge script script/Deploy.s.sol \
-  --rpc-url <RPC_URL> \
-  --broadcast \
-  --tc UpgradeBlogHub
-```
-
----
-
-## 附录
-
-### A. 函数选择器速查
-
-| 函数 | 选择器 |
-|------|--------|
-| `publish(string,uint64,uint96,string)` | `0x...` |
-| `evaluate(uint256,uint8,string,address,uint256)` | `0xff1f090a` |
-| `likeComment(uint256,uint256,address,address)` | `0xdffd40f2` |
-| `follow(address,bool)` | `0x63c3cc16` |
-
-```bash
-# 获取函数选择器
-cast sig "evaluate(uint256,uint8,string,address,uint256)"
-```
-
-### B. 事件签名速查
-
-```bash
-# ArticlePublished (包含 originalAuthor)
-cast sig-event "ArticlePublished(uint256,address,uint256,string,string,uint256)"
-
-# ArticleEvaluated
-cast sig-event "ArticleEvaluated(uint256,address,uint8,uint256,uint256)"
-
-# CommentAdded
-cast sig-event "CommentAdded(uint256,address,string,uint256,uint8)"
-
-# FollowStatusChanged
-cast sig-event "FollowStatusChanged(address,address,bool)"
-```
-
-### C. 有用的 Cast 命令
-
-```bash
-# 解码交易数据
-cast calldata-decode "evaluate(uint256,uint8,string,address,uint256)" <CALLDATA>
-
-# 解码事件日志
-cast logs --address <CONTRACT> --from-block <BLOCK> --rpc-url <RPC_URL>
-
-# 模拟交易
-cast call <CONTRACT> <FUNCTION_SIG> <ARGS> --rpc-url <RPC_URL>
-
-# 估算 Gas
-cast estimate <CONTRACT> <FUNCTION_SIG> <ARGS> --rpc-url <RPC_URL>
-```
-
----
-
-*文档版本: 3.0.0*
-*最后更新: 2025-12*
-
-**更新日志:**
-- v3.0.0: 前端框架从 Nuxt.js 迁移到 SvelteKit；更新第13-16章为 SvelteKit 实现；使用 Svelte 5 runes 语法；集成 Paraglide i18n 国际化；使用 Tailwind CSS v4；简化依赖（移除 wagmi，直接使用 viem）
-- v2.0.0: 完整重构文档结构；新增 SubSquid 索引开发指南（第6-9章）；新增 Irys+Arweave 存储集成指南（第10-12章）；新增 Nuxt.js 前端开发指南（第13-16章）；添加项目进度概览
-- v1.2.0: 更新合约地址（BlogHub Proxy: 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9）；更新函数选择器；移除 withdraw/accountBalance 相关功能（打赏现为直接转账）
-- v1.1.0: `publish` 函数新增 `originalAuthor` 参数，支持代发文章记录真实作者
+| 章节 | 说明 |
+|------|------|
+| [测试网部署](contracts.md#6-测试网部署) | Optimism Sepolia 部署流程 |
+| [主网部署检查清单](contracts.md#7-主网部署检查清单) | 部署前/后检查、监控指标 |
+| [常见问题排查](contracts.md#8-常见问题排查) | 交易失败、Session Key、Paymaster 问题 |
+| [附录：速查表](contracts.md#9-附录速查表) | 函数选择器、事件签名、Cast 命令 |

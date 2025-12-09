@@ -57,35 +57,3 @@ $ forge fmt
 # gas snapshot
 $ forge snapshot
 ```
-
-### Anvil
-本地以太坊开发节点(类似Ganache，Hardhat Network)
-```shell
-$ anvil --load-state cache/anvil.json
-$ anvil --dump-state cache/anvil.json --load-state cache/anvil.json
-```
-
-### Deploy
-
-```shell
-export PRIVATE_KEY=<YOUR_PRIVATE_KEY>
-
-# 部署新实现
-forge script script/Deploy.s.sol \
-  --rpc-url <RPC_URL> \
-  --broadcast \
-  --tc DeployBlogHub
-
-# 升级代理
-BLOG_HUB_PROXY=<PROXY_ADDRESS> \
-forge script script/Deploy.s.sol \
-  --rpc-url <RPC_URL> \
-  --broadcast \
-  --tc UpgradeBlogHub
-```
-
-### Cast
-命令行的以太坊合约交互工具，可发起合约调用
-```shell
-$ cast <subcommand>
-```

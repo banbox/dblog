@@ -12,7 +12,7 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
  * @dev 部署所有 DBlog 合约的脚本
  * 
  * 使用方法:
- * 1. 本地测试: forge script script/Deploy.s.sol --fork-url http://localhost:8545 --broadcast --tc DeployScript
+ * 1. 本地测试: forge script script/Deploy.s.sol --rpc-url http://localhost:8545 --broadcast --tc DeployScript
  * 2. Optimism Sepolia: forge script script/Deploy.s.sol --rpc-url $OP_SEPOLIA_RPC --broadcast --verify --tc DeployScript
  * 3. Optimism Mainnet: forge script script/Deploy.s.sol --rpc-url $OP_MAINNET_RPC --broadcast --verify --tc DeployScript
  * 
