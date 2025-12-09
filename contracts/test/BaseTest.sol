@@ -209,10 +209,11 @@ abstract contract BaseTest is Test {
         address _sessionKey,
         address allowedContract
     ) internal {
-        bytes4[] memory selectors = new bytes4[](3);
+        bytes4[] memory selectors = new bytes4[](4);
         selectors[0] = BlogHub.evaluate.selector;
         selectors[1] = BlogHub.likeComment.selector;
         selectors[2] = BlogHub.follow.selector;
+        selectors[3] = BlogHub.publish.selector;
 
         vm.prank(_owner);
         sessionKeyManager.registerSessionKey(

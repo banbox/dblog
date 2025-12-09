@@ -3,9 +3,9 @@
  * Handles publishing articles to BlogHub contract
  */
 
-import { createWalletClient, createPublicClient, custom, http, encodeFunctionData, keccak256, toBytes } from 'viem';
+import { createWalletClient, createPublicClient, custom, http, encodeFunctionData, keccak256, encodeAbiParameters, parseAbiParameters } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import { getBlogHubContractAddress, getRpcUrl } from '$lib/config';
+import { getBlogHubContractAddress, getSessionKeyManagerAddress, getRpcUrl, getChainId } from '$lib/config';
 import { getChainConfig } from '$lib/chain';
 import type { StoredSessionKey } from '$lib/sessionKey';
 
@@ -560,49 +560,114 @@ export async function getArticle(articleId: bigint): Promise<ArticleData> {
 //                  Session Key 发布功能
 // ============================================================
 
+// SessionKeyManager ABI for reading nonce
+const SESSION_KEY_MANAGER_ABI = [
+	{
+		name: 'getSessionKeyData',
+		type: 'function',
+		inputs: [
+			{ name: 'owner', type: 'address' },
+			{ name: 'sessionKey', type: 'address' }
+		],
+		outputs: [
+			{
+				name: '',
+				type: 'tuple',
+				components: [
+					{ name: 'sessionKey', type: 'address' },
+					{ name: 'validAfter', type: 'uint48' },
+					{ name: 'validUntil', type: 'uint48' },
+					{ name: 'allowedContract', type: 'address' },
+					{ name: 'allowedSelectors', type: 'bytes4[]' },
+					{ name: 'spendingLimit', type: 'uint256' },
+					{ name: 'spentAmount', type: 'uint256' },
+					{ name: 'nonce', type: 'uint256' }
+				]
+			}
+		],
+		stateMutability: 'view'
+	}
+] as const;
+
+// EIP-712 Domain for SessionKeyManager
+function getSessionKeyManagerDomain() {
+	return {
+		name: 'SessionKeyManager',
+		version: '1',
+		chainId: getChainId(),
+		verifyingContract: getSessionKeyManagerAddress()
+	};
+}
+
+// EIP-712 Types for SessionOperation
+const SESSION_OPERATION_TYPES = {
+	SessionOperation: [
+		{ name: 'owner', type: 'address' },
+		{ name: 'sessionKey', type: 'address' },
+		{ name: 'target', type: 'address' },
+		{ name: 'selector', type: 'bytes4' },
+		{ name: 'callData', type: 'bytes' },
+		{ name: 'value', type: 'uint256' },
+		{ name: 'nonce', type: 'uint256' },
+		{ name: 'deadline', type: 'uint256' }
+	]
+} as const;
+
 /**
- * Create Session Key signature for publish operation
- * @param sessionKey - Stored session key data
- * @param arweaveId - Arweave hash
- * @param categoryId - Category ID
- * @param royaltyBps - Royalty basis points
- * @param originalAuthor - Original author name
- * @param title - Article title
- * @param deadline - Signature deadline timestamp
+ * Get current nonce for session key from SessionKeyManager contract
  */
-async function createPublishSignature(
-	sessionKey: StoredSessionKey,
-	arweaveId: string,
-	categoryId: bigint,
-	royaltyBps: bigint,
-	originalAuthor: string,
-	title: string,
-	deadline: bigint
-): Promise<`0x${string}`> {
-	const sessionKeyAccount = privateKeyToAccount(sessionKey.privateKey as `0x${string}`);
-	
-	// Encode the publish function call data
-	const callData = encodeFunctionData({
-		abi: BLOGHUB_ABI,
-		functionName: 'publish',
-		args: [arweaveId, categoryId, royaltyBps, originalAuthor, title]
+async function getSessionKeyNonce(
+	owner: `0x${string}`,
+	sessionKeyAddress: `0x${string}`
+): Promise<bigint> {
+	const publicClient = getPublicClient();
+	const sessionKeyManager = getSessionKeyManagerAddress();
+
+	const data = await publicClient.readContract({
+		address: sessionKeyManager,
+		abi: SESSION_KEY_MANAGER_ABI,
+		functionName: 'getSessionKeyData',
+		args: [owner, sessionKeyAddress]
 	});
 
-	// Create message hash: keccak256(owner, target, selector, callData, value, deadline, nonce)
-	// Note: This should match the SessionKeyManager's signature verification
+	return data.nonce;
+}
+
+/**
+ * Create EIP-712 signature for Session Key publish operation
+ * @param sessionKey - Stored session key data
+ * @param callData - Encoded function call data
+ * @param deadline - Signature deadline timestamp
+ * @param nonce - Current nonce from SessionKeyManager
+ */
+async function createSessionKeySignature(
+	sessionKey: StoredSessionKey,
+	callData: `0x${string}`,
+	deadline: bigint,
+	nonce: bigint
+): Promise<`0x${string}`> {
+	const sessionKeyAccount = privateKeyToAccount(sessionKey.privateKey as `0x${string}`);
 	const blogHub = getBlogHubContractAddress();
 	const publishSelector = '0xc7e76bf0' as `0x${string}`; // publish(string,uint64,uint96,string,string)
-	
-	// Create the message to sign (simplified - actual implementation depends on SessionKeyManager)
-	const messageHash = keccak256(
-		toBytes(
-			`${sessionKey.owner}${blogHub}${publishSelector}${callData}0${deadline}`
-		)
-	);
 
-	// Sign with session key
-	const signature = await sessionKeyAccount.signMessage({
-		message: { raw: messageHash }
+	// Create EIP-712 typed data message
+	const message = {
+		owner: sessionKey.owner as `0x${string}`,
+		sessionKey: sessionKey.address as `0x${string}`,
+		target: blogHub,
+		selector: publishSelector,
+		callData: callData,
+		value: 0n,
+		nonce: nonce,
+		deadline: deadline
+	};
+
+	// Sign with EIP-712
+	const signature = await sessionKeyAccount.signTypedData({
+		domain: getSessionKeyManagerDomain(),
+		types: SESSION_OPERATION_TYPES,
+		primaryType: 'SessionOperation',
+		message
 	});
 
 	return signature;
@@ -665,15 +730,25 @@ export async function publishToContractWithSessionKey(
 		// Set deadline to 5 minutes from now
 		const deadline = BigInt(Math.floor(Date.now() / 1000) + 300);
 
-		// Create signature
-		const signature = await createPublishSignature(
+		// Encode the publish function call data (this is what gets hashed in the signature)
+		const callData = encodeFunctionData({
+			abi: BLOGHUB_ABI,
+			functionName: 'publish',
+			args: [arweaveId, categoryId, royaltyBps, originalAuthor, title]
+		});
+
+		// Get current nonce from SessionKeyManager
+		const nonce = await getSessionKeyNonce(
+			sessionKey.owner as `0x${string}`,
+			sessionKey.address as `0x${string}`
+		);
+
+		// Create EIP-712 signature
+		const signature = await createSessionKeySignature(
 			sessionKey,
-			arweaveId,
-			categoryId,
-			royaltyBps,
-			originalAuthor,
-			title,
-			deadline
+			callData,
+			deadline,
+			nonce
 		);
 
 		// Call publishWithSessionKey

@@ -4,6 +4,7 @@ pragma solidity ^0.8.30;
 import {BaseTest} from "./BaseTest.sol";
 import {BlogHub} from "../src/BlogHub.sol";
 import {ISessionKeyManager} from "../src/interfaces/ISessionKeyManager.sol";
+import {SessionKeyManager} from "../src/SessionKeyManager.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /**
@@ -434,6 +435,420 @@ contract BlogHubSessionKeyTest is BaseTest {
             block.timestamp + 1 hours,
             ""
         );
+    }
+
+    // ============ publishWithSessionKey 测试 ============
+
+    event ArticlePublished(
+        uint256 indexed articleId,
+        address indexed author,
+        uint256 indexed categoryId,
+        string arweaveId,
+        string originalAuthor,
+        string title,
+        uint256 timestamp
+    );
+
+    function test_PublishWithSessionKey_Success() public {
+        uint256 deadline = block.timestamp + 1 hours;
+        string memory arweaveId = "test-arweave-hash-session";
+        uint64 categoryId = 1;
+        uint96 royaltyBps = 500;
+        string memory originalAuthor = "";
+        string memory title = "Session Key Published Article";
+
+        bytes memory callData = abi.encodeWithSelector(
+            BlogHub.publish.selector,
+            arweaveId,
+            categoryId,
+            royaltyBps,
+            originalAuthor,
+            title
+        );
+
+        ISessionKeyManager.SessionKeyData memory data = sessionKeyManager.getSessionKeyData(user1, sessionKey);
+
+        bytes memory signature = _signSessionOperation(
+            sessionKeyPrivateKey,
+            user1,
+            sessionKey,
+            address(blogHub),
+            BlogHub.publish.selector,
+            callData,
+            0, // publish 不需要支付
+            data.nonce,
+            deadline
+        );
+
+        uint256 expectedArticleId = blogHub.nextArticleId();
+
+        vm.expectEmit(true, true, true, true);
+        emit ArticlePublished(
+            expectedArticleId,
+            user1,
+            categoryId,
+            arweaveId,
+            originalAuthor,
+            title,
+            block.timestamp
+        );
+
+        vm.expectEmit(true, true, false, true);
+        emit SessionKeyOperationExecuted(user1, sessionKey, BlogHub.publish.selector);
+
+        uint256 articleId = blogHub.publishWithSessionKey(
+            user1,
+            sessionKey,
+            arweaveId,
+            categoryId,
+            royaltyBps,
+            originalAuthor,
+            title,
+            deadline,
+            signature
+        );
+
+        // 验证文章创建
+        assertEq(articleId, expectedArticleId);
+        
+        // 验证 NFT 铸造给 owner (user1)
+        assertEq(blogHub.balanceOf(user1, articleId), 1);
+        
+        // 验证文章元数据
+        (
+            string memory storedArweaveHash,
+            address storedAuthor,
+            string memory storedOriginalAuthor,
+            string memory storedTitle,
+            uint64 storedCategoryId,
+            uint64 storedTimestamp
+        ) = blogHub.articles(articleId);
+        
+        assertEq(storedArweaveHash, arweaveId);
+        assertEq(storedAuthor, user1);
+        assertEq(storedOriginalAuthor, originalAuthor);
+        assertEq(storedTitle, title);
+        assertEq(storedCategoryId, categoryId);
+        assertEq(storedTimestamp, uint64(block.timestamp));
+    }
+
+    function test_PublishWithSessionKey_WithOriginalAuthor() public {
+        uint256 deadline = block.timestamp + 1 hours;
+        string memory arweaveId = "test-arweave-hash-proxy";
+        uint64 categoryId = 2;
+        uint96 royaltyBps = 1000;
+        string memory originalAuthor = "RealAuthorName";
+        string memory title = "Proxy Published Article";
+
+        bytes memory callData = abi.encodeWithSelector(
+            BlogHub.publish.selector,
+            arweaveId,
+            categoryId,
+            royaltyBps,
+            originalAuthor,
+            title
+        );
+
+        ISessionKeyManager.SessionKeyData memory data = sessionKeyManager.getSessionKeyData(user1, sessionKey);
+
+        bytes memory signature = _signSessionOperation(
+            sessionKeyPrivateKey,
+            user1,
+            sessionKey,
+            address(blogHub),
+            BlogHub.publish.selector,
+            callData,
+            0,
+            data.nonce,
+            deadline
+        );
+
+        uint256 articleId = blogHub.publishWithSessionKey(
+            user1,
+            sessionKey,
+            arweaveId,
+            categoryId,
+            royaltyBps,
+            originalAuthor,
+            title,
+            deadline,
+            signature
+        );
+
+        // 验证原作者字段
+        (, , string memory storedOriginalAuthor, , , ) = blogHub.articles(articleId);
+        assertEq(storedOriginalAuthor, originalAuthor);
+    }
+
+    function test_PublishWithSessionKey_RevertRoyaltyTooHigh() public {
+        uint256 deadline = block.timestamp + 1 hours;
+        uint96 invalidRoyaltyBps = 10001; // 超过 100%
+
+        bytes memory callData = abi.encodeWithSelector(
+            BlogHub.publish.selector,
+            "test-hash",
+            uint64(1),
+            invalidRoyaltyBps,
+            "",
+            "Title"
+        );
+
+        ISessionKeyManager.SessionKeyData memory data = sessionKeyManager.getSessionKeyData(user1, sessionKey);
+
+        bytes memory signature = _signSessionOperation(
+            sessionKeyPrivateKey,
+            user1,
+            sessionKey,
+            address(blogHub),
+            BlogHub.publish.selector,
+            callData,
+            0,
+            data.nonce,
+            deadline
+        );
+
+        vm.expectRevert(BlogHub.RoyaltyTooHigh.selector);
+        blogHub.publishWithSessionKey(
+            user1,
+            sessionKey,
+            "test-hash",
+            1,
+            invalidRoyaltyBps,
+            "",
+            "Title",
+            deadline,
+            signature
+        );
+    }
+
+    function test_PublishWithSessionKey_RevertOriginalAuthorTooLong() public {
+        uint256 deadline = block.timestamp + 1 hours;
+        // 创建一个超过 64 字节的原作者名称
+        string memory longOriginalAuthor = "This is a very long original author name that exceeds the maximum allowed length of 64 bytes";
+
+        bytes memory callData = abi.encodeWithSelector(
+            BlogHub.publish.selector,
+            "test-hash",
+            uint64(1),
+            uint96(500),
+            longOriginalAuthor,
+            "Title"
+        );
+
+        ISessionKeyManager.SessionKeyData memory data = sessionKeyManager.getSessionKeyData(user1, sessionKey);
+
+        bytes memory signature = _signSessionOperation(
+            sessionKeyPrivateKey,
+            user1,
+            sessionKey,
+            address(blogHub),
+            BlogHub.publish.selector,
+            callData,
+            0,
+            data.nonce,
+            deadline
+        );
+
+        vm.expectRevert(BlogHub.OriginalAuthorTooLong.selector);
+        blogHub.publishWithSessionKey(
+            user1,
+            sessionKey,
+            "test-hash",
+            1,
+            500,
+            longOriginalAuthor,
+            "Title",
+            deadline,
+            signature
+        );
+    }
+
+    function test_PublishWithSessionKey_RevertTitleTooLong() public {
+        uint256 deadline = block.timestamp + 1 hours;
+        // 创建一个超过 128 字节的标题
+        string memory longTitle = "This is a very long title that exceeds the maximum allowed length of 128 bytes. It keeps going and going until it is definitely too long for the contract to accept.";
+
+        bytes memory callData = abi.encodeWithSelector(
+            BlogHub.publish.selector,
+            "test-hash",
+            uint64(1),
+            uint96(500),
+            "",
+            longTitle
+        );
+
+        ISessionKeyManager.SessionKeyData memory data = sessionKeyManager.getSessionKeyData(user1, sessionKey);
+
+        bytes memory signature = _signSessionOperation(
+            sessionKeyPrivateKey,
+            user1,
+            sessionKey,
+            address(blogHub),
+            BlogHub.publish.selector,
+            callData,
+            0,
+            data.nonce,
+            deadline
+        );
+
+        vm.expectRevert(BlogHub.TitleTooLong.selector);
+        blogHub.publishWithSessionKey(
+            user1,
+            sessionKey,
+            "test-hash",
+            1,
+            500,
+            "",
+            longTitle,
+            deadline,
+            signature
+        );
+    }
+
+    function test_PublishWithSessionKey_RevertSessionKeyManagerNotSet() public {
+        // 创建一个没有设置 SessionKeyManager 的 BlogHub
+        BlogHub newBlogHub = new BlogHub();
+        bytes memory initData = abi.encodeWithSelector(
+            BlogHub.initialize.selector,
+            owner,
+            treasury
+        );
+        address proxy = address(new ERC1967Proxy(address(newBlogHub), initData));
+        BlogHub blogHubNoManager = BlogHub(payable(proxy));
+
+        vm.expectRevert(BlogHub.SessionKeyManagerNotSet.selector);
+        blogHubNoManager.publishWithSessionKey(
+            user1,
+            sessionKey,
+            "test-hash",
+            1,
+            500,
+            "",
+            "Title",
+            block.timestamp + 1 hours,
+            ""
+        );
+    }
+
+    function test_PublishWithSessionKey_RevertInvalidSignature() public {
+        uint256 deadline = block.timestamp + 1 hours;
+
+        bytes memory callData = abi.encodeWithSelector(
+            BlogHub.publish.selector,
+            "test-hash",
+            uint64(1),
+            uint96(500),
+            "",
+            "Title"
+        );
+
+        // 使用错误的私钥签名
+        bytes memory invalidSignature = _signSessionOperation(
+            user2PrivateKey, // 错误的私钥
+            user1,
+            sessionKey,
+            address(blogHub),
+            BlogHub.publish.selector,
+            callData,
+            0,
+            0,
+            deadline
+        );
+
+        vm.expectRevert(SessionKeyManager.InvalidSignature.selector);
+        blogHub.publishWithSessionKey(
+            user1,
+            sessionKey,
+            "test-hash",
+            1,
+            500,
+            "",
+            "Title",
+            deadline,
+            invalidSignature
+        );
+    }
+
+    function test_PublishWithSessionKey_MultipleArticles() public {
+        uint256 deadline = block.timestamp + 1 hours;
+
+        // 发布第一篇文章
+        bytes memory callData1 = abi.encodeWithSelector(
+            BlogHub.publish.selector,
+            "arweave-hash-1",
+            uint64(1),
+            uint96(500),
+            "",
+            "First Article"
+        );
+
+        ISessionKeyManager.SessionKeyData memory data1 = sessionKeyManager.getSessionKeyData(user1, sessionKey);
+
+        bytes memory signature1 = _signSessionOperation(
+            sessionKeyPrivateKey,
+            user1,
+            sessionKey,
+            address(blogHub),
+            BlogHub.publish.selector,
+            callData1,
+            0,
+            data1.nonce,
+            deadline
+        );
+
+        uint256 articleId1 = blogHub.publishWithSessionKey(
+            user1,
+            sessionKey,
+            "arweave-hash-1",
+            1,
+            500,
+            "",
+            "First Article",
+            deadline,
+            signature1
+        );
+
+        // 发布第二篇文章（nonce 应该已递增）
+        bytes memory callData2 = abi.encodeWithSelector(
+            BlogHub.publish.selector,
+            "arweave-hash-2",
+            uint64(2),
+            uint96(1000),
+            "",
+            "Second Article"
+        );
+
+        ISessionKeyManager.SessionKeyData memory data2 = sessionKeyManager.getSessionKeyData(user1, sessionKey);
+        assertEq(data2.nonce, data1.nonce + 1);
+
+        bytes memory signature2 = _signSessionOperation(
+            sessionKeyPrivateKey,
+            user1,
+            sessionKey,
+            address(blogHub),
+            BlogHub.publish.selector,
+            callData2,
+            0,
+            data2.nonce,
+            deadline
+        );
+
+        uint256 articleId2 = blogHub.publishWithSessionKey(
+            user1,
+            sessionKey,
+            "arweave-hash-2",
+            2,
+            1000,
+            "",
+            "Second Article",
+            deadline,
+            signature2
+        );
+
+        // 验证两篇文章都创建成功
+        assertEq(articleId2, articleId1 + 1);
+        assertEq(blogHub.balanceOf(user1, articleId1), 1);
+        assertEq(blogHub.balanceOf(user1, articleId2), 1);
     }
 
     // ============ 多次操作测试 ============

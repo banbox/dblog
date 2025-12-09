@@ -640,5 +640,21 @@ upload.ts:396  POST https://devnet.irys.xyz/tx/ethereum 402 (Payment Required)
 upload.ts:400 Error when uploading markdown content: Error: 402 error: Paying address has insufficient balance to cover upload
     at async uploadMarkdownContent (upload.ts:396:19)
 @README.md 上面是我发布文章时的错误，它自动上传文件到irys；目前irys支持100KB下免费，有配置项；我上传的并未超过100KB，所以不应该报错，请帮我检查相关逻辑，定位原因并解决  
-Cluade: Irys devnet 的 100KB 免费上传功能不支持 paidBy 参数；已改为不足100KB不传递paidBy
+Cluade: Irys devnet 的 100KB 免费上传功能不支持 paidBy 参数；已改为不足100KB不传递paidBy  
+开发者：这次irys可静默上传，但publishWithSessionKey报不存在
+
+#### 2025-12-09 10:50  测试publishWithSessionKey
+我需要测试一下publishWithSessionKey；参考contracts\src\BlogHub.sol，帮我创建对应的测试脚本，在contracts\test中，针对anvil链  
+Claude：测试通过
+
+#### 2025-12-09 11:10  上链时签名错误
+... [more logs]
+Unable to decode signature "0x62db3e42" as it was not found on the provided ABI. Make sure you are using the correct ABI and that the error exists on it.  
+@README.md @Developers.md  
+我在发布文章时，出现了上面错误，但我执行了contracts下针对publishWithSessionKey的单元测试，全部通过了。请帮我查阅相关的代码逻辑和配置，帮我检查请求的链是否正确，请求逻辑是否符合预期。定位错误原因，并解决   
+Claude：旧的 Session Key 注册时没有包含正确的 publish 函数选择器，导致 SessionKeyManager._validateSessionKeyInternal() 在检查 allowedSelectors 时返回 false，抛出 SessionKeyNotActive() 错误，已解决  
+开发者：Unable to decode signature "0x8baa579f"；这次出现这个错误，类似，请继续排查  
+Claude：createPublishSignature 函数的签名方式完全错误。它使用了简单的字符串拼接和 signMessage，但合约使用的是 EIP-712 结构化签名。已修复  
+开发者：无感发布成功
+
 

@@ -49,11 +49,12 @@ const SESSION_KEY_MANAGER_ABI = [
 ] as const;
 
 // Allowed function selectors for session key
+// Use: cast sig "functionName(params)" to get selector
 const ALLOWED_SELECTORS: `0x${string}`[] = [
-	'0xff1f090a', // evaluate
-	'0xdffd40f2', // likeComment
-	'0x63c3cc16', // follow
-	'0xacb9420e' // publish
+	'0xff1f090a', // evaluate(uint256,uint8,string,address,uint256)
+	'0xdffd40f2', // likeComment(uint256,uint256,address,address)
+	'0x63c3cc16', // follow(address,bool)
+	'0xc7e76bf0' // publish(string,uint64,uint96,string,string)
 ];
 
 // Default spending limit (10 ETH)
