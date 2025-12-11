@@ -112,7 +112,7 @@ export interface ArticleCountResult {
 }
 
 /**
- * Get single article by ID
+ * Get single article by ID with comments
  * Note: coverImage is no longer stored on-chain, use arweaveId/coverImage path to access cover
  */
 export const ARTICLE_BY_ID_QUERY = gql`
@@ -133,9 +133,35 @@ export const ARTICLE_BY_ID_QUERY = gql`
 			createdAt
 			blockNumber
 			txHash
+			comments(orderBy: createdAt_DESC) {
+				id
+				user {
+					id
+				}
+				content
+				parentCommentId
+				likes
+				createdAt
+				txHash
+			}
 		}
 	}
 `;
+
+/**
+ * Comment data from GraphQL
+ */
+export interface CommentData {
+	id: string;
+	user: {
+		id: string;
+	};
+	content: string;
+	parentCommentId: string | null;
+	likes: number;
+	createdAt: string;
+	txHash: string;
+}
 
 /**
  * Article detail data from GraphQL
@@ -157,4 +183,5 @@ export interface ArticleDetailData {
 	createdAt: string;
 	blockNumber: number;
 	txHash: string;
+	comments: CommentData[];
 }

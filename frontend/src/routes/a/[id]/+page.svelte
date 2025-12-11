@@ -8,6 +8,7 @@
 	import { onMount } from 'svelte';
 	import { marked } from 'marked';
 	import DOMPurify from 'dompurify';
+	import CommentSection from '$lib/components/CommentSection.svelte';
 	import { parseEther } from 'viem';
 	import {
 		EvaluationScore,
@@ -46,7 +47,6 @@
 	// UI state
 	let showTipModal = $state(false);
 	let tipAmount = $state('0.001');
-	let commentText = $state('');
 	let feedbackMessage = $state<{ type: 'success' | 'error'; text: string } | null>(null);
 
 	// Local counts (optimistic updates)
@@ -236,7 +236,7 @@
 	}
 
 	// Handle Comment
-	async function handleComment() {
+	async function handleComment(commentText: string) {
 		if (!walletAddress) {
 			showFeedback('error', m.please_connect_wallet({}));
 			return;
@@ -256,7 +256,6 @@
 				await evaluateArticle(articleId, EvaluationScore.Neutral, commentText.trim(),
 					'0x0000000000000000000000000000000000000000', 0n, minValue);
 			}
-			commentText = '';
 			showFeedback('success', m.comment_success({}));
 		} catch (error) {
 			showFeedback('error', m.interaction_failed({ error: getErrorMessage(error) }));
@@ -384,7 +383,7 @@
 							d="M12 20.25c4.97 0 9-3.694 9-8.25s-4.03-8.25-9-8.25S3 7.444 3 12c0 2.104.859 4.023 2.273 5.48.432.447.74 1.04.586 1.641a4.483 4.483 0 01-.923 1.785A5.969 5.969 0 006 21c1.282 0 2.47-.402 3.445-1.087.81.22 1.668.337 2.555.337z"
 						/>
 					</svg>
-					<span class="text-sm">0</span>
+					<span class="text-sm">{article.comments?.length || 0}</span>
 				</a>
 
 				<!-- Dislike -->
@@ -490,51 +489,13 @@
 	{@render interactionBar('bottom')}
 
 	<!-- Comments Section -->
-	<section class="mt-10" id="comments">
-		<h2 class="mb-6 text-xl font-bold text-gray-900">
-			{m.comments({})}
-		</h2>
-		
-		<!-- Comment Input -->
-		<div class="mb-6">
-			<div class="flex gap-3">
-				<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 text-sm font-medium text-white">
-					{walletAddress ? shortAddress(walletAddress).slice(0, 2).toUpperCase() : '?'}
-				</div>
-				<div class="flex-1">
-					<textarea
-						bind:value={commentText}
-						placeholder={m.write_comment({})}
-						rows="3"
-						class="w-full resize-none rounded-lg border border-gray-200 px-4 py-3 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-						disabled={isCommenting}
-					></textarea>
-					<div class="mt-2 flex items-center justify-between">
-						<div class="text-xs text-gray-400">
-							{#if !walletAddress}
-								{m.please_connect_wallet({})}
-							{:else if !hasValidSessionKey}
-								<span class="text-amber-600">{m.enable_seamless_for_interaction({})}</span>
-							{/if}
-						</div>
-						<button
-							type="button"
-							onclick={handleComment}
-							disabled={isCommenting || !commentText.trim() || !walletAddress}
-							class="rounded-full bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-						>
-							{isCommenting ? m.posting({}) : m.post_comment({})}
-						</button>
-					</div>
-				</div>
-			</div>
-		</div>
-
-		<!-- Comments List (placeholder) -->
-		<div class="rounded-lg border border-gray-200 bg-gray-50 p-8 text-center text-gray-500">
-			<p>{m.no_comments({})}</p>
-		</div>
-	</section>
+	<CommentSection
+		comments={article.comments || []}
+		{walletAddress}
+		{hasValidSessionKey}
+		{isCommenting}
+		onComment={handleComment}
+	/>
 
 	<!-- Transaction Info (collapsed) -->
 	<details class="mt-10 text-sm text-gray-500">

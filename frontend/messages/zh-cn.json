@@ -163,5 +163,9 @@
 	"following": "已关注",
 	"unfollow": "取消关注",
 	"eth": "ETH",
-	"cancel": "取消"
+	"cancel": "取消",
+	"reply": "回复",
+	"bold": "加粗",
+	"italic": "斜体",
+	"anonymous": "匿名用户"
 }

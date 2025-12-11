@@ -163,5 +163,9 @@
 	"following": "Following",
 	"unfollow": "Unfollow",
 	"eth": "ETH",
-	"cancel": "Cancel"
+	"cancel": "Cancel",
+	"reply": "Reply",
+	"bold": "Bold",
+	"italic": "Italic",
+	"anonymous": "Anonymous"
 }
