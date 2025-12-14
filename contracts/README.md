@@ -22,7 +22,7 @@
 
 ## 代付机制
 - **Gas 代付**：Sponsor 存款到 BlogPaymaster 并授权用户，用户发送 UserOperation 时自动从 Sponsor 余额扣除 Gas
-- **业务支付**：用户可在 BlogHub 存入余额，通过 Session Key 使用余额进行赞赏/点赞（无需授权他人）
+- **业务支付**：调用 BlogHub 业务函数时携带 ETH（msg.value），Session Key 版本同样通过 msg.value 支付
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐

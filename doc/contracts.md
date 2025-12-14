@@ -107,18 +107,21 @@ cast call 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512 "sessionKeyManager()(addres
 ### 3.1 发布文章
 
 ```bash
-# publish(string arweaveId, uint64 categoryId, uint96 royaltyBps, string originalAuthor, string title, string coverImage)
-# originalAuthor 为空字符串表示发布者即作者
-# title 为文章标题（最大128字节）
-# coverImage 为封面图片 Arweave Hash（可为空，最大64字节）
+# publish(string arweaveId, uint64 categoryId, uint96 royaltyBps, string originalAuthor, string title, address trueAuthor, uint256 collectPrice, uint256 maxCollectSupply, uint8 originality)
+# originalAuthor 为展示用的原作者信息（最大 64 字节）
+# title 为文章标题（最大 128 字节）
+# trueAuthor = 0x0 表示真实作者为发布者（用于收款/版税）
 cast send 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9 \
-  "publish(string,uint64,uint96,string,string,string)(uint256)" \
+  "publish(string,uint64,uint96,string,string,address,uint256,uint256,uint8)(uint256)" \
   "QmTestArweaveHash987654321" \
   1 \
   500 \
   "RealAuthor.eth" \
   "Web3 Development Guide" \
-  "QmCoverImageHash123" \
+  0x0000000000000000000000000000000000000000 \
+  0 \
+  0 \
+  0 \
   --private-key 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d \
   --rpc-url http://localhost:8545
 
@@ -126,9 +129,9 @@ cast send 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9 \
 cast call 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9 "nextArticleId()(uint256)" --rpc-url http://localhost:8545
 # 应返回 2（下一个文章ID）
 
-# 查看文章详情（包含 originalAuthor, title, coverImage 字段）
+# 查看文章详情
 cast call 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9 \
-  "articles(uint256)(string,address,string,string,string,uint64,uint64)" \
+  "articles(uint256)(address,uint64,uint16,uint8,uint96,uint32,uint32,string)" \
   1 \
   --rpc-url http://localhost:8545
 ```
@@ -149,13 +152,13 @@ cast send 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9 \
   --private-key 0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a \
   --rpc-url http://localhost:8545
 
-# 注意：打赏金额会直接转账给作者，无需提取
+# 注意：支付金额会按平台费/推荐费规则分配，作者无需提取
 ```
 
-### 3.3 纯评论（无打赏）
+### 3.3 评论（需支付最小金额）
 
 ```bash
-# 纯评论需要 score=0 且有内容
+# 评论内容不为空时需要支付金额 >= minActionValue（默认 0.00002 ether）
 cast send 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9 \
   "evaluate(uint256,uint8,string,address,uint256)" \
   1 \
@@ -163,6 +166,7 @@ cast send 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9 \
   "This is a comment without tip" \
   0x0000000000000000000000000000000000000000 \
   0 \
+  --value 0.00002ether \
   --private-key 0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a \
   --rpc-url http://localhost:8545
 ```
@@ -531,7 +535,7 @@ forge script script/Deploy.s.sol \
 
 | 函数 | 选择器 |
 |------|--------|
-| `publish(string,uint64,uint96,string)` | `0x...` |
+| `publish(string,uint64,uint96,string,string,address,uint256,uint256,uint8)` | `0x...` |
 | `evaluate(uint256,uint8,string,address,uint256)` | `0xff1f090a` |
 | `likeComment(uint256,uint256,address,address)` | `0xdffd40f2` |
 | `follow(address,bool)` | `0x63c3cc16` |
@@ -544,8 +548,8 @@ cast sig "evaluate(uint256,uint8,string,address,uint256)"
 ### B. 事件签名
 
 ```bash
-# ArticlePublished (包含 originalAuthor)
-cast sig-event "ArticlePublished(uint256,address,uint256,string,string,uint256)"
+# ArticlePublished
+cast sig-event "ArticlePublished(uint256,address,uint256,string,string,string,uint256,address,uint256,uint256,uint8)"
 
 # ArticleEvaluated
 cast sig-event "ArticleEvaluated(uint256,address,uint8,uint256,uint256)"

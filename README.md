@@ -28,7 +28,7 @@ dblog/
 采用 ERC-4337 账户抽象实现去中心化代付，结合 Session Keys 实现无感交互体验。
 业务函数有两类（以evaluate为例）：
 * evaluate: MetaMask / EOA 普通用户，使用原生 ETH 支付
-* evaluateWithSessionKey: 高频交互用户，使用"临时密钥"签名 + 合约内余额支付
+* evaluateWithSessionKey: 高频交互用户，使用"临时密钥"签名 + 原生 ETH 支付
 
 ## SubSquid索引设计
 只索引“关系”和“状态”，不索引文章全文。文章的标题、摘要等 Metadata 由前端获取 Arweave Hash 后在客户端（或 SSR 层）懒加载，或者由 Indexer 的 Worker 异步获取。 为了简化 MVP，我们采用前端懒加载策略，Indexer 只存 Hash。

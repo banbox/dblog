@@ -732,3 +732,10 @@ GPT: solidty不会读取struct的所有字段，所以单独map的收益不高�
 @README.md @BlogHub.sol   补 Foundry 测试，覆盖 SessionKey 路径与直接调用路径在支付、referrer、collect 上限等场景。  
 GPT: 已增加单元测试
 
+#### 2025-12-14 14:02  MulticallUpgradeable必要性
+@README.md  @README.md @BlogHub.sol 此合约引入了MulticallUpgradeable，但似乎目前前端并未使用，请你阅读整体项目要求，了解当前项目的最终目的，帮我考虑是否有必要继续引入，如果有必要，告诉我应该在哪些部分引入和使用   
+GPT: 暂时未用到，主要从SubSquid读，但保留成本很低，可保留
+
+#### 2025-12-14 14:24  文档更新
+@BlogHub.sol  @contracts.md  @README.md @contracts/README.md  当前的智能合约进行了一些修改，主要是取消赞赏铸造NFT，发布文章时允许设置收藏NFT数量，读者可付费收藏铸造NFT；新增原创属性，记录是否原创，新增trueAuthor记录真实作者等方面；请你以当前的最新智能合约代码为准，检查这几个文档中，哪些地方是旧的，需要更新的，帮我进行更新，务必慎重更新，只更新明确错误的；最小更新，不要增加不必要内容，不要输出套话总结等；一切为了方便阅读维护角度出发，只输出干货文档  
+GPT: 更新完成
