@@ -699,10 +699,14 @@ Gemini：很慢，花了一小时才完成任务；任务都已完成
 
 #### 2025-12-13 16:50  误删除测试代码
 @README.md @README.md 当前对智能合约进行了若干修改，主要是发布文章时允许设置收藏数量铸造NFT，取消赞赏和评论铸造NFT，声明原创；其他功能照旧，但是我发现AI生成代码时，把contracts\test\BlogHubSessionKey.t.sol中的很多测试用例删除了，比如关注的逻辑等。请使用git命令检查此文件的修改，然后分析被删除代码中，哪些是应该保留的，然后帮我恢复   
-GPT-5.2 Medium：完成
+GPT-5.2 Medium Reasoning：完成
 
 #### 2025-12-13 17:40  内容分级机制
 @README.md @contracts/README.md 当前是一个去中心化博客项目，目前只包含发布，点赞，不喜欢，评论等功能，我希望加入去中心化的内容审核机制；大致作用应该是，默认发布后只有一部分人可见，这些人对文章的初步评判，决定了是否应该推送给更多的人（也就是上升一级）;我想尽量保持简单，打算直接使用合约当前支持的评价：喜欢、不喜欢来实现；根据评价的总金额，和推荐度（喜欢的总金额/(喜欢+不喜欢的总金额)）来实现；需要SubSquid端过滤作者自评的金额，增加likeAmount和dislikeAmount字段和其他相关逻辑；请你梳理整体的项目要求，根据此要求，帮我修改SubSquid实现。  
-GPT: 修改完成  
+GPT-5.2 High Reasoning: 修改完成  
 开发者：帮我把SubSquid中的likes和dislikes次数统计删除，不再需要了；  
 GPT: 修改完成
+
+#### 2025-12-14 10:15  智能合约代码优化
+@BlogHub.sol 当前智能合约进行了很多次修改，当前支持直接触发和通关SessionKey调用业务函数两种方式；目前可能有很多代码冗余；请你作为高级智能合约专家，一方面从方便维护的角度，查找冗余的代码，提取为子函数；另一方面检查是否有gas浪费可优化的地方，帮我改进；最后查看是否有逻辑冗余可删除的（冗余的只做提示）  
+GPT: 提取了一些重复逻辑，移除Article memory大拷贝；冗余的：EIP712并未使用，Multicall业务代码未使用，ZeroAmount和SpamProtection语义重复；更激进的gas优化：把Article的string字段拆到单独map或分为ArticleCore和ArticleText；其他建议：补充Foundry测试，覆盖SessionKey 路径与直接调用路径在支付、referrer、collect 上限等场景

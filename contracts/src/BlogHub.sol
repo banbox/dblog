@@ -10,7 +10,6 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {MulticallUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/MulticallUpgradeable.sol";
 import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {ISessionKeyManager} from "./interfaces/ISessionKeyManager.sol";
 
 /**
@@ -29,8 +28,6 @@ contract BlogHub is
     MulticallUpgradeable,
     EIP712Upgradeable
 {
-    using ECDSA for bytes32;
-
     // --- Custom Errors (Gas Saving) ---
     error InvalidLength();
     error InvalidScore();
@@ -216,6 +213,48 @@ contract BlogHub is
     //                      内部工具函数
     // =============================================================
 
+    function _requireSessionKeyManager() internal view returns (ISessionKeyManager manager) {
+        manager = sessionKeyManager;
+        if (address(manager) == address(0)) revert SessionKeyManagerNotSet();
+    }
+
+    function _validateAndUseSessionKey(
+        ISessionKeyManager manager,
+        address owner,
+        address sessionKey,
+        bytes4 selector,
+        bytes memory callData,
+        uint256 value,
+        uint256 deadline,
+        bytes calldata signature
+    ) internal {
+        bool valid = manager.validateAndUseSessionKey(
+            owner,
+            sessionKey,
+            address(this),
+            selector,
+            callData,
+            value,
+            deadline,
+            signature
+        );
+        if (!valid) revert SessionKeyValidationFailed();
+    }
+
+    function _validatePublishParams(
+        uint96 royaltyBps,
+        string calldata originalAuthor,
+        string calldata title
+    ) internal pure {
+        if (royaltyBps > 10000) revert RoyaltyTooHigh();
+        if (bytes(originalAuthor).length > MAX_ORIGINAL_AUTHOR_LENGTH) revert OriginalAuthorTooLong();
+        if (bytes(title).length > MAX_TITLE_LENGTH) revert TitleTooLong();
+    }
+
+    function _executeFollow(address follower, address target, bool status) internal {
+        emit FollowStatusChanged(follower, target, status);
+    }
+
     /**
      * @dev 执行评价的核心逻辑（内部函数）
      * @param sender 操作发起人
@@ -248,7 +287,8 @@ contract BlogHub is
         if (contentLength > 0 && amount < minActionValue)
             revert SpamProtection();
 
-        Article memory article = articles[_articleId];
+        Article storage article = articles[_articleId];
+        address articleAuthor = article.author;
 
         // --- 资金处理 ---
         if (amount > 0) {
@@ -258,14 +298,13 @@ contract BlogHub is
                 (bool success, ) = payable(platformTreasury).call{value: amount}("");
                 if (!success) revert TransferFailed();
             } else {
-                
-                address[] memory invalidAddrs = new address[](1);
-                invalidAddrs[0] = article.author;
-                address validReferrer = _validateReferrer(_referrer, sender, invalidAddrs);
+                address validReferrer = _validateReferrer(_referrer, sender, articleAuthor);
                 uint256 authorShare = _distributePlatformAndReferralFees(amount, validReferrer);
                 if (authorShare > 0) {
                     // 优先转给 trueAuthor
-                    address recipient = article.trueAuthor != address(0) ? article.trueAuthor : article.author;
+                    address recipient = article.trueAuthor != address(0)
+                        ? article.trueAuthor
+                        : articleAuthor;
                     (bool success, ) = payable(recipient).call{value: authorShare}("");
                     if (!success) revert TransferFailed();
                 }
@@ -301,40 +340,36 @@ contract BlogHub is
         uint256 amount
     ) internal {
         if (_articleId >= nextArticleId) revert ArticleNotFound();
-        
-        // 需重新读取 storage 以更新 collectCount
-        Article storage articleStorage = articles[_articleId];
-        Article memory article = articles[_articleId]; // memory copy for reading config
 
-        if (article.maxCollectSupply > 0 && article.collectCount >= article.maxCollectSupply) {
-            revert MaxSupplyReached();
-        }
-        // 如果 maxCollectSupply 为 0，且 collectCount 也为 0 (旧文章默认值)，这里需要判断策略。
-        // 假设 maxCollectSupply 0 意味着不可收藏（除非特殊逻辑）。
-        // 简单起见，如果 maxCollectSupply == 0，视为不可收藏。
-        // 如果想发布无限量的，作者应设置一个极大值。
-        if (article.maxCollectSupply == 0) {
-            revert CollectNotEnabled();
-        }
+        Article storage article = articles[_articleId];
+        address articleAuthor = article.author;
+        address articleTrueAuthor = article.trueAuthor;
 
-        if (amount < article.collectPrice) {
+        uint256 maxSupply = article.maxCollectSupply;
+        if (maxSupply == 0) revert CollectNotEnabled();
+        if (article.collectCount >= maxSupply) revert MaxSupplyReached();
+
+        uint256 collectPrice = article.collectPrice;
+        if (amount < collectPrice) {
             revert InsufficientPayment();
         }
 
         // 更新计数
-        articleStorage.collectCount++;
+        unchecked {
+            article.collectCount++;
+        }
 
         // 铸造 NFT
         _mint(sender, _articleId, 1, "");
 
         // 资金分配
-        address[] memory invalidAddrs = new address[](1);
-        invalidAddrs[0] = article.author;
-        address validReferrer = _validateReferrer(_referrer, sender, invalidAddrs);
+        address validReferrer = _validateReferrer(_referrer, sender, articleAuthor);
         uint256 authorShare = _distributePlatformAndReferralFees(amount, validReferrer);
         
         if (authorShare > 0) {
-            address recipient = article.trueAuthor != address(0) ? article.trueAuthor : article.author;
+            address recipient = articleTrueAuthor != address(0)
+                ? articleTrueAuthor
+                : articleAuthor;
             (bool success, ) = payable(recipient).call{value: authorShare}("");
             if (!success) revert TransferFailed();
         }
@@ -369,13 +404,17 @@ contract BlogHub is
         if (_commenter == address(0)) revert InvalidCommenter();
         if (amount == 0) revert SpamProtection();
 
-        Article memory article = articles[_articleId];
+        Article storage article = articles[_articleId];
+        address articleAuthor = article.author;
+        address articleTrueAuthor = article.trueAuthor;
 
         // --- 资金分配 ---
-        address[] memory invalidAddrs = new address[](2);
-        invalidAddrs[0] = article.author;
-        invalidAddrs[1] = _commenter;
-        address validReferrer = _validateReferrer(_referrer, sender, invalidAddrs);
+        address validReferrer = _validateReferrer(
+            _referrer,
+            sender,
+            articleAuthor,
+            _commenter
+        );
 
         uint256 remaining = _distributePlatformAndReferralFees(amount, validReferrer);
 
@@ -384,7 +423,9 @@ contract BlogHub is
 
         if (halfShare > 0) {
             // 作者份额给 trueAuthor
-            address recipient = article.trueAuthor != address(0) ? article.trueAuthor : article.author;
+            address recipient = articleTrueAuthor != address(0)
+                ? articleTrueAuthor
+                : articleAuthor;
             (bool success1, ) = payable(recipient).call{value: halfShare}("");
             if (!success1) revert TransferFailed();
         }
@@ -407,15 +448,27 @@ contract BlogHub is
      * @dev 校验推荐人地址有效性
      */
     function _validateReferrer(
-        address _referrer,
-        address _sender,
-        address[] memory _invalidAddresses
+        address referrer,
+        address sender,
+        address invalid0
     ) internal pure returns (address) {
-        if (_referrer == _sender) return address(0);
-        for (uint256 i = 0; i < _invalidAddresses.length; i++) {
-            if (_referrer == _invalidAddresses[i]) return address(0);
-        }
-        return _referrer;
+        if (referrer == address(0) || referrer == sender || referrer == invalid0) return address(0);
+        return referrer;
+    }
+
+    function _validateReferrer(
+        address referrer,
+        address sender,
+        address invalid0,
+        address invalid1
+    ) internal pure returns (address) {
+        if (
+            referrer == address(0) ||
+            referrer == sender ||
+            referrer == invalid0 ||
+            referrer == invalid1
+        ) return address(0);
+        return referrer;
     }
 
     /**
@@ -441,7 +494,9 @@ contract BlogHub is
             emit ReferralPaid(_referrer, referralShare);
         }
 
-        return _amount - platformShare - referralShare;
+        unchecked {
+            return _amount - platformShare - referralShare;
+        }
     }
 
     // =============================================================
@@ -463,14 +518,11 @@ contract BlogHub is
         uint256 _maxCollectSupply,
         Originality _originality
     ) external whenNotPaused returns (uint256) {
-        if (_royaltyBps > 10000) revert RoyaltyTooHigh();
-        if (bytes(_originalAuthor).length > MAX_ORIGINAL_AUTHOR_LENGTH) revert OriginalAuthorTooLong();
-        if (bytes(_title).length > MAX_TITLE_LENGTH) revert TitleTooLong();
-        
+        _validatePublishParams(_royaltyBps, _originalAuthor, _title);
+
         address author = _msgSender();
         uint256 newId = nextArticleId++;
 
-        // 存储文章元数据
         articles[newId] = Article({
             arweaveHash: _arweaveId,
             author: author,
@@ -485,12 +537,8 @@ contract BlogHub is
             originality: _originality
         });
 
-        // 1. 铸造 NFT (初始归作者所有 - 创世 NFT 1个)
-        articles[newId].collectCount = 1;
         _mint(author, newId, 1, "");
 
-        // 2. 设置独立的 ERC2981 版税 (归作者所有，或者 trueAuthor?)
-        // 版税通常给收款人
         address royaltyReceiver = _trueAuthor != address(0) ? _trueAuthor : author;
         _setTokenRoyalty(newId, royaltyReceiver, _royaltyBps);
 
@@ -550,7 +598,7 @@ contract BlogHub is
      * @dev 关注用户
      */
     function follow(address _target, bool _status) external whenNotPaused {
-        emit FollowStatusChanged(_msgSender(), _target, _status);
+        _executeFollow(_msgSender(), _target, _status);
     }
 
     // =============================================================
@@ -645,11 +693,12 @@ contract BlogHub is
         uint256 deadline,
         bytes calldata signature
     ) external payable nonReentrant whenNotPaused {
-        if (address(sessionKeyManager) == address(0)) revert SessionKeyManagerNotSet();
+        ISessionKeyManager manager = _requireSessionKeyManager();
+        bytes4 selector = BlogHub.evaluate.selector;
 
         // 构建 callData 用于验证
         bytes memory callData = abi.encodeWithSelector(
-            this.evaluate.selector,
+            selector,
             _articleId,
             _score,
             _content,
@@ -657,24 +706,21 @@ contract BlogHub is
             _parentCommentId
         );
 
-        // 验证 Session Key
-        bool valid = sessionKeyManager.validateAndUseSessionKey(
+        _validateAndUseSessionKey(
+            manager,
             owner,
             sessionKey,
-            address(this),
-            this.evaluate.selector,
+            selector,
             callData,
             msg.value,
             deadline,
             signature
         );
 
-        if (!valid) revert SessionKeyValidationFailed();
-
         // 执行评价操作（以 owner 身份），资金分配由 _executeEvaluate 内部处理
         _executeEvaluate(owner, _articleId, _score, _content, _referrer, _parentCommentId, msg.value);
 
-        emit SessionKeyOperationExecuted(owner, sessionKey, this.evaluate.selector);
+        emit SessionKeyOperationExecuted(owner, sessionKey, selector);
     }
 
     /**
@@ -688,33 +734,31 @@ contract BlogHub is
         uint256 deadline,
         bytes calldata signature
     ) external payable nonReentrant whenNotPaused {
-        if (address(sessionKeyManager) == address(0)) revert SessionKeyManagerNotSet();
+        ISessionKeyManager manager = _requireSessionKeyManager();
+        bytes4 selector = BlogHub.collect.selector;
 
         // 构建 callData 用于验证
         bytes memory callData = abi.encodeWithSelector(
-            this.collect.selector,
+            selector,
             _articleId,
             _referrer
         );
 
-        // 验证 Session Key
-        bool valid = sessionKeyManager.validateAndUseSessionKey(
+        _validateAndUseSessionKey(
+            manager,
             owner,
             sessionKey,
-            address(this),
-            this.collect.selector,
+            selector,
             callData,
             msg.value,
             deadline,
             signature
         );
 
-        if (!valid) revert SessionKeyValidationFailed();
-
         // 执行收藏操作（以 owner 身份）
         _executeCollect(owner, _articleId, _referrer, msg.value);
 
-        emit SessionKeyOperationExecuted(owner, sessionKey, this.collect.selector);
+        emit SessionKeyOperationExecuted(owner, sessionKey, selector);
     }
 
     /**
@@ -730,30 +774,28 @@ contract BlogHub is
         uint256 deadline,
         bytes calldata signature
     ) external payable nonReentrant whenNotPaused {
-        if (address(sessionKeyManager) == address(0)) revert SessionKeyManagerNotSet();
+        ISessionKeyManager manager = _requireSessionKeyManager();
+        bytes4 selector = BlogHub.likeComment.selector;
 
         // 构建 callData 用于验证
         bytes memory callData = abi.encodeWithSelector(
-            this.likeComment.selector,
+            selector,
             _articleId,
             _commentId,
             _commenter,
             _referrer
         );
 
-        // 验证 Session Key
-        bool valid = sessionKeyManager.validateAndUseSessionKey(
+        _validateAndUseSessionKey(
+            manager,
             owner,
             sessionKey,
-            address(this),
-            this.likeComment.selector,
+            selector,
             callData,
             msg.value,
             deadline,
             signature
         );
-
-        if (!valid) revert SessionKeyValidationFailed();
 
         // likeComment 必须有支付金额
         if (msg.value == 0) revert ZeroAmount();
@@ -761,7 +803,7 @@ contract BlogHub is
         // 执行点赞操作（以 owner 身份），资金分配由 _executeLikeComment 内部处理
         _executeLikeComment(owner, _articleId, _commentId, _commenter, _referrer, msg.value);
 
-        emit SessionKeyOperationExecuted(owner, sessionKey, this.likeComment.selector);
+        emit SessionKeyOperationExecuted(owner, sessionKey, selector);
     }
 
     /**
@@ -775,33 +817,31 @@ contract BlogHub is
         uint256 deadline,
         bytes calldata signature
     ) external whenNotPaused {
-        if (address(sessionKeyManager) == address(0)) revert SessionKeyManagerNotSet();
+        ISessionKeyManager manager = _requireSessionKeyManager();
+        bytes4 selector = BlogHub.follow.selector;
 
         // 构建 callData 用于验证
         bytes memory callData = abi.encodeWithSelector(
-            this.follow.selector,
+            selector,
             _target,
             _status
         );
 
-        // 验证 Session Key
-        bool valid = sessionKeyManager.validateAndUseSessionKey(
+        _validateAndUseSessionKey(
+            manager,
             owner,
             sessionKey,
-            address(this),
-            this.follow.selector,
+            selector,
             callData,
-            0, // follow 操作不需要支付
+            0,
             deadline,
             signature
         );
 
-        if (!valid) revert SessionKeyValidationFailed();
-
         // 执行关注操作
-        emit FollowStatusChanged(owner, _target, _status);
+        _executeFollow(owner, _target, _status);
 
-        emit SessionKeyOperationExecuted(owner, sessionKey, this.follow.selector);
+        emit SessionKeyOperationExecuted(owner, sessionKey, selector);
     }
 
     /**
@@ -827,44 +867,26 @@ contract BlogHub is
         uint256 deadline,
         bytes calldata signature
     ) external whenNotPaused returns (uint256) {
-        if (address(sessionKeyManager) == address(0)) revert SessionKeyManagerNotSet();
-        if (params.royaltyBps > 10000) revert RoyaltyTooHigh();
-        if (bytes(params.originalAuthor).length > MAX_ORIGINAL_AUTHOR_LENGTH) revert OriginalAuthorTooLong();
-        if (bytes(params.title).length > MAX_TITLE_LENGTH) revert TitleTooLong();
+        ISessionKeyManager manager = _requireSessionKeyManager();
+        _validatePublishParams(params.royaltyBps, params.originalAuthor, params.title);
+        bytes4 selector = BlogHub.publish.selector;
 
-        // 构建 callData 用于验证
-        // 注意：这里需要确保 ABI 编码与 client 端签名构建一致
-        bytes memory callData = abi.encodeWithSelector(
-            this.publish.selector,
-            params.arweaveId,
-            params.categoryId,
-            params.royaltyBps,
-            params.originalAuthor,
-            params.title,
-            params.trueAuthor,
-            params.collectPrice,
-            params.maxCollectSupply,
-            params.originality
-        );
+        bytes memory callData = _encodePublishCallData(params);
 
         // 验证 Session Key
-        bool valid = sessionKeyManager.validateAndUseSessionKey(
+        _validateAndUseSessionKey(
+            manager,
             owner,
             sessionKey,
-            address(this),
-            this.publish.selector,
+            selector,
             callData,
-            0, // publish 操作不需要支付
+            0,
             deadline,
             signature
         );
 
-        if (!valid) revert SessionKeyValidationFailed();
-
-        // 执行发布操作（以 owner 身份）
         uint256 newId = nextArticleId++;
 
-        // 存储文章元数据
         articles[newId] = Article({
             arweaveHash: params.arweaveId,
             author: owner,
@@ -879,10 +901,7 @@ contract BlogHub is
             originality: params.originality
         });
 
-        if (params.maxCollectSupply > 0) {
-             articles[newId].collectCount = 1;
-             _mint(owner, newId, 1, "");
-        }
+        _mint(owner, newId, 1, "");
 
         address royaltyReceiver = params.trueAuthor != address(0) ? params.trueAuthor : owner;
         _setTokenRoyalty(newId, royaltyReceiver, params.royaltyBps);
@@ -901,9 +920,27 @@ contract BlogHub is
             params.originality
         );
 
-        emit SessionKeyOperationExecuted(owner, sessionKey, this.publish.selector);
+        emit SessionKeyOperationExecuted(owner, sessionKey, selector);
 
         return newId;
+    }
+
+    function _encodePublishCallData(
+        PublishParams calldata params
+    ) internal pure returns (bytes memory) {
+        return
+            abi.encodeWithSelector(
+                BlogHub.publish.selector,
+                params.arweaveId,
+                params.categoryId,
+                params.royaltyBps,
+                params.originalAuthor,
+                params.title,
+                params.trueAuthor,
+                params.collectPrice,
+                params.maxCollectSupply,
+                params.originality
+            );
     }
 
     // =============================================================
