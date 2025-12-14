@@ -117,10 +117,10 @@ contract BlogHubTest is BaseTest {
             address storedAuthor,
             uint64 timestamp,
             uint16 catId,
-            uint32 storedMaxCollectSupply,
-            uint32 storedCollectCount,
             BlogHub.Originality storedOriginality,
             uint96 storedCollectPrice,
+            uint32 storedMaxCollectSupply,
+            uint32 storedCollectCount,
             string memory hash
         ) = blogHub.articles(articleId);
         assertEq(hash, arweaveHash);

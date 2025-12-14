@@ -74,8 +74,8 @@ contract BlogHub is
         uint16 categoryId;    // 2 bytes
         Originality originality; // enum uint8 (1 byte)
         
-        // --- Slot 1 (16 bytes，剩余 16 bytes) ---
-        uint96 collectPrice; // 8 bytes
+        // --- Slot 1 (20 bytes，剩余 12 bytes) ---
+        uint96 collectPrice; // 12 bytes
         uint32 maxCollectSupply;  // 4 bytes
         uint32 collectCount;  // 4 bytes
         

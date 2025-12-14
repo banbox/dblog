@@ -724,3 +724,11 @@ Gemini: 不用拆，因为拆了写入时太耗gas，且读取时编译器会优
 @BlogHub.sol 当前的Article中的title 和 originalAuthor只做读取，合约中不使用，不应存储，直接event即可；我已删除，请帮我修改其他函数中对应的地方。另外帮我检查相关代码，分析Article中的author和trueAuthor这两个字段是否有冗余？我本意是存储真实作者的钱包地址，后续用于转账；目前用两个是否没必要？如果确实没必要，帮我删除一个；最后，对于collectPrice，目前使用uint256存储，这个是否太大了？有没有必要使用更小的？我后续要部署到多链，如OP链，polygon等evm兼容链；请帮我考虑是否需要改；  
 GPT: 已移除存储title/originAuthor，删除冗余trueAuthor，collectPrice改uint96  
 
+#### 2025-12-14 13:03  arweaveHash是否应该单独map
+@README.md @contracts/README.md @BlogHub.sol 当前合约使用map存储了文章的所有信息，其中的arweaveHash用于支持uri接口，请帮我分析是否应该将此字段单独维护一个map？如果有必要，请帮我修改  
+GPT: solidty不会读取struct的所有字段，所以单独map的收益不高，没必要
+
+#### 2025-12-14 13:28  补充单元测试
+@README.md @BlogHub.sol   补 Foundry 测试，覆盖 SessionKey 路径与直接调用路径在支付、referrer、collect 上限等场景。  
+GPT: 已增加单元测试
+

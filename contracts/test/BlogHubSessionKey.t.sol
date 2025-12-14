@@ -41,6 +41,7 @@ contract BlogHubSessionKeyTest is BaseTest {
         uint256 amountPaid,
         uint256 timestamp
     );
+    event ReferralPaid(address indexed referrer, uint256 amount);
     event FollowStatusChanged(
         address indexed follower,
         address indexed target,
@@ -587,10 +588,10 @@ contract BlogHubSessionKeyTest is BaseTest {
             address storedAuthor,
             uint64 storedTimestamp,
             uint16 storedCategoryId,
-            uint32 storedSupply,
-            uint32 storedCount,
             BlogHub.Originality storedOriginality,
             uint96 storedPrice,
+            uint32 storedSupply,
+            uint32 storedCount,
             string memory storedArweaveHash
         ) = blogHub.articles(articleId);
         
@@ -1023,6 +1024,388 @@ contract BlogHubSessionKeyTest is BaseTest {
         );
 
         assertEq(blogHub.balanceOf(user1, articleId), 0);
+    }
+
+    function test_Evaluate_PaymentWithReferrer_SameAsDirect() public {
+        uint256 articleId = _publishTestArticle(user2);
+        address referrer = makeAddr("referrer");
+        uint256 amount = 1 ether;
+
+        uint256 expectedPlatformShare = (amount * blogHub.platformFeeBps()) / 10000;
+        uint256 expectedReferralShare = (amount * 1000) / 10000;
+        uint256 expectedAuthorShare = amount - expectedPlatformShare - expectedReferralShare;
+
+        uint256 snap = vm.snapshot();
+
+        uint256 treasuryBefore = treasury.balance;
+        uint256 authorBefore = user2.balance;
+        uint256 payerBefore = user1.balance;
+
+        vm.prank(user1);
+        blogHub.evaluate{value: amount}(articleId, 1, "", referrer, 0);
+
+        assertEq(treasury.balance - treasuryBefore, expectedPlatformShare);
+        assertEq(payerBefore - user1.balance, amount);
+        assertEq(user2.balance - authorBefore, expectedAuthorShare);
+
+        vm.revertTo(snap);
+
+        uint256 deadline = block.timestamp + 1 hours;
+        bytes memory callData = abi.encodeWithSelector(
+            BlogHub.evaluate.selector,
+            articleId,
+            uint8(1),
+            "",
+            referrer,
+            uint256(0)
+        );
+
+        ISessionKeyManager.SessionKeyData memory data = sessionKeyManager.getSessionKeyData(user1, sessionKey);
+        bytes memory signature = _signSessionOperation(
+            sessionKeyPrivateKey,
+            user1,
+            sessionKey,
+            address(blogHub),
+            BlogHub.evaluate.selector,
+            callData,
+            amount,
+            data.nonce,
+            deadline
+        );
+
+        treasuryBefore = treasury.balance;
+        authorBefore = user2.balance;
+        uint256 ownerBefore = owner.balance;
+        uint256 referrerBefore = referrer.balance;
+
+        vm.prank(owner);
+        blogHub.evaluateWithSessionKey{value: amount}(
+            user1,
+            sessionKey,
+            articleId,
+            1,
+            "",
+            referrer,
+            0,
+            deadline,
+            signature
+        );
+
+        assertEq(treasury.balance - treasuryBefore, expectedPlatformShare);
+        assertEq(ownerBefore - owner.balance, amount);
+        assertEq(referrer.balance - referrerBefore, expectedReferralShare);
+        assertEq(user2.balance - authorBefore, expectedAuthorShare);
+    }
+
+    function test_Evaluate_InvalidReferrer_NoReferral_SameAsDirect() public {
+        uint256 articleId = _publishTestArticle(user2);
+        address referrer = user1;
+        uint256 amount = 1 ether;
+
+        uint256 expectedPlatformShare = (amount * blogHub.platformFeeBps()) / 10000;
+        uint256 expectedReferralShare = 0;
+        uint256 expectedAuthorShare = amount - expectedPlatformShare;
+
+        uint256 snap = vm.snapshot();
+
+        uint256 treasuryBefore = treasury.balance;
+        uint256 authorBefore = user2.balance;
+        uint256 payerBefore = user1.balance;
+
+        vm.prank(user1);
+        blogHub.evaluate{value: amount}(articleId, 1, "", referrer, 0);
+
+        assertEq(treasury.balance - treasuryBefore, expectedPlatformShare);
+        assertEq(payerBefore - user1.balance, amount);
+        assertEq(user2.balance - authorBefore, expectedAuthorShare);
+
+        vm.revertTo(snap);
+
+        uint256 deadline = block.timestamp + 1 hours;
+        bytes memory callData = abi.encodeWithSelector(
+            BlogHub.evaluate.selector,
+            articleId,
+            uint8(1),
+            "",
+            referrer,
+            uint256(0)
+        );
+
+        ISessionKeyManager.SessionKeyData memory data = sessionKeyManager.getSessionKeyData(user1, sessionKey);
+        bytes memory signature = _signSessionOperation(
+            sessionKeyPrivateKey,
+            user1,
+            sessionKey,
+            address(blogHub),
+            BlogHub.evaluate.selector,
+            callData,
+            amount,
+            data.nonce,
+            deadline
+        );
+
+        treasuryBefore = treasury.balance;
+        authorBefore = user2.balance;
+        uint256 ownerBefore = owner.balance;
+        uint256 referrerBefore = referrer.balance;
+
+        vm.prank(owner);
+        blogHub.evaluateWithSessionKey{value: amount}(
+            user1,
+            sessionKey,
+            articleId,
+            1,
+            "",
+            referrer,
+            0,
+            deadline,
+            signature
+        );
+
+        assertEq(treasury.balance - treasuryBefore, expectedPlatformShare);
+        assertEq(ownerBefore - owner.balance, amount);
+        assertEq(referrer.balance - referrerBefore, expectedReferralShare);
+        assertEq(user2.balance - authorBefore, expectedAuthorShare);
+    }
+
+    function test_Collect_PaymentWithReferrer_SameAsDirect() public {
+        uint256 articleId = _publishTestArticle(user2);
+        address referrer = makeAddr("referrer");
+        uint256 amount = 0.01 ether;
+
+        uint256 expectedPlatformShare = (amount * blogHub.platformFeeBps()) / 10000;
+        uint256 expectedReferralShare = (amount * 1000) / 10000;
+        uint256 expectedAuthorShare = amount - expectedPlatformShare - expectedReferralShare;
+
+        uint256 snap = vm.snapshot();
+
+        (,,,, uint96 collectPrice0, uint32 maxSupply0, uint32 collectCount0, ) = blogHub.articles(articleId);
+        assertEq(collectPrice0, amount);
+        assertEq(maxSupply0, 100);
+        assertEq(collectCount0, 1);
+
+        uint256 treasuryBefore = treasury.balance;
+        uint256 authorBefore = user2.balance;
+        uint256 referrerBefore = referrer.balance;
+
+        vm.prank(user1);
+        blogHub.collect{value: amount}(articleId, referrer);
+
+        assertEq(blogHub.balanceOf(user1, articleId), 1);
+
+        (,,,, , , uint32 collectCount1, ) = blogHub.articles(articleId);
+        assertEq(collectCount1, 2);
+
+        assertEq(treasury.balance - treasuryBefore, expectedPlatformShare);
+        assertEq(referrer.balance - referrerBefore, expectedReferralShare);
+        assertEq(user2.balance - authorBefore, expectedAuthorShare);
+
+        vm.revertTo(snap);
+
+        uint256 deadline = block.timestamp + 1 hours;
+        bytes memory callData = abi.encodeWithSelector(
+            BlogHub.collect.selector,
+            articleId,
+            referrer
+        );
+
+        ISessionKeyManager.SessionKeyData memory data = sessionKeyManager.getSessionKeyData(user1, sessionKey);
+        bytes memory signature = _signSessionOperation(
+            sessionKeyPrivateKey,
+            user1,
+            sessionKey,
+            address(blogHub),
+            BlogHub.collect.selector,
+            callData,
+            amount,
+            data.nonce,
+            deadline
+        );
+
+        (,,,, collectPrice0, maxSupply0, collectCount0, ) = blogHub.articles(articleId);
+        assertEq(collectPrice0, amount);
+        assertEq(maxSupply0, 100);
+        assertEq(collectCount0, 1);
+
+        treasuryBefore = treasury.balance;
+        authorBefore = user2.balance;
+        referrerBefore = referrer.balance;
+
+        vm.prank(owner);
+        blogHub.collectWithSessionKey{value: amount}(
+            user1,
+            sessionKey,
+            articleId,
+            referrer,
+            deadline,
+            signature
+        );
+
+        assertEq(blogHub.balanceOf(user1, articleId), 1);
+
+        (,,,, , , collectCount1, ) = blogHub.articles(articleId);
+        assertEq(collectCount1, 2);
+
+        assertEq(treasury.balance - treasuryBefore, expectedPlatformShare);
+        assertEq(referrer.balance - referrerBefore, expectedReferralShare);
+        assertEq(user2.balance - authorBefore, expectedAuthorShare);
+    }
+
+    function test_Collect_MaxSupplyReached_SameAsDirect() public {
+        uint256 amount = 0.01 ether;
+
+        vm.prank(user2);
+        uint256 articleId = blogHub.publish(
+            "test-arweave-hash",
+            1,
+            500,
+            "",
+            "Test Title",
+            address(0),
+            amount,
+            2,
+            BlogHub.Originality.Original
+        );
+
+        uint256 snap = vm.snapshot();
+
+        vm.prank(user1);
+        blogHub.collect{value: amount}(articleId, address(0));
+
+        vm.prank(user1);
+        vm.expectRevert(BlogHub.MaxSupplyReached.selector);
+        blogHub.collect{value: amount}(articleId, address(0));
+
+        vm.revertTo(snap);
+
+        uint256 deadline = block.timestamp + 1 hours;
+        bytes memory callData = abi.encodeWithSelector(
+            BlogHub.collect.selector,
+            articleId,
+            address(0)
+        );
+
+        ISessionKeyManager.SessionKeyData memory data1 = sessionKeyManager.getSessionKeyData(user1, sessionKey);
+        bytes memory signature1 = _signSessionOperation(
+            sessionKeyPrivateKey,
+            user1,
+            sessionKey,
+            address(blogHub),
+            BlogHub.collect.selector,
+            callData,
+            amount,
+            data1.nonce,
+            deadline
+        );
+
+        vm.prank(owner);
+        blogHub.collectWithSessionKey{value: amount}(
+            user1,
+            sessionKey,
+            articleId,
+            address(0),
+            deadline,
+            signature1
+        );
+
+        ISessionKeyManager.SessionKeyData memory data2 = sessionKeyManager.getSessionKeyData(user1, sessionKey);
+        bytes memory signature2 = _signSessionOperation(
+            sessionKeyPrivateKey,
+            user1,
+            sessionKey,
+            address(blogHub),
+            BlogHub.collect.selector,
+            callData,
+            amount,
+            data2.nonce,
+            deadline
+        );
+
+        vm.prank(owner);
+        vm.expectRevert(BlogHub.MaxSupplyReached.selector);
+        blogHub.collectWithSessionKey{value: amount}(
+            user1,
+            sessionKey,
+            articleId,
+            address(0),
+            deadline,
+            signature2
+        );
+    }
+
+    function test_LikeComment_PaymentWithReferrer_SameAsDirect() public {
+        uint256 articleId = _publishTestArticle(user2);
+        address commenter = makeAddr("commenter");
+        address referrer = makeAddr("referrer");
+        uint256 commentId = 1;
+        uint256 amount = 1 ether;
+
+        uint256 expectedPlatformShare = (amount * blogHub.platformFeeBps()) / 10000;
+        uint256 expectedReferralShare = (amount * 1000) / 10000;
+        uint256 expectedRemaining = amount - expectedPlatformShare - expectedReferralShare;
+        uint256 expectedAuthorShare = expectedRemaining / 2;
+        uint256 expectedCommenterShare = expectedRemaining - expectedAuthorShare;
+
+        uint256 snap = vm.snapshot();
+
+        uint256 treasuryBefore = treasury.balance;
+        uint256 authorBefore = user2.balance;
+        uint256 commenterBefore = commenter.balance;
+        uint256 referrerBefore = referrer.balance;
+
+        vm.prank(user1);
+        blogHub.likeComment{value: amount}(articleId, commentId, commenter, referrer);
+
+        assertEq(treasury.balance - treasuryBefore, expectedPlatformShare);
+        assertEq(referrer.balance - referrerBefore, expectedReferralShare);
+        assertEq(user2.balance - authorBefore, expectedAuthorShare);
+        assertEq(commenter.balance - commenterBefore, expectedCommenterShare);
+
+        vm.revertTo(snap);
+
+        uint256 deadline = block.timestamp + 1 hours;
+        bytes memory callData = abi.encodeWithSelector(
+            BlogHub.likeComment.selector,
+            articleId,
+            commentId,
+            commenter,
+            referrer
+        );
+
+        ISessionKeyManager.SessionKeyData memory data = sessionKeyManager.getSessionKeyData(user1, sessionKey);
+        bytes memory signature = _signSessionOperation(
+            sessionKeyPrivateKey,
+            user1,
+            sessionKey,
+            address(blogHub),
+            BlogHub.likeComment.selector,
+            callData,
+            amount,
+            data.nonce,
+            deadline
+        );
+
+        treasuryBefore = treasury.balance;
+        authorBefore = user2.balance;
+        commenterBefore = commenter.balance;
+        referrerBefore = referrer.balance;
+
+        vm.prank(owner);
+        blogHub.likeCommentWithSessionKey{value: amount}(
+            user1,
+            sessionKey,
+            articleId,
+            commentId,
+            commenter,
+            referrer,
+            deadline,
+            signature
+        );
+
+        assertEq(treasury.balance - treasuryBefore, expectedPlatformShare);
+        assertEq(referrer.balance - referrerBefore, expectedReferralShare);
+        assertEq(user2.balance - authorBefore, expectedAuthorShare);
+        assertEq(commenter.balance - commenterBefore, expectedCommenterShare);
     }
 
     function test_PublishWithSessionKey_RevertRoyaltyTooHigh() public {
