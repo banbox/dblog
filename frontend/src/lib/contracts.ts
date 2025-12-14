@@ -182,7 +182,11 @@ const BLOGHUB_ABI = [
 			{ name: '_categoryId', type: 'uint64' },
 			{ name: '_royaltyBps', type: 'uint96' },
 			{ name: '_originalAuthor', type: 'string' },
-			{ name: '_title', type: 'string' }
+			{ name: '_title', type: 'string' },
+			{ name: '_trueAuthor', type: 'address' },
+			{ name: '_collectPrice', type: 'uint256' },
+			{ name: '_maxCollectSupply', type: 'uint256' },
+			{ name: '_originality', type: 'uint8' }
 		],
 		outputs: [{ type: 'uint256' }],
 		stateMutability: 'nonpayable'
@@ -230,11 +234,21 @@ const BLOGHUB_ABI = [
 		inputs: [
 			{ name: 'owner', type: 'address' },
 			{ name: 'sessionKey', type: 'address' },
-			{ name: '_arweaveId', type: 'string' },
-			{ name: '_categoryId', type: 'uint64' },
-			{ name: '_royaltyBps', type: 'uint96' },
-			{ name: '_originalAuthor', type: 'string' },
-			{ name: '_title', type: 'string' },
+			{
+				name: 'params',
+				type: 'tuple',
+				components: [
+					{ name: 'arweaveId', type: 'string' },
+					{ name: 'categoryId', type: 'uint64' },
+					{ name: 'royaltyBps', type: 'uint96' },
+					{ name: 'originalAuthor', type: 'string' },
+					{ name: 'title', type: 'string' },
+					{ name: 'trueAuthor', type: 'address' },
+					{ name: 'collectPrice', type: 'uint256' },
+					{ name: 'maxCollectSupply', type: 'uint256' },
+					{ name: 'originality', type: 'uint8' }
+				]
+			},
 			{ name: 'deadline', type: 'uint256' },
 			{ name: 'signature', type: 'bytes' }
 		],
@@ -430,13 +444,24 @@ export async function publishToContract(
 
 	try {
 		const walletClient = await getWalletClient();
+		const zeroAddress = '0x0000000000000000000000000000000000000000' as const;
 
 		// Call publish function
 		const txHash = await walletClient.writeContract({
 			address: getBlogHubContractAddress(),
 			abi: BLOGHUB_ABI,
 			functionName: 'publish',
-			args: [arweaveId, categoryId, royaltyBps, originalAuthor, title]
+			args: [
+				arweaveId,
+				categoryId,
+				royaltyBps,
+				originalAuthor,
+				title,
+				zeroAddress,
+				0n,
+				0n,
+				0
+			]
 		});
 
 		console.log(`Article published to contract. Tx: ${txHash}`);
@@ -666,10 +691,11 @@ async function getSessionKeyNonce(
 
 // Function selectors for Session Key operations
 const FUNCTION_SELECTORS = {
-	publish: '0xc7e76bf0' as `0x${string}`,      // publish(string,uint64,uint96,string,string)
+	publish: '0xe7628e4d' as `0x${string}`,      // publish(string,uint64,uint96,string,string,address,uint256,uint256,uint8)
 	evaluate: '0xff1f090a' as `0x${string}`,     // evaluate(uint256,uint8,string,address,uint256)
 	follow: '0x63c3cc16' as `0x${string}`,       // follow(address,bool)
-	likeComment: '0xdffd40f2' as `0x${string}`   // likeComment(uint256,uint256,address,address)
+	likeComment: '0xdffd40f2' as `0x${string}`,  // likeComment(uint256,uint256,address,address)
+	collect: '0x8d3c100a' as `0x${string}`       // collect(uint256,address)
 };
 
 /**
@@ -771,12 +797,23 @@ export async function publishToContractWithSessionKey(
 
 		// Set deadline to 5 minutes from now
 		const deadline = BigInt(Math.floor(Date.now() / 1000) + 300);
+		const zeroAddress = '0x0000000000000000000000000000000000000000' as const;
 
 		// Encode the publish function call data (this is what gets hashed in the signature)
 		const callData = encodeFunctionData({
 			abi: BLOGHUB_ABI,
 			functionName: 'publish',
-			args: [arweaveId, categoryId, royaltyBps, originalAuthor, title]
+			args: [
+				arweaveId,
+				categoryId,
+				royaltyBps,
+				originalAuthor,
+				title,
+				zeroAddress,
+				0n,
+				0n,
+				0
+			]
 		});
 
 		// Get current nonce from SessionKeyManager
@@ -803,11 +840,17 @@ export async function publishToContractWithSessionKey(
 			args: [
 				sessionKey.owner as `0x${string}`,
 				sessionKey.address as `0x${string}`,
-				arweaveId,
-				categoryId,
-				royaltyBps,
-				originalAuthor,
-				title,
+				{
+					arweaveId,
+					categoryId,
+					royaltyBps,
+					originalAuthor,
+					title,
+					trueAuthor: zeroAddress,
+					collectPrice: 0n,
+					maxCollectSupply: 0n,
+					originality: 0
+				},
 				deadline,
 				signature
 			]

@@ -158,7 +158,8 @@ npx squid-evm-typegen src/abi src/abi/BlogHub.json
 - **CommentAdded** - 评论添加
 - **FollowStatusChanged** - 关注状态变更
 
-Processor 配置位于 `src/processor.ts`，订阅 BlogHub 合约的上述事件。
+Processor 配置位于 `src/processor.ts`，订阅 BlogHub 合约事件（包含 `ArticleCollected`）。
+
 
 ### 3.2 本地运行测试
 
@@ -465,7 +466,9 @@ Session Key 允许用户授权临时密钥执行特定操作，实现无感交�
 const ALLOWED_SELECTORS: `0x${string}`[] = [
   '0xff1f090a', // evaluate
   '0xdffd40f2', // likeComment
-  '0x63c3cc16'  // follow
+  '0x63c3cc16', // follow
+  '0xe7628e4d', // publish
+  '0x8d3c100a'  // collect
 ];
 
 // 默认消费额度 (10 ETH)

@@ -204,6 +204,8 @@ VALID_UNTIL=$((CURRENT_TIME + 86400))  # 24小时后过期
 # evaluate: 0xff1f090a
 # likeComment: 0xdffd40f2
 # follow: 0x63c3cc16
+# publish: 0xe7628e4d
+# collect: 0x8d3c100a
 
 # registerSessionKey(address sessionKey, uint48 validAfter, uint48 validUntil, address allowedContract, bytes4[] allowedSelectors, uint256 spendingLimit)
 cast send 0x5FbDB2315678afecb367f032d93F642f64180aa3 \
@@ -539,6 +541,8 @@ forge script script/Deploy.s.sol \
 | `evaluate(uint256,uint8,string,address,uint256)` | `0xff1f090a` |
 | `likeComment(uint256,uint256,address,address)` | `0xdffd40f2` |
 | `follow(address,bool)` | `0x63c3cc16` |
+| `publish` | `0xe7628e4d` |
+| `collect` | `0x8d3c100a` |
 
 ```bash
 # 获取函数选择器
