@@ -132,7 +132,7 @@ async function fetchArticleFromFolder(manifestId: string): Promise<ArticleMetada
 	
 	return {
 		title: title || 'Untitled',
-		summary: content.substring(0, 200),
+		summary: '',
 		content,
 		tags: [],
 		createdAt: Date.now(),

@@ -27,6 +27,8 @@
 	} from '$lib/sessionKey';
 	import { getMinActionValue } from '$lib/config';
 
+	const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as const;
+
 	let { data }: { data: PageData } = $props();
 	const article = data.article;
 
@@ -49,7 +51,10 @@
 
 	// UI state
 	let showTipModal = $state(false);
+	let showCollectModal = $state(false);
+	let showDislikeModal = $state(false);
 	let tipAmount = $state('0.001');
+	let dislikeAmount = $state('0.001');
 	let feedbackMessage = $state<{ type: 'success' | 'error'; text: string } | null>(null);
 
 	// Local counts (optimistic updates)
@@ -63,11 +68,7 @@
 	}
 
 	async function handleCollect() {
-		if (!walletAddress) {
-			showFeedback('error', m.please_connect_wallet({}));
-			return;
-		}
-		if (isCollecting) return;
+		if (!requireWallet() || isCollecting) return;
 
 		const maxSupply = BigInt(article.maxCollectSupply);
 		const currentCount = BigInt(localCollectCount);
@@ -84,12 +85,10 @@
 		try {
 			const articleId = BigInt(article.id);
 			const priceWei = BigInt(article.collectPrice);
-			const referrer = '0x0000000000000000000000000000000000000000' as const;
-			if (hasValidSessionKey && sessionKey) {
-				await collectArticleWithSessionKey(sessionKey, articleId, referrer, priceWei);
-			} else {
-				await collectArticle(articleId, referrer, priceWei);
-			}
+			await callWithSessionKey(
+				(sk) => collectArticleWithSessionKey(sk, articleId, ZERO_ADDRESS, priceWei),
+				() => collectArticle(articleId, ZERO_ADDRESS, priceWei)
+			);
 			localCollectCount = (BigInt(localCollectCount) + 1n).toString();
 			showFeedback('success', 'Collected');
 		} catch (error) {
@@ -159,6 +158,26 @@
 		}, 3000);
 	}
 
+	// Check wallet and show error if not connected, returns true if wallet is connected
+	function requireWallet(): boolean {
+		if (!walletAddress) {
+			showFeedback('error', m.please_connect_wallet({}));
+			return false;
+		}
+		return true;
+	}
+
+	// Execute contract call with session key if available, otherwise use regular call
+	async function callWithSessionKey<T>(
+		withSessionKey: (sk: StoredSessionKey) => Promise<T>,
+		withoutSessionKey: () => Promise<T>
+	): Promise<T> {
+		if (hasValidSessionKey && sessionKey) {
+			return withSessionKey(sessionKey);
+		}
+		return withoutSessionKey();
+	}
+
 	// Get error message from ContractError
 	function getErrorMessage(error: unknown): string {
 		if (error instanceof ContractError) {
@@ -197,35 +216,23 @@
 
 	// Handle Dislike
 	async function handleDislike() {
-		if (!walletAddress) {
-			showFeedback('error', m.please_connect_wallet({}));
+		if (!requireWallet()) return;
+		const amount = parseFloat(dislikeAmount);
+		if (isNaN(amount) || amount <= 0) {
+			showFeedback('error', 'Invalid amount');
 			return;
 		}
 		isDisliking = true;
 		try {
 			const articleId = BigInt(article.id);
-			const minValue = getMinActionValue();
-			if (hasValidSessionKey && sessionKey) {
-				await evaluateArticleWithSessionKey(
-					sessionKey,
-					articleId,
-					EvaluationScore.Dislike,
-					'',
-					'0x0000000000000000000000000000000000000000',
-					0n,
-					minValue
-				);
-			} else {
-				await evaluateArticle(
-					articleId,
-					EvaluationScore.Dislike,
-					'',
-					'0x0000000000000000000000000000000000000000',
-					0n,
-					minValue
-				);
-			}
-			localDislikeAmount = (BigInt(localDislikeAmount) + minValue).toString();
+			const dislikeWei = parseEther(dislikeAmount);
+			await callWithSessionKey(
+				(sk) => evaluateArticleWithSessionKey(sk, articleId, EvaluationScore.Dislike, '', ZERO_ADDRESS, 0n, dislikeWei),
+				() => evaluateArticle(articleId, EvaluationScore.Dislike, '', ZERO_ADDRESS, 0n, dislikeWei)
+			);
+			localDislikeAmount = (BigInt(localDislikeAmount) + dislikeWei).toString();
+			showDislikeModal = false;
+			dislikeAmount = '0.001';
 			showFeedback('success', m.dislike_success({}));
 		} catch (error) {
 			showFeedback('error', m.interaction_failed({ error: getErrorMessage(error) }));
@@ -236,18 +243,14 @@
 
 	// Handle Follow
 	async function handleFollow() {
-		if (!walletAddress) {
-			showFeedback('error', m.please_connect_wallet({}));
-			return;
-		}
+		if (!requireWallet()) return;
 		isFollowing = true;
 		try {
 			const targetAddress = article.author.id as `0x${string}`;
-			if (hasValidSessionKey && sessionKey) {
-				await followUserWithSessionKey(sessionKey, targetAddress, true);
-			} else {
-				await followUser(targetAddress, true);
-			}
+			await callWithSessionKey(
+				(sk) => followUserWithSessionKey(sk, targetAddress, true),
+				() => followUser(targetAddress, true)
+			);
 			showFeedback('success', m.follow_success({}));
 		} catch (error) {
 			showFeedback('error', m.interaction_failed({ error: getErrorMessage(error) }));
@@ -258,10 +261,7 @@
 
 	// Handle Tip
 	async function handleTip() {
-		if (!walletAddress) {
-			showFeedback('error', m.please_connect_wallet({}));
-			return;
-		}
+		if (!requireWallet()) return;
 		const amount = parseFloat(tipAmount);
 		if (isNaN(amount) || amount <= 0) {
 			showFeedback('error', 'Invalid tip amount');
@@ -271,17 +271,10 @@
 		try {
 			const articleId = BigInt(article.id);
 			const tipWei = parseEther(tipAmount);
-			if (hasValidSessionKey && sessionKey) {
-				await evaluateArticleWithSessionKey(
-					sessionKey, articleId, EvaluationScore.Like, '',
-					'0x0000000000000000000000000000000000000000', 0n, tipWei
-				);
-			} else {
-				await evaluateArticle(
-					articleId, EvaluationScore.Like, '',
-					'0x0000000000000000000000000000000000000000', 0n, tipWei
-				);
-			}
+			await callWithSessionKey(
+				(sk) => evaluateArticleWithSessionKey(sk, articleId, EvaluationScore.Like, '', ZERO_ADDRESS, 0n, tipWei),
+				() => evaluateArticle(articleId, EvaluationScore.Like, '', ZERO_ADDRESS, 0n, tipWei)
+			);
 			showTipModal = false;
 			tipAmount = '0.001';
 			showFeedback('success', m.tip_success({}));
@@ -294,25 +287,16 @@
 
 	// Handle Comment
 	async function handleComment(commentText: string) {
-		if (!walletAddress) {
-			showFeedback('error', m.please_connect_wallet({}));
-			return;
-		}
-		if (!commentText.trim()) return;
+		if (!requireWallet() || !commentText.trim()) return;
 		isCommenting = true;
 		try {
 			const articleId = BigInt(article.id);
-			// Comments require minActionValue to prevent spam (contract requirement)
 			const minValue = getMinActionValue();
-			if (hasValidSessionKey && sessionKey) {
-				await evaluateArticleWithSessionKey(
-					sessionKey, articleId, EvaluationScore.Neutral, commentText.trim(),
-					'0x0000000000000000000000000000000000000000', 0n, minValue
-				);
-			} else {
-				await evaluateArticle(articleId, EvaluationScore.Neutral, commentText.trim(),
-					'0x0000000000000000000000000000000000000000', 0n, minValue);
-			}
+			const text = commentText.trim();
+			await callWithSessionKey(
+				(sk) => evaluateArticleWithSessionKey(sk, articleId, EvaluationScore.Neutral, text, ZERO_ADDRESS, 0n, minValue),
+				() => evaluateArticle(articleId, EvaluationScore.Neutral, text, ZERO_ADDRESS, 0n, minValue)
+			);
 			showFeedback('success', m.comment_success({}));
 		} catch (error) {
 			showFeedback('error', m.interaction_failed({ error: getErrorMessage(error) }));
@@ -323,24 +307,44 @@
 
 	const coverUrl = $derived(getCoverUrl(article.arweaveId));
 	const categoryName = $derived(getCategoryName(article.categoryId));
-	const authorDisplay = $derived(article.originalAuthor || shortAddress(article.author.id));
+	// Display trueAuthor if available, otherwise author
+	const displayAuthor = $derived(
+		article.trueAuthor && article.trueAuthor !== '0x0000000000000000000000000000000000000000'
+			? shortAddress(article.trueAuthor)
+			: (article.originalAuthor || shortAddress(article.author.id))
+	);
+	// Check if article is published on behalf of trueAuthor by author
+	const isProxyPublish = $derived(
+		article.trueAuthor && 
+		article.trueAuthor !== '0x0000000000000000000000000000000000000000' &&
+		article.trueAuthor.toLowerCase() !== article.author.id.toLowerCase()
+	);
 	const authorAddress = $derived(article.author.id);
 	const readingTime = $derived(articleContent?.content ? getReadingTime(articleContent.content) : 0);
 	const trueAuthorAddress = $derived(article.trueAuthor || article.author.id);
-	const originalityLabel = $derived.by(() => {
-		switch (article.originality) {
-			case 0:
-				return 'Original';
-			case 1:
-				return 'SemiOriginal';
-			case 2:
-				return 'Reprint';
-			default:
-				return String(article.originality);
-		}
-	});
 	const maxCollectSupply = $derived(BigInt(article.maxCollectSupply));
 	const collectAvailable = $derived(maxCollectSupply > 0n && BigInt(localCollectCount) < maxCollectSupply);
+	
+	// Article quality score: round(likeAmount*10/(likeAmount+dislikeAmount), 1)
+	const qualityScore = $derived(() => {
+		const like = BigInt(article.totalTips);
+		const dislike = BigInt(localDislikeAmount);
+		const total = like + dislike;
+		if (total === 0n) return null;
+		// Calculate score with 1 decimal precision
+		const score = Number(like * 100n / total) / 10;
+		return Math.round(score * 10) / 10;
+	});
+	
+	// Get gradient color based on score (0-10)
+	function getScoreColor(score: number | null): string {
+		if (score === null) return 'text-gray-400';
+		if (score >= 8) return 'bg-gradient-to-r from-emerald-500 to-green-400 bg-clip-text text-transparent';
+		if (score >= 6) return 'bg-gradient-to-r from-lime-500 to-emerald-400 bg-clip-text text-transparent';
+		if (score >= 4) return 'bg-gradient-to-r from-amber-500 to-yellow-400 bg-clip-text text-transparent';
+		if (score >= 2) return 'bg-gradient-to-r from-orange-500 to-amber-400 bg-clip-text text-transparent';
+		return 'bg-gradient-to-r from-red-500 to-orange-400 bg-clip-text text-transparent';
+	}
 
 	onMount(async () => {
 		await checkWalletConnection();
@@ -387,16 +391,27 @@
 				<div
 					class="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 text-sm font-medium text-white"
 				>
-					{authorDisplay.slice(0, 2).toUpperCase()}
+					{displayAuthor.slice(0, 2).toUpperCase()}
 				</div>
 			</a>
 
 			<div class="flex flex-1 flex-col">
 				<!-- Name & Follow -->
 				<div class="flex items-center gap-2">
-					<a href={`/u/${authorAddress}`} class="font-medium text-gray-900 hover:underline">
-						{authorDisplay}
-					</a>
+					{#if isProxyPublish}
+						<span class="group relative">
+							<a href={`/u/${trueAuthorAddress}`} class="font-medium text-gray-900 hover:underline">
+								{displayAuthor}
+							</a>
+							<span class="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-800 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">
+								Published by {shortAddress(article.author.id)}
+							</span>
+						</span>
+					{:else}
+						<a href={`/u/${authorAddress}`} class="font-medium text-gray-900 hover:underline">
+							{displayAuthor}
+						</a>
+					{/if}
 					<span class="text-gray-300">·</span>
 					<button
 						type="button"
@@ -408,21 +423,24 @@
 					</button>
 				</div>
 
-				<!-- Read time & Date -->
-				<div class="flex items-center gap-1 text-sm text-gray-500">
+				<!-- Read time & Date & Originality Tag -->
+				<div class="flex items-center gap-2 text-sm text-gray-500">
 					{#if readingTime > 0}
 						<span>{readingTime} {m.min_read({})}</span>
-						<span class="mx-1">·</span>
+						<span>·</span>
 					{/if}
 					<time datetime={article.createdAt}>
 						{formatDate(article.createdAt)}
 					</time>
-				</div>
-				<div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
-					<span>True Author: {shortAddress(trueAuthorAddress)}</span>
-					<span>Originality: {originalityLabel}</span>
-					<span>Collect Price: {formatTips(article.collectPrice)}</span>
-					<span>Collect: {localCollectCount}/{article.maxCollectSupply}</span>
+					<span>·</span>
+					<!-- Originality Tag with different background colors -->
+					{#if article.originality === 0}
+						<span class="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">Original</span>
+					{:else if article.originality === 1}
+						<span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">Semi-Original</span>
+					{:else}
+						<span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">Reprint</span>
+					{/if}
 				</div>
 			</div>
 		</div>
@@ -432,17 +450,27 @@
 	<div class={position === 'top' ? 'mb-8' : 'mt-12'} >
 		<div class="flex items-center justify-between border-y border-gray-100 py-3">
 			<div class="flex items-center gap-5">
-				<!-- Tip/Appreciate -->
+				<!-- Quality Score -->
+				{#if qualityScore() !== null}
+					<span class={`text-lg font-bold ${getScoreColor(qualityScore())}`} title="Article Quality Score">
+						{qualityScore()?.toFixed(1)}
+					</span>
+				{:else}
+					<span class="text-lg font-bold text-gray-300" title="No ratings yet">--</span>
+				{/if}
+
+				<!-- Like/Tip -->
 				<button
 					type="button"
 					class="group flex items-center gap-1.5 text-gray-500 transition-colors hover:text-amber-500"
 					onclick={() => showTipModal = true}
 					title={m.tip({})}
 				>
+					<!-- Thumbs Up Icon -->
 					<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+						<path stroke-linecap="round" stroke-linejoin="round" d="M6.633 10.25c.806 0 1.533-.446 2.031-1.08a9.041 9.041 0 0 1 2.861-2.4c.723-.384 1.35-.956 1.653-1.715a4.498 4.498 0 0 0 .322-1.672V2.75a.75.75 0 0 1 .75-.75 2.25 2.25 0 0 1 2.25 2.25c0 1.152-.26 2.243-.723 3.218-.266.558.107 1.282.725 1.282m0 0h3.126c1.026 0 1.945.694 2.054 1.715.045.422.068.85.068 1.285a11.95 11.95 0 0 1-2.649 7.521c-.388.482-.987.729-1.605.729H13.48c-.483 0-.964-.078-1.423-.23l-3.114-1.04a4.501 4.501 0 0 0-1.423-.23H5.904m10.598-9.75H14.25M5.904 18.5c.083.205.173.405.27.602.197.4-.078.898-.523.898h-.908c-.889 0-1.713-.518-1.972-1.368a12 12 0 0 1-.521-3.507c0-1.553.295-3.036.831-4.398C3.387 9.953 4.167 9.5 5 9.5h1.053c.472 0 .745.556.5.96a8.958 8.958 0 0 0-1.302 4.665c0 1.194.232 2.333.652 3.375Z" />
 					</svg>
-					<span class="text-sm">{formatTips(article.totalTips)}</span>
+					<span class="text-sm">{formatTips(article.totalTips)} ETH</span>
 				</button>
 
 				<!-- Comments -->
@@ -461,20 +489,16 @@
 					<span class="text-sm">{article.comments?.length || 0}</span>
 				</a>
 
+				<!-- Collect/Bookmark -->
 				<button
 					type="button"
-					class="group flex items-center gap-1.5 text-gray-500 transition-colors hover:text-gray-900 disabled:opacity-50"
-					onclick={handleCollect}
-					disabled={isCollecting || !collectAvailable}
+					class="group flex items-center gap-1.5 text-gray-500 transition-colors hover:text-gray-900"
+					onclick={() => showCollectModal = true}
 					title="Collect"
 				>
-					<svg class="h-5 w-5" class:animate-pulse={isCollecting} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							d="M16.5 18.75h-9A2.25 2.25 0 015.25 16.5v-9A2.25 2.25 0 017.5 5.25h9A2.25 2.25 0 0118.75 7.5v9A2.25 2.25 0 0116.5 18.75z"
-						/>
-						<path stroke-linecap="round" stroke-linejoin="round" d="M8.25 9.75h7.5M8.25 12.75h7.5" />
+					<!-- Bookmark Icon -->
+					<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" />
 					</svg>
 					<span class="text-sm">{localCollectCount}</span>
 				</button>
@@ -483,16 +507,13 @@
 				<button
 					type="button"
 					class="group flex items-center gap-1.5 text-gray-500 transition-colors hover:text-red-500 disabled:opacity-50"
-					onclick={handleDislike}
+					onclick={() => showDislikeModal = true}
 					disabled={isDisliking}
 					title={m.dislike({})}
 				>
-					<svg class="h-5 w-5" class:animate-pulse={isDisliking} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							d="M7.5 15h2.25m8.024-9.75c.011.05.028.1.052.148.591 1.2.924 2.55.924 3.977a8.96 8.96 0 01-.999 4.125m.023-8.25c-.076-.365.183-.75.575-.75h.908c.889 0 1.713.518 1.972 1.368.339 1.11.521 2.287.521 3.507 0 1.553-.295 3.036-.831 4.398C20.613 14.547 19.833 15 19 15h-1.053c-.472 0-.745-.556-.5-.96a8.95 8.95 0 00.303-.54m.023-8.25H16.48a4.5 4.5 0 01-1.423-.23l-3.114-1.04a4.5 4.5 0 00-1.423-.23H6.504c-.618 0-1.217.247-1.605.729A11.95 11.95 0 002.25 12c0 .434.023.863.068 1.285C2.427 14.306 3.346 15 4.372 15h3.126c.618 0 .991.724.725 1.282A7.471 7.471 0 007.5 19.5a2.25 2.25 0 002.25 2.25.75.75 0 00.75-.75v-.633c0-.573.11-1.14.322-1.672.304-.76.93-1.33 1.653-1.715a9.04 9.04 0 002.86-2.4c.498-.634 1.226-1.08 2.032-1.08h.384"
-						/>
+					<!-- Thumbs Down Icon -->
+					<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M7.498 15.25H4.372c-1.026 0-1.945-.694-2.054-1.715a12.137 12.137 0 0 1-.068-1.285c0-2.848.992-5.464 2.649-7.521C5.287 4.247 5.886 4 6.504 4h4.016a4.5 4.5 0 0 1 1.423.23l3.114 1.04a4.5 4.5 0 0 0 1.423.23h1.294M7.498 15.25c.618 0 .991.724.725 1.282A7.471 7.471 0 0 0 7.5 19.5a2.25 2.25 0 0 0 2.25 2.25.75.75 0 0 0 .75-.75v-.633c0-.573.11-1.14.322-1.672.304-.76.93-1.33 1.653-1.715a9.04 9.04 0 0 0 2.86-2.4c.498-.634 1.226-1.08 2.032-1.08h.384m-10.253 0H4.372M18.75 5.5h-.908c-.392 0-.651.385-.575.75.076.364.183.75.183.75.591 1.2.924 2.55.924 3.977a8.96 8.96 0 0 1-.999 4.125m0-8.852c.339 1.11.521 2.287.521 3.507 0 1.553-.295 3.036-.831 4.398-.306.78-1.086 1.233-1.919 1.233h-1.053c-.472 0-.745-.556-.5-.96a8.95 8.95 0 0 0 .303-.54" />
 					</svg>
 					<span class="text-sm">{formatTips(localDislikeAmount)}</span>
 				</button>
@@ -632,67 +653,219 @@
 	</details>
 </article>
 
-<!-- Tip Modal -->
-{#if showTipModal}
-	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" role="dialog" aria-modal="true" onclick={() => showTipModal = false}>
+{#snippet amountModal(config: {
+	show: boolean,
+	onClose: () => void,
+	title: string,
+	description?: string,
+	labelText: string,
+	inputId: string,
+	value: string,
+	onValueChange: (v: string) => void,
+	isProcessing: boolean,
+	onSubmit: () => void,
+	submitText: string,
+	colorScheme: 'emerald' | 'amber' | 'red'
+})}
+	{#if config.show}
+		<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions a11y_interactive_supports_focus -->
+		<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" role="dialog" aria-modal="true" tabindex="-1" onclick={config.onClose}>
+			<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+			<div class="mx-4 w-full max-w-sm rounded-xl bg-white p-6 shadow-xl" role="document" onclick={(e) => e.stopPropagation()}>
+				<h3 class="mb-4 text-lg font-bold text-gray-900">{config.title}</h3>
+				{#if config.description}
+					<p class="mb-4 text-sm text-gray-500">{config.description}</p>
+				{/if}
+				
+				<div class="mb-4">
+					<label for={config.inputId} class="mb-2 block text-sm font-medium text-gray-700">{config.labelText}</label>
+					<div class="flex items-center gap-2">
+						<input
+							id={config.inputId}
+							type="number"
+							value={config.value}
+							oninput={(e) => config.onValueChange(e.currentTarget.value)}
+							step="0.001"
+							min="0.001"
+							class="flex-1 rounded-lg border border-gray-300 px-4 py-2 focus:border-{config.colorScheme}-500 focus:outline-none focus:ring-1 focus:ring-{config.colorScheme}-500"
+							disabled={config.isProcessing}
+						/>
+						<span class="text-sm font-medium text-gray-600">{m.eth({})}</span>
+					</div>
+				</div>
+
+				<!-- Quick amounts -->
+				<div class="mb-6 flex gap-2">
+					{#each ['0.001', '0.005', '0.01', '0.05'] as amount}
+						<button
+							type="button"
+							onclick={() => config.onValueChange(amount)}
+							class="flex-1 rounded-lg border border-gray-200 py-1.5 text-sm transition-colors hover:border-{config.colorScheme}-500 hover:bg-{config.colorScheme}-50"
+							class:border-emerald-500={config.colorScheme === 'emerald' && config.value === amount}
+							class:bg-emerald-50={config.colorScheme === 'emerald' && config.value === amount}
+							class:border-amber-500={config.colorScheme === 'amber' && config.value === amount}
+							class:bg-amber-50={config.colorScheme === 'amber' && config.value === amount}
+							class:border-red-500={config.colorScheme === 'red' && config.value === amount}
+							class:bg-red-50={config.colorScheme === 'red' && config.value === amount}
+						>
+							{amount}
+						</button>
+					{/each}
+				</div>
+
+				<div class="flex gap-3">
+					<button
+						type="button"
+						onclick={config.onClose}
+						class="flex-1 rounded-lg border border-gray-300 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+						disabled={config.isProcessing}
+					>
+						{m.cancel({})}
+					</button>
+					<button
+						type="button"
+						onclick={config.onSubmit}
+						disabled={config.isProcessing || !config.value}
+						class="flex-1 rounded-lg py-2 text-sm font-medium text-white transition-colors disabled:opacity-50"
+						class:bg-emerald-500={config.colorScheme === 'emerald'}
+						class:hover:bg-emerald-600={config.colorScheme === 'emerald'}
+						class:bg-amber-500={config.colorScheme === 'amber'}
+						class:hover:bg-amber-600={config.colorScheme === 'amber'}
+						class:bg-red-500={config.colorScheme === 'red'}
+						class:hover:bg-red-600={config.colorScheme === 'red'}
+					>
+						{config.isProcessing ? m.processing({}) : config.submitText}
+					</button>
+				</div>
+			</div>
+		</div>
+	{/if}
+{/snippet}
+
+<!-- Collect Modal -->
+{#if showCollectModal}
+	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions a11y_interactive_supports_focus -->
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" role="dialog" aria-modal="true" tabindex="-1" onclick={() => showCollectModal = false}>
 		<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-		<div class="mx-4 w-full max-w-sm rounded-xl bg-white p-6 shadow-xl" onclick={(e) => e.stopPropagation()}>
-			<h3 class="mb-4 text-lg font-bold text-gray-900">{m.tip_author({})}</h3>
+		<div class="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl" role="document" onclick={(e) => e.stopPropagation()}>
+			<h3 class="mb-4 text-lg font-bold text-gray-900">Collect Article</h3>
 			
-			<div class="mb-4">
-				<label for="tip-amount" class="mb-2 block text-sm font-medium text-gray-700">{m.tip_amount({})}</label>
-				<div class="flex items-center gap-2">
-					<input
-						id="tip-amount"
-						type="number"
-						bind:value={tipAmount}
-						step="0.001"
-						min="0.001"
-						placeholder={m.tip_placeholder({})}
-						class="flex-1 rounded-lg border border-gray-300 px-4 py-2 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-						disabled={isTipping}
-					/>
-					<span class="text-sm font-medium text-gray-600">{m.eth({})}</span>
+			<!-- Collect Stats -->
+			<div class="mb-6 grid grid-cols-3 gap-4">
+				<div class="rounded-lg bg-gray-50 p-3 text-center">
+					<div class="text-2xl font-bold text-gray-900">{localCollectCount}</div>
+					<div class="text-xs text-gray-500">Collected</div>
+				</div>
+				<div class="rounded-lg bg-gray-50 p-3 text-center">
+					<div class="text-2xl font-bold text-emerald-600">{formatTips(article.collectPrice)}</div>
+					<div class="text-xs text-gray-500">Price (ETH)</div>
+				</div>
+				<div class="rounded-lg bg-gray-50 p-3 text-center">
+					<div class="text-2xl font-bold text-gray-900">
+						{maxCollectSupply > 0n ? (maxCollectSupply - BigInt(localCollectCount)).toString() : '∞'}
+					</div>
+					<div class="text-xs text-gray-500">Remaining</div>
 				</div>
 			</div>
 
-			<!-- Quick amounts -->
-			<div class="mb-6 flex gap-2">
-				{#each ['0.001', '0.005', '0.01', '0.05'] as amount}
-					<button
-						type="button"
-						onclick={() => tipAmount = amount}
-						class="flex-1 rounded-lg border border-gray-200 py-1.5 text-sm transition-colors hover:border-emerald-500 hover:bg-emerald-50"
-						class:border-emerald-500={tipAmount === amount}
-						class:bg-emerald-50={tipAmount === amount}
-					>
-						{amount}
-					</button>
-				{/each}
-			</div>
+			<!-- Collectors List -->
+			{#if article.collections && article.collections.length > 0}
+				<div class="mb-6">
+					<h4 class="mb-3 text-sm font-medium text-gray-700">Collectors ({article.collections.length})</h4>
+					<div class="max-h-48 overflow-y-auto rounded-lg border border-gray-200">
+						<table class="w-full text-sm">
+							<thead class="sticky top-0 bg-gray-50">
+								<tr class="text-left text-xs text-gray-500">
+									<th class="px-3 py-2">Address</th>
+									<th class="px-3 py-2 text-right">Amount</th>
+									<th class="px-3 py-2 text-right">Time</th>
+								</tr>
+							</thead>
+							<tbody class="divide-y divide-gray-100">
+								{#each article.collections as collection}
+									<tr class="hover:bg-gray-50">
+										<td class="px-3 py-2">
+											<a href={`/u/${collection.user.id}`} class="text-blue-600 hover:underline">
+												{shortAddress(collection.user.id)}
+											</a>
+										</td>
+										<td class="px-3 py-2 text-right font-medium text-emerald-600">
+											{formatTips(collection.amount)}
+										</td>
+										<td class="px-3 py-2 text-right text-gray-500">
+											{formatDate(collection.createdAt)}
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				</div>
+			{:else}
+				<div class="mb-6 rounded-lg border border-gray-200 p-4 text-center text-sm text-gray-500">
+					No collectors yet. Be the first!
+				</div>
+			{/if}
 
+			<!-- Action Buttons -->
 			<div class="flex gap-3">
 				<button
 					type="button"
-					onclick={() => showTipModal = false}
+					onclick={() => showCollectModal = false}
 					class="flex-1 rounded-lg border border-gray-300 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
-					disabled={isTipping}
+					disabled={isCollecting}
 				>
 					{m.cancel({})}
 				</button>
 				<button
 					type="button"
-					onclick={handleTip}
-					disabled={isTipping || !tipAmount}
-					class="flex-1 rounded-lg bg-amber-500 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-600 disabled:opacity-50"
+					onclick={handleCollect}
+					disabled={isCollecting || !collectAvailable}
+					class="flex-1 rounded-lg bg-emerald-500 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
 				>
-					{isTipping ? m.processing({}) : m.send_tip({})}
+					{#if isCollecting}
+						{m.processing({})}
+					{:else if !collectAvailable}
+						Sold Out
+					{:else}
+						Collect for {formatTips(article.collectPrice)} ETH
+					{/if}
 				</button>
 			</div>
 		</div>
 	</div>
 {/if}
+
+<!-- Tip Modal -->
+{@render amountModal({
+	show: showTipModal,
+	onClose: () => showTipModal = false,
+	title: m.tip_author({}),
+	labelText: m.tip_amount({}),
+	inputId: 'tip-amount',
+	value: tipAmount,
+	onValueChange: (v: string) => tipAmount = v,
+	isProcessing: isTipping,
+	onSubmit: handleTip,
+	submitText: m.send_tip({}),
+	colorScheme: 'amber'
+})}
+
+<!-- Dislike Modal -->
+{@render amountModal({
+	show: showDislikeModal,
+	onClose: () => showDislikeModal = false,
+	title: m.dislike({}),
+	description: m.dislike_description({}),
+	labelText: m.dislike_amount({}),
+	inputId: 'dislike-amount',
+	value: dislikeAmount,
+	onValueChange: (v: string) => dislikeAmount = v,
+	isProcessing: isDisliking,
+	onSubmit: handleDislike,
+	submitText: m.send_dislike({}),
+	colorScheme: 'red'
+})}
 
 <!-- Feedback Toast -->
 {#if feedbackMessage}

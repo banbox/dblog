@@ -165,6 +165,16 @@ export const ARTICLE_BY_ID_QUERY = gql`
 				createdAt
 				txHash
 			}
+			collections(orderBy: amount_DESC) {
+				id
+				user {
+					id
+				}
+				tokenId
+				amount
+				createdAt
+				txHash
+			}
 		}
 	}
 `;
@@ -181,6 +191,24 @@ export interface CommentData {
 	content: string;
 	parentCommentId: string | null;
 	likes: number;
+	createdAt: string;
+	txHash: string;
+}
+
+/**
+ * Article detail data from GraphQL
+ * Note: Cover image is accessed via arweaveId/coverImage path in Irys mutable folder
+ */
+/**
+ * Collection data from GraphQL
+ */
+export interface CollectionData {
+	id: string;
+	user: {
+		id: string;
+	};
+	tokenId: string;
+	amount: string;
 	createdAt: string;
 	txHash: string;
 }
@@ -211,4 +239,5 @@ export interface ArticleDetailData {
 	blockNumber: number;
 	txHash: string;
 	comments: CommentData[];
+	collections: CollectionData[];
 }

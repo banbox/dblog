@@ -140,13 +140,12 @@
 	const userInitials = $derived(walletAddress ? shortAddress(walletAddress).slice(0, 2).toUpperCase() : '?');
 </script>
 
-<section class="mt-10" id="comments">
-	<h2 class="mb-6 text-xl font-bold text-gray-900">
-		{m.comments({})} ({comments?.length || 0})
-	</h2>
-
+<section class="mt-8" id="comments">
 	<!-- Comments List -->
 	{#if comments && comments.length > 0}
+		<h2 class="mb-6 text-xl font-bold text-gray-900">
+			{m.comments({})} ({comments.length})
+		</h2>
 		<div class="space-y-6 mb-2">
 			{#each comments as comment (comment.id)}
 				<article class="comment-item">
@@ -195,7 +194,7 @@
 			{/each}
 		</div>
 	{:else}
-		<div class="py-8 text-center text-gray-500 mb-10">
+		<div class="py-4 text-center mb-8 text-gray-500">
 			<p>{m.no_comments({})}</p>
 		</div>
 	{/if}

@@ -76,7 +76,6 @@
 	let coverImageFile = $state<File | null>(null);
 	let coverImagePreview = $state<string | null>(null);
 	let royaltyBps = $state<bigint>(500n);
-	let trueAuthor = $state('');
 	let collectPriceEth = $state<string | number>('0');
 	let maxCollectSupply = $state<string | number>('0');
 	let originality = $state<'0' | '1' | '2'>('0');
@@ -180,13 +179,6 @@
 			submitStatus = 'uploadingArticle';
 			statusMessage = m.uploading_to_arweave();
 
-			const trueAuthorTrimmed = trueAuthor.trim();
-			if (trueAuthorTrimmed && !/^0x[a-fA-F0-9]{40}$/.test(trueAuthorTrimmed)) {
-				throw new Error(
-					`Invalid true author address: expected an EVM address like 0x followed by 40 hex characters (example: 0x1234...abcd). Got: "${trueAuthorTrimmed}"`
-				);
-			}
-
 			let collectPrice = 0n;
 			try {
 				const collectPriceEthTrimmed = String(collectPriceEth ?? '0').trim();
@@ -222,7 +214,6 @@
 				categoryId: categoryId,
 				royaltyBps: royaltyBps,
 				originalAuthor: author.trim() || undefined,
-				trueAuthor: (trueAuthorTrimmed || undefined) as `0x${string}` | undefined,
 				collectPrice,
 				maxCollectSupply: maxSupply,
 				originality: originalityNum
@@ -410,19 +401,6 @@
 			</div>
 
 			<div class="grid grid-cols-2 gap-4">
-				<div>
-					<label for="trueAuthor" class="mb-2 block text-sm font-medium text-gray-700">
-						True Author (0x...)
-					</label>
-					<input
-						id="trueAuthor"
-						bind:value={trueAuthor}
-						type="text"
-						placeholder="0x0000000000000000000000000000000000000000"
-						class="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-base text-gray-900 placeholder-gray-400 transition-colors focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-300"
-						disabled={isSubmitting}
-					/>
-				</div>
 				<div>
 					<label for="originality" class="mb-2 block text-sm font-medium text-gray-700">
 						Originality
