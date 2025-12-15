@@ -8,5 +8,8 @@
 		"pathPattern": "./messages/{locale}.json"
 	},
 	"baseLocale": "en-us",
-	"locales": ["en-us", "zh-cn"]
+	"locales": ["en-us", "zh-cn"],
+	"paraglide": {
+		"strategy": ["url", "cookie", "baseLocale"]
+	}
 }

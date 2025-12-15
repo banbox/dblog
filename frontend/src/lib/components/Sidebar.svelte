@@ -98,7 +98,7 @@
 		</a>
 	</div>
 
-	<!-- Upper Section: Navigation -->
+	<!-- Navigation Section -->
 	<nav class="flex-1 overflow-y-auto px-3 py-4">
 		<ul class="space-y-1">
 			{#each navItems as item}
@@ -147,51 +147,48 @@
 				<span>{m.nav_write()}</span>
 			</a>
 		</div>
-	</nav>
 
-	<!-- Divider -->
-	<div class="border-t border-gray-200"></div>
-
-	<!-- Lower Section: Following Users -->
-	<div class="flex-shrink-0 overflow-y-auto px-3 py-4" style="max-height: 40vh;">
-		<h3 class="mb-3 px-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
+		<!-- Following Users -->
+		<div class="mt-6 border-t border-gray-200 pt-6">
+			<h3 class="mb-3 px-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
 			{m.following_users()}
 		</h3>
 
-		{#if !walletAddress}
-			<p class="px-3 text-sm text-gray-400">{m.please_connect_wallet()}</p>
-		{:else if loadingFollowing}
-			<div class="flex items-center justify-center py-4">
-				<svg class="h-5 w-5 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24">
-					<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-					<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-				</svg>
-			</div>
-		{:else if followingUsers.length === 0}
-			<p class="px-3 text-sm text-gray-400">{m.no_following()}</p>
-		{:else}
-			<ul class="space-y-1">
-				{#each followingUsers as follow}
-					{@const user = follow.following}
-					{#if user}
-						<li>
-							<a
-								href="/author/{user.id}"
-								class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-gray-50"
-							>
-								<!-- Avatar placeholder -->
-								<div class="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-400 to-purple-500 text-xs font-medium text-white">
-									{user.id.slice(2, 4).toUpperCase()}
-								</div>
-								<div class="min-w-0 flex-1">
-									<p class="truncate font-medium text-gray-900">{shortAddress(user.id)}</p>
-									<p class="text-xs text-gray-500">{user.totalArticles} {m.profile_articles().toLowerCase()}</p>
-								</div>
-							</a>
-						</li>
-					{/if}
-				{/each}
-			</ul>
-		{/if}
-	</div>
+				{#if !walletAddress}
+				<p class="px-3 text-sm text-gray-400">{m.please_connect_wallet()}</p>
+			{:else if loadingFollowing}
+				<div class="flex items-center justify-center py-4">
+					<svg class="h-5 w-5 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24">
+						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+						<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+					</svg>
+				</div>
+			{:else if followingUsers.length === 0}
+				<p class="px-3 text-sm text-gray-400">{m.no_following()}</p>
+			{:else}
+				<ul class="space-y-1">
+					{#each followingUsers as follow}
+						{@const user = follow.following}
+						{#if user}
+							<li>
+								<a
+									href="/author/{user.id}"
+									class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-gray-50"
+								>
+									<!-- Avatar placeholder -->
+									<div class="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-400 to-purple-500 text-xs font-medium text-white">
+										{user.id.slice(2, 4).toUpperCase()}
+									</div>
+									<div class="min-w-0 flex-1">
+										<p class="truncate font-medium text-gray-900">{shortAddress(user.id)}</p>
+										<p class="text-xs text-gray-500">{user.totalArticles} {m.profile_articles().toLowerCase()}</p>
+									</div>
+								</a>
+							</li>
+						{/if}
+					{/each}
+				</ul>
+			{/if}
+		</div>
+	</nav>
 </aside>

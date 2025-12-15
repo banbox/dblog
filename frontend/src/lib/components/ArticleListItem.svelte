@@ -50,7 +50,7 @@
 
 <a
 	href="/a/{article.id}"
-	class="group flex gap-4 border-b border-gray-100 py-5 transition-colors hover:bg-gray-50/50"
+	class="group flex gap-4 border-b border-gray-100 py-5 transition-colors"
 >
 	<!-- Left: Text Content -->
 	<div class="min-w-0 flex-1">
