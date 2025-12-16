@@ -38,7 +38,10 @@
 					? { limit: PAGE_SIZE, offset: currentOffset, categoryId: selectedCategory.toString() }
 					: { limit: PAGE_SIZE, offset: currentOffset };
 
-			const result = await client.query(query, variables).toPromise();
+			// Use 'network-only' on reset to ensure fresh data, 'cache-first' for pagination
+			const result = await client.query(query, variables, { 
+				requestPolicy: reset ? 'network-only' : 'cache-first' 
+			}).toPromise();
 
 			if (result.error) {
 				throw new Error(result.error.message);

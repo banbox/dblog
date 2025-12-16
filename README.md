@@ -43,3 +43,8 @@ Web3交互：viem + @wagmi/core
 钱包连接UI：@reown/appkit
 数据查询：@urql/svelte
 其他：prettier，eslint，tailwindcss，vitest，playwright，@inlang/paraglide-sveltekit
+
+## TODO
+* 文章历史版本查看
+* 文章编辑
+* 搜索功能

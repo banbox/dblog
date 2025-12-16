@@ -34,6 +34,9 @@ processor.run(new TypeormDatabase(), async (ctx) => {
         if (!user) {
             user = new User({
                 id,
+                nickname: null,
+                avatar: null,
+                bio: null,
                 totalArticles: 0,
                 totalFollowers: 0,
                 totalFollowing: 0,
@@ -119,6 +122,9 @@ processor.run(new TypeormDatabase(), async (ctx) => {
                 if (!user) {
                     user = new User({
                         id: event.author.toLowerCase(),
+                        nickname: null,
+                        avatar: null,
+                        bio: null,
                         totalArticles: 0,
                         totalFollowers: 0,
                         totalFollowing: 0,
@@ -192,6 +198,9 @@ processor.run(new TypeormDatabase(), async (ctx) => {
                 if (!user) {
                     user = new User({
                         id: event.user.toLowerCase(),
+                        nickname: null,
+                        avatar: null,
+                        bio: null,
                         totalArticles: 0,
                         totalFollowers: 0,
                         totalFollowing: 0,
@@ -273,6 +282,9 @@ processor.run(new TypeormDatabase(), async (ctx) => {
                 if (!user) {
                     user = new User({
                         id: event.commenter.toLowerCase(),
+                        nickname: null,
+                        avatar: null,
+                        bio: null,
                         totalArticles: 0,
                         totalFollowers: 0,
                         totalFollowing: 0,
@@ -341,6 +353,9 @@ processor.run(new TypeormDatabase(), async (ctx) => {
                 if (!followerUser) {
                     followerUser = new User({
                         id: event.follower.toLowerCase(),
+                        nickname: null,
+                        avatar: null,
+                        bio: null,
                         totalArticles: 0,
                         totalFollowers: 0,
                         totalFollowing: 0,
@@ -356,6 +371,9 @@ processor.run(new TypeormDatabase(), async (ctx) => {
                 if (!targetUser) {
                     targetUser = new User({
                         id: event.target.toLowerCase(),
+                        nickname: null,
+                        avatar: null,
+                        bio: null,
                         totalArticles: 0,
                         totalFollowers: 0,
                         totalFollowing: 0,
@@ -422,6 +440,9 @@ processor.run(new TypeormDatabase(), async (ctx) => {
                 if (!user) {
                     user = new User({
                         id: event.collector.toLowerCase(),
+                        nickname: null,
+                        avatar: null,
+                        bio: null,
                         totalArticles: 0,
                         totalFollowers: 0,
                         totalFollowing: 0,
@@ -460,6 +481,9 @@ processor.run(new TypeormDatabase(), async (ctx) => {
                 if (!user) {
                     user = new User({
                         id: userId,
+                        nickname: null,
+                        avatar: null,
+                        bio: null,
                         totalArticles: 0,
                         totalFollowers: 0,
                         totalFollowing: 0,

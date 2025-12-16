@@ -47,6 +47,7 @@ function parseContractError(error: unknown): ContractError {
 	const errorMessage = error instanceof Error ? error.message : String(error);
 	const lowerMessage = errorMessage.toLowerCase();
 
+	// Session key specific errors
 	if (
 		lowerMessage.includes('sessionkeynotactive') ||
 		lowerMessage.includes('0x62db3e42') ||
@@ -56,7 +57,34 @@ function parseContractError(error: unknown): ContractError {
 	) {
 		return new ContractError(
 			'contract_reverted',
-			errorMessage,
+			'Session key is not active or has expired. Please create a new session key.',
+			error instanceof Error ? error : undefined
+		);
+	}
+
+	// InvalidSignature error from SessionKeyManager
+	if (lowerMessage.includes('invalidsignature') || lowerMessage.includes('0x8baa579f')) {
+		return new ContractError(
+			'contract_reverted',
+			'Invalid signature. The session key signature verification failed. This may be due to callData mismatch.',
+			error instanceof Error ? error : undefined
+		);
+	}
+
+	// SignatureExpired error
+	if (lowerMessage.includes('signatureexpired') || lowerMessage.includes('0x0819bdcd')) {
+		return new ContractError(
+			'contract_reverted',
+			'Signature has expired. Please try again.',
+			error instanceof Error ? error : undefined
+		);
+	}
+
+	// SessionKeyValidationFailed error
+	if (lowerMessage.includes('sessionkeyvalidationfailed')) {
+		return new ContractError(
+			'contract_reverted',
+			'Session key validation failed. The session key may not be authorized for this operation.',
 			error instanceof Error ? error : undefined
 		);
 	}
@@ -186,11 +214,63 @@ function parseContractError(error: unknown): ContractError {
 	);
 }
 
-// BlogHub contract ABI
+// BlogHub contract ABI (includes SessionKeyManager errors for proper decoding)
 const BLOGHUB_ABI = [
+	// BlogHub errors
 	{
 		type: 'error',
 		name: 'SessionKeyNotActive',
+		inputs: []
+	},
+	{
+		type: 'error',
+		name: 'SessionKeyManagerNotSet',
+		inputs: []
+	},
+	{
+		type: 'error',
+		name: 'SessionKeyValidationFailed',
+		inputs: []
+	},
+	// SessionKeyManager errors
+	{
+		type: 'error',
+		name: 'InvalidSessionKey',
+		inputs: []
+	},
+	{
+		type: 'error',
+		name: 'SessionKeyExpired',
+		inputs: []
+	},
+	{
+		type: 'error',
+		name: 'UnauthorizedContract',
+		inputs: []
+	},
+	{
+		type: 'error',
+		name: 'UnauthorizedSelector',
+		inputs: []
+	},
+	{
+		type: 'error',
+		name: 'SpendingLimitExceeded',
+		inputs: []
+	},
+	{
+		type: 'error',
+		name: 'InvalidSignature',
+		inputs: []
+	},
+	{
+		type: 'error',
+		name: 'SignatureExpired',
+		inputs: []
+	},
+	{
+		type: 'error',
+		name: 'InvalidNonce',
 		inputs: []
 	},
 	{
@@ -1006,14 +1086,14 @@ export async function publishToContractWithSessionKey(
 			functionName: 'publish',
 			args: [
 				arweaveId,
-				categoryId,
-				royaltyBps,
+				BigInt(categoryId),
+				BigInt(royaltyBps),
 				originalAuthor,
 				title,
 				trueAuthor,
-				collectPrice,
-				maxCollectSupply,
-				originality
+				BigInt(collectPrice),
+				BigInt(maxCollectSupply),
+				Number(originality)
 			]
 		});
 
@@ -1030,6 +1110,19 @@ export async function publishToContractWithSessionKey(
 			0n
 		);
 
+		// Debug: Log signature parameters
+		console.log('=== publishWithSessionKey Debug ===');
+		console.log('owner:', sessionKey.owner);
+		console.log('sessionKey:', sessionKey.address);
+		console.log('selector:', FUNCTION_SELECTORS.publish);
+		console.log('callData:', callData);
+		console.log('callData first 10 bytes:', callData.slice(0, 22));
+		console.log('nonce:', nonce.toString());
+		console.log('deadline:', deadline.toString());
+		console.log('target (BlogHub):', getBlogHubContractAddress());
+		console.log('SessionKeyManager:', getSessionKeyManagerAddress());
+		console.log('chainId:', getChainId());
+
 		// Create EIP-712 signature
 		const signature = await createSessionKeySignature(
 			sessionKey,
@@ -1039,8 +1132,11 @@ export async function publishToContractWithSessionKey(
 			deadline,
 			nonce
 		);
+		
+		console.log('signature:', signature);
 
 		// Call publishWithSessionKey
+		// IMPORTANT: params must match exactly with what was encoded in callData
 		const txHash = await walletClient.writeContract({
 			address: getBlogHubContractAddress(),
 			abi: BLOGHUB_ABI,
@@ -1050,14 +1146,14 @@ export async function publishToContractWithSessionKey(
 				sessionKey.address as `0x${string}`,
 				{
 					arweaveId,
-					categoryId,
-					royaltyBps,
+					categoryId: BigInt(categoryId),
+					royaltyBps: BigInt(royaltyBps),
 					originalAuthor,
 					title,
 					trueAuthor: trueAuthor,
-					collectPrice: collectPrice,
-					maxCollectSupply: maxCollectSupply,
-					originality: originality
+					collectPrice: BigInt(collectPrice),
+					maxCollectSupply: BigInt(maxCollectSupply),
+					originality: Number(originality)
 				},
 				deadline,
 				signature

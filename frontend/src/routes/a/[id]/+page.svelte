@@ -10,6 +10,7 @@
 	import DOMPurify from 'dompurify';
 	import CommentSection from '$lib/components/CommentSection.svelte';
 	import { parseEther } from 'viem';
+	import { client, USER_BY_ID_QUERY, type UserData } from '$lib/graphql';
 	import {
 		EvaluationScore,
 		collectArticle,
@@ -37,6 +38,9 @@
 	let articleContent = $state<ArticleMetadata | null>(null);
 	let contentLoading = $state(true);
 	let contentError = $state<string | null>(null);
+
+	// Author data (fetched separately because SubSquid relation resolution has issues)
+	let authorData = $state<UserData | null>(null);
 
 	// Wallet & Session Key state
 	let walletAddress = $state<string | null>(null);
@@ -257,7 +261,7 @@
 		if (!requireWallet()) return;
 		isFollowing = true;
 		try {
-			const targetAddress = article.author.id as `0x${string}`;
+			const targetAddress = (authorId || article.author?.id || '') as `0x${string}`;
 			await callWithSessionKey(
 				(sk) => followUserWithSessionKey(sk, targetAddress, true),
 				() => followUser(targetAddress, true)
@@ -318,34 +322,48 @@
 		}
 	}
 
+	// Get author ID from article data (trueAuthor takes precedence for actual author)
+	const articleAuthorId = $derived(
+		(article.author?.id || article.trueAuthor || '').toLowerCase()
+	);
+
+	// Use fetched authorData if available, fallback to article.author
+	const author = $derived(authorData ?? article.author ?? { id: '', nickname: null, avatar: null });
+	const authorId = $derived(author.id || articleAuthorId || '');
+
 	// article.id is now arweaveId (primary key)
 	const coverUrl = $derived(getCoverUrl(article.id));
 	const categoryName = $derived(getCategoryName(article.categoryId));
-	// Display author name: prefer nickname > originalAuthor > short address
+	// Display author name: prefer fetched nickname > article.author.nickname > originalAuthor > short address
 	const displayAuthor = $derived(
-		article.author.nickname ||
+		authorData?.nickname ||
+		author.nickname ||
 		article.originalAuthor ||
 		(article.trueAuthor && article.trueAuthor !== '0x0000000000000000000000000000000000000000'
 			? shortAddress(article.trueAuthor)
-			: shortAddress(article.author.id))
+			: shortAddress(authorId)) ||
+		'Anonymous'
 	);
-	// Get author avatar initials
+	// Get author avatar (prefer fetched data)
+	const authorAvatar = $derived(authorData?.avatar || author.avatar);
+	// Get author avatar initials safely
 	const authorInitials = $derived(
-		article.author.nickname
-			? article.author.nickname.slice(0, 2).toUpperCase()
+		(authorData?.nickname || author.nickname)
+			? (authorData?.nickname || author.nickname || '').slice(0, 2).toUpperCase()
 			: (article.originalAuthor
 				? article.originalAuthor.slice(0, 2).toUpperCase()
-				: shortAddress(article.author.id).slice(0, 2).toUpperCase())
+				: (authorId ? authorId.slice(2, 4).toUpperCase() : '??'))
 	);
 	// Check if article is published on behalf of trueAuthor by author
 	const isProxyPublish = $derived(
 		article.trueAuthor && 
 		article.trueAuthor !== '0x0000000000000000000000000000000000000000' &&
-		article.trueAuthor.toLowerCase() !== article.author.id.toLowerCase()
+		authorId &&
+		article.trueAuthor.toLowerCase() !== authorId.toLowerCase()
 	);
-	const authorAddress = $derived(article.author.id);
+	const authorAddress = $derived(authorId);
 	const readingTime = $derived(articleContent?.content ? getReadingTime(articleContent.content) : 0);
-	const trueAuthorAddress = $derived(article.trueAuthor || article.author.id);
+	const trueAuthorAddress = $derived(article.trueAuthor || authorId);
 	const maxCollectSupply = $derived(BigInt(article.maxCollectSupply));
 	const collectAvailable = $derived(maxCollectSupply > 0n && BigInt(localCollectCount) < maxCollectSupply);
 	
@@ -370,7 +388,28 @@
 		return 'bg-gradient-to-r from-red-500 to-orange-400 bg-clip-text text-transparent';
 	}
 
+	// Fetch author data separately (SubSquid relation resolution has issues)
+	async function fetchAuthorData() {
+		const targetAuthorId = articleAuthorId;
+		if (!targetAuthorId || targetAuthorId === '0x0000000000000000000000000000000000000000') return;
+		
+		try {
+			const result = await client
+				.query(USER_BY_ID_QUERY, { id: targetAuthorId }, { requestPolicy: 'cache-first' })
+				.toPromise();
+			
+			if (result.data?.userById) {
+				authorData = result.data.userById;
+			}
+		} catch (e) {
+			console.error('Failed to fetch author data:', e);
+		}
+	}
+
 	onMount(async () => {
+		// Fetch author data first
+		fetchAuthorData();
+		
 		await checkWalletConnection();
 		const eth = typeof window !== 'undefined' ? window.ethereum : undefined;
 		eth?.on?.('accountsChanged', async (accounts: unknown) => {
@@ -413,11 +452,11 @@
 		<div class="flex items-center gap-3">
 			<!-- Avatar -->
 			<a href={`/u/${authorAddress}`} class="shrink-0">
-				{#if getAvatarUrl(article.author.avatar)}
-					<img src={getAvatarUrl(article.author.avatar)} alt="" class="h-11 w-11 rounded-full object-cover" />
+				{#if getAvatarUrl(authorAvatar)}
+					<img src={getAvatarUrl(authorAvatar)} alt="" class="h-11 w-11 rounded-full object-cover" />
 				{:else}
 					<div
-						class="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 text-sm font-medium text-white"
+						class="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-blue-400 to-purple-500 text-sm font-medium text-white"
 					>
 						{authorInitials}
 					</div>
@@ -433,7 +472,7 @@
 								{displayAuthor}
 							</a>
 							<span class="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-800 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">
-								Published by {shortAddress(article.author.id)}
+								Published by {shortAddress(authorId)}
 							</span>
 						</span>
 					{:else}
@@ -814,8 +853,15 @@
 								{#each article.collections as collection}
 									<tr class="hover:bg-gray-50">
 										<td class="px-3 py-2">
-											<a href={`/u/${collection.user.id}`} class="text-blue-600 hover:underline">
-												{collection.user.nickname || shortAddress(collection.user.id)}
+											<a href={`/u/${collection.user.id}`} class="flex items-center gap-2 hover:underline">
+												{#if getAvatarUrl(collection.user.avatar)}
+													<img src={getAvatarUrl(collection.user.avatar)} alt="" class="h-6 w-6 rounded-full object-cover" />
+												{:else}
+													<div class="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-blue-400 to-purple-500 text-xs font-medium text-white">
+														{collection.user.id.slice(2, 4).toUpperCase()}
+													</div>
+												{/if}
+												<span class="truncate text-gray-700">{collection.user.nickname || shortAddress(collection.user.id)}</span>
 											</a>
 										</td>
 										<td class="px-3 py-2 text-right font-medium text-emerald-600">

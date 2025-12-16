@@ -10,7 +10,8 @@ import { error } from '@sveltejs/kit';
 export const load: PageLoad = async ({ params }) => {
 	const articleId = params.id;
 
-	const result = await client.query(ARTICLE_BY_ID_QUERY, { id: articleId }).toPromise();
+	// Use 'network-only' to always fetch fresh data and avoid cache issues
+	const result = await client.query(ARTICLE_BY_ID_QUERY, { id: articleId }, { requestPolicy: 'network-only' }).toPromise();
 
 	if (result.error) {
 		throw error(500, result.error.message);

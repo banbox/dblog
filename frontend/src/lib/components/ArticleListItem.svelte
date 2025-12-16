@@ -1,14 +1,19 @@
 <script lang="ts">
-	import type { ArticleData } from '$lib/graphql';
+	import type { ArticleData, UserData } from '$lib/graphql';
+	import { client, USER_BY_ID_QUERY } from '$lib/graphql';
 	import { CATEGORY_KEYS } from '$lib/data';
 	import * as m from '$lib/paraglide/messages';
-	import { getCoverImageUrl } from '$lib/arweave';
+	import { getCoverImageUrl, getAvatarUrl } from '$lib/arweave';
+	import { onMount } from 'svelte';
 
 	interface Props {
 		article: ArticleData;
 	}
 
 	let { article }: Props = $props();
+
+	// Author data (fetched separately because SubSquid relation resolution has issues)
+	let authorData = $state<UserData | null>(null);
 
 	function shortAddress(address: string): string {
 		if (!address) return '';
@@ -43,13 +48,46 @@
 		return getCoverImageUrl(arweaveId, true);
 	}
 
+	// Get author ID from article data (trueAuthor takes precedence for actual author)
+	const articleAuthorId = $derived(
+		(article.author?.id || article.trueAuthor || '').toLowerCase()
+	);
+
+	// Use fetched authorData if available, fallback to article.author
+	const author = $derived(authorData ?? article.author ?? { id: '', nickname: null, avatar: null });
+	const authorId = $derived(author.id || articleAuthorId || '');
+
 	// article.id is now arweaveId (primary key)
 	const coverUrl = $derived(getCoverUrl(article.id));
 	const categoryName = $derived(getCategoryName(article.categoryId));
-	// Priority: originalAuthor (for reposts) > author nickname > short address
+	// Priority: originalAuthor (for reposts) > fetched nickname > article.author.nickname > short address
 	const authorDisplay = $derived(
-		article.originalAuthor || article.author.nickname || shortAddress(article.author.id)
+		article.originalAuthor || authorData?.nickname || author.nickname || shortAddress(authorId) || 'Anonymous'
 	);
+	// Get author avatar (prefer fetched data)
+	const authorAvatar = $derived(authorData?.avatar || author.avatar);
+	// Get avatar initials safely
+	const authorInitials = $derived(
+		authorId ? authorId.slice(2, 4).toUpperCase() : '??'
+	);
+
+	// Fetch author data separately (SubSquid relation resolution has issues)
+	onMount(async () => {
+		const targetAuthorId = articleAuthorId;
+		if (!targetAuthorId || targetAuthorId === '0x0000000000000000000000000000000000000000') return;
+		
+		try {
+			const result = await client
+				.query(USER_BY_ID_QUERY, { id: targetAuthorId }, { requestPolicy: 'cache-first' })
+				.toPromise();
+			
+			if (result.data?.userById) {
+				authorData = result.data.userById;
+			}
+		} catch (e) {
+			console.error('Failed to fetch author data:', e);
+		}
+	});
 </script>
 
 <a
@@ -60,11 +98,19 @@
 	<div class="min-w-0 flex-1">
 		<!-- Category & Author -->
 		<div class="mb-2 flex items-center gap-2 text-sm">
-			{#if categoryName}
-				<span class="font-medium text-gray-500">{m.in_category()} {categoryName}</span>
-				<span class="text-gray-300">·</span>
+			<!-- Author Avatar -->
+			{#if getAvatarUrl(authorAvatar)}
+				<img src={getAvatarUrl(authorAvatar)} alt="" class="h-6 w-6 rounded-full object-cover" />
+			{:else}
+				<div class="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-blue-400 to-purple-500 text-xs font-medium text-white">
+					{authorInitials}
+				</div>
 			{/if}
-			<span class="text-gray-500">{m.by_author()} <span class="font-medium text-gray-700">{authorDisplay}</span></span>
+			<span class="truncate text-gray-700">{authorData?.nickname || author.nickname || authorDisplay}</span>
+			{#if categoryName}
+				<span class="text-gray-300">·</span>
+				<span class="text-gray-500">{m.in_category()} {categoryName}</span>
+			{/if}
 		</div>
 
 		<!-- Title -->
