@@ -15,10 +15,10 @@
 
 	// Navigation items
 	const navItems = [
-		{ href: '/', icon: 'home', labelKey: 'nav_home' },
-		{ href: '/library', icon: 'library', labelKey: 'nav_library' },
-		{ href: '/profile', icon: 'profile', labelKey: 'nav_profile' },
-		{ href: '/stories', icon: 'stories', labelKey: 'nav_stories' }
+		{ href: '/', icon: 'home', labelKey: 'home_page' },
+		{ href: '/library', icon: 'library', labelKey: 'library' },
+		{ href: '/profile', icon: 'profile', labelKey: 'profile' },
+		{ href: '/stories', icon: 'stories', labelKey: 'my_stories' }
 	];
 
 	// Check if current path matches nav item
@@ -144,14 +144,14 @@
 				<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
 				</svg>
-				<span>{m.nav_write()}</span>
+				<span>{m.write()}</span>
 			</a>
 		</div>
 
 		<!-- Following Users -->
 		<div class="mt-6 border-t border-gray-200 pt-6">
 			<h3 class="mb-3 px-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
-			{m.following_users()}
+			{m.following_list()}
 		</h3>
 
 				{#if !walletAddress}
@@ -181,7 +181,7 @@
 									</div>
 									<div class="min-w-0 flex-1">
 										<p class="truncate font-medium text-gray-900">{shortAddress(user.id)}</p>
-										<p class="text-xs text-gray-500">{user.totalArticles} {m.profile_articles().toLowerCase()}</p>
+										<p class="text-xs text-gray-500">{user.totalArticles} {m.articles().toLowerCase()}</p>
 									</div>
 								</a>
 							</li>

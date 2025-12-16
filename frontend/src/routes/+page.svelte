@@ -112,7 +112,7 @@
 <div class="mx-auto max-w-3xl px-6 py-8">
 	<!-- Page Header -->
 	<div class="mb-8">
-		<h1 class="text-2xl font-bold text-gray-900">{m.nav_home()}</h1>
+		<h1 class="text-2xl font-bold text-gray-900">{m.home_page()}</h1>
 		<p class="mt-1 text-gray-600">{m.tagline()}</p>
 	</div>
 

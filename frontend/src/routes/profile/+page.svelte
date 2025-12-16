@@ -41,10 +41,10 @@
 	let connected = $derived(isWalletConnected());
 
 	const tabs: { key: TabType; label: () => string }[] = [
-		{ key: 'articles', label: () => m.profile_articles() },
-		{ key: 'followers', label: () => m.profile_followers() },
-		{ key: 'following', label: () => m.profile_following() },
-		{ key: 'about', label: () => m.profile_about() }
+		{ key: 'articles', label: () => m.articles() },
+		{ key: 'followers', label: () => m.followers() },
+		{ key: 'following', label: () => m.following_count() },
+		{ key: 'about', label: () => m.about_me() }
 	];
 
 	function shortAddress(address: string): string {
@@ -298,12 +298,12 @@
 					{/if}
 					{#if user}
 						<div class="mt-2 flex items-center gap-4 text-sm text-gray-500">
-							<span>{user.totalArticles} {m.profile_articles().toLowerCase()}</span>
-							<span>{user.totalFollowers} {m.profile_followers().toLowerCase()}</span>
-							<span>{user.totalFollowing} {m.profile_following().toLowerCase()}</span>
+							<span>{user.totalArticles} {m.articles().toLowerCase()}</span>
+							<span>{user.totalFollowers} {m.followers().toLowerCase()}</span>
+							<span>{user.totalFollowing} {m.following_count().toLowerCase()}</span>
 						</div>
 						<p class="mt-1 text-sm text-gray-400">
-							{m.profile_member_since()} {formatDate(user.createdAt)}
+							{m.member_since()} {formatDate(user.createdAt)}
 						</p>
 					{/if}
 				</div>
@@ -363,7 +363,7 @@
 								{/if}
 								<div class="flex-1">
 									<p class="font-medium text-gray-900">{follower.nickname || shortAddress(follower.id)}</p>
-									<p class="text-sm text-gray-500">{follower.totalArticles} {m.profile_articles().toLowerCase()}</p>
+									<p class="text-sm text-gray-500">{follower.totalArticles} {m.articles().toLowerCase()}</p>
 								</div>
 							</a>
 						{/if}
@@ -393,7 +393,7 @@
 								{/if}
 								<div class="flex-1">
 									<p class="font-medium text-gray-900">{followingUser.nickname || shortAddress(followingUser.id)}</p>
-									<p class="text-sm text-gray-500">{followingUser.totalArticles} {m.profile_articles().toLowerCase()}</p>
+									<p class="text-sm text-gray-500">{followingUser.totalArticles} {m.articles().toLowerCase()}</p>
 								</div>
 							</a>
 						{/if}
@@ -407,14 +407,14 @@
 		{:else if activeTab === 'about'}
 			<div class="py-4">
 				<div class="mb-6 flex items-center justify-between">
-					<h3 class="text-lg font-medium text-gray-900">{m.profile_about()}</h3>
+					<h3 class="text-lg font-medium text-gray-900">{m.about_me()}</h3>
 					{#if !editingProfile}
 						<button
 							type="button"
 							onclick={startEditProfile}
 							class="text-sm text-blue-600 hover:text-blue-700"
 						>
-							{m.profile_edit()}
+							{m.edit_profile()}
 						</button>
 					{/if}
 				</div>
@@ -424,49 +424,49 @@
 						<!-- Nickname -->
 						<div>
 							<label for="nickname" class="mb-1 block text-sm font-medium text-gray-700">
-								{m.profile_nickname()}
+								{m.nickname()}
 							</label>
 							<input
 								id="nickname"
 								type="text"
 								bind:value={nicknameInput}
 								class="w-full rounded-lg border border-gray-300 p-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-								placeholder={m.profile_nickname_placeholder()}
+								placeholder={m.nickname_placeholder()}
 								maxlength="64"
 							/>
-							<p class="mt-1 text-xs text-gray-400">{m.profile_max_chars({ count: 64 })}</p>
+							<p class="mt-1 text-xs text-gray-400">{m.max_chars({ count: 64 })}</p>
 						</div>
 
 						<!-- Avatar URL -->
 						<div>
 							<label for="avatar" class="mb-1 block text-sm font-medium text-gray-700">
-								{m.profile_avatar()}
+								{m.avatar()}
 							</label>
 							<input
 								id="avatar"
 								type="text"
 								bind:value={avatarInput}
 								class="w-full rounded-lg border border-gray-300 p-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-								placeholder={m.profile_avatar_placeholder()}
+								placeholder={m.avatar_placeholder()}
 								maxlength="128"
 							/>
-							<p class="mt-1 text-xs text-gray-400">{m.profile_avatar_hint()}</p>
+							<p class="mt-1 text-xs text-gray-400">{m.avatar_hint()}</p>
 						</div>
 
 						<!-- Bio -->
 						<div>
 							<label for="bio" class="mb-1 block text-sm font-medium text-gray-700">
-								{m.profile_bio()}
+								{m.bio()}
 							</label>
 							<textarea
 								id="bio"
 								bind:value={bioInput}
 								class="w-full rounded-lg border border-gray-300 p-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
 								rows="4"
-								placeholder={m.profile_bio_placeholder()}
+								placeholder={m.bio_placeholder()}
 								maxlength="256"
 							></textarea>
-							<p class="mt-1 text-xs text-gray-400">{m.profile_max_chars({ count: 256 })}</p>
+							<p class="mt-1 text-xs text-gray-400">{m.max_chars({ count: 256 })}</p>
 						</div>
 
 						<!-- Error message -->
@@ -482,7 +482,7 @@
 								disabled={savingProfile}
 								class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
 							>
-								{savingProfile ? m.profile_saving() : m.profile_save()}
+								{savingProfile ? m.saving() : m.save()}
 							</button>
 							<button
 								type="button"
@@ -499,8 +499,8 @@
 					<div class="space-y-4">
 						<!-- Nickname -->
 						<div>
-							<p class="text-sm font-medium text-gray-500">{m.profile_nickname()}</p>
-							<p class="mt-1 text-gray-900">{user?.nickname || m.profile_not_set()}</p>
+							<p class="text-sm font-medium text-gray-500">{m.nickname()}</p>
+							<p class="mt-1 text-gray-900">{user?.nickname || m.not_set()}</p>
 						</div>
 
 						<!-- Avatar -->
@@ -508,7 +508,7 @@
 							{@const avatarUrl = getAvatarUrl(user.avatar)}
 							{#if avatarUrl}
 								<div>
-									<p class="text-sm font-medium text-gray-500">{m.profile_avatar()}</p>
+									<p class="text-sm font-medium text-gray-500">{m.avatar()}</p>
 									<img src={avatarUrl} alt="Avatar" class="mt-2 h-24 w-24 rounded-full object-cover" />
 								</div>
 							{/if}
@@ -516,8 +516,8 @@
 
 						<!-- Bio -->
 						<div>
-							<p class="text-sm font-medium text-gray-500">{m.profile_bio()}</p>
-							<p class="mt-1 whitespace-pre-wrap text-gray-900">{user?.bio || m.profile_no_bio()}</p>
+							<p class="text-sm font-medium text-gray-500">{m.bio()}</p>
+							<p class="mt-1 whitespace-pre-wrap text-gray-900">{user?.bio || m.no_bio()}</p>
 						</div>
 					</div>
 				{/if}

@@ -102,37 +102,37 @@ export const MIN_DEFAULT_GAS_FEE_MULTIPLIER = 10;
 export const configFields: ConfigFieldMeta[] = [
 	{
 		key: 'rpcUrl',
-		labelKey: 'settings_rpc_url',
+		labelKey: 'rpc_url',
 		type: 'text',
 		placeholder: 'https://...'
 	},
 	{
 		key: 'chainId',
-		labelKey: 'settings_chain_id',
+		labelKey: 'chain_id',
 		type: 'number',
 		placeholder: '31337'
 	},
 	{
 		key: 'blogHubContractAddress',
-		labelKey: 'settings_blog_hub_address',
+		labelKey: 'blog_hub_address',
 		type: 'text',
 		placeholder: '0x...'
 	},
 	{
 		key: 'sessionKeyManagerAddress',
-		labelKey: 'settings_session_key_manager_address',
+		labelKey: 'session_manager_address',
 		type: 'text',
 		placeholder: '0x...'
 	},
 	{
 		key: 'subsquidEndpoint',
-		labelKey: 'settings_subsquid_endpoint',
+		labelKey: 'subsquid_endpoint',
 		type: 'text',
 		placeholder: 'https://...'
 	},
 	{
 		key: 'irysNetwork',
-		labelKey: 'settings_irys_network',
+		labelKey: 'irys_network',
 		type: 'select',
 		options: [
 			{ value: 'mainnet', labelKey: 'mainnet' },
@@ -141,13 +141,13 @@ export const configFields: ConfigFieldMeta[] = [
 	},
 	{
 		key: 'arweaveGateways',
-		labelKey: 'settings_arweave_gateways',
+		labelKey: 'arweave_gateways',
 		type: 'array',
 		placeholder: 'https://gateway.irys.xyz'
 	},
 	{
 		key: 'defaultGasFeeMultiplier',
-		labelKey: 'settings_default_gas_multiplier',
+		labelKey: 'gas_multiplier',
 		type: 'number',
 		placeholder: '30'
 	}

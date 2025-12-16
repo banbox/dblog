@@ -191,17 +191,17 @@
 	function getErrorMessage(error: unknown): string {
 		if (error instanceof ContractError) {
 			const errorMessages: Record<string, string> = {
-				user_rejected: m.error_user_rejected({}),
-				insufficient_funds: m.error_insufficient_funds({}),
-				network_error: m.error_network_error({}),
-				contract_reverted: m.error_contract_reverted({}),
-				gas_estimation_failed: m.error_gas_estimation_failed({}),
-				nonce_too_low: m.error_nonce_too_low({}),
-				replacement_underpriced: m.error_replacement_underpriced({}),
-				wallet_not_connected: m.error_wallet_not_connected({}),
-				wrong_network: m.error_wrong_network({}),
-				timeout: m.error_timeout({}),
-				unknown_error: m.error_unknown({})
+				user_rejected: m.user_rejected({}),
+				insufficient_funds: m.insufficient_funds({}),
+				network_error: m.network_error({}),
+				contract_reverted: m.contract_reverted({}),
+				gas_estimation_failed: m.gas_estimation_failed({}),
+				nonce_too_low: m.nonce_too_low({}),
+				replacement_underpriced: m.replacement_underpriced({}),
+				wallet_not_connected: m.wallet_not_connected({}),
+				wrong_network: m.wrong_network({}),
+				timeout: m.timeout({}),
+				unknown_error: m.unknown_error({})
 			};
 			return errorMessages[error.code] || error.message;
 		}

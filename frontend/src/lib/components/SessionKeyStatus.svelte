@@ -55,7 +55,7 @@
 			await checkSessionKey();
 		} catch (error) {
 			console.error('Failed to create session key:', error);
-			errorMessage = m.session_key_error();
+			errorMessage = m.session_error();
 		} finally {
 			isLoading = false;
 		}
@@ -69,7 +69,7 @@
 			await checkSessionKey();
 		} catch (error) {
 			console.error('Failed to revoke session key:', error);
-			errorMessage = m.session_key_error();
+			errorMessage = m.session_error();
 		} finally {
 			isLoading = false;
 		}
@@ -85,7 +85,7 @@
 			await checkSessionKey();
 		} catch (error) {
 			console.error('Failed to fund session key:', error);
-			errorMessage = m.session_key_error();
+			errorMessage = m.session_error();
 		} finally {
 			isFunding = false;
 		}
@@ -112,18 +112,18 @@
 		
 		<!-- Balance display -->
 		<div class="mb-4 flex items-center gap-2">
-			<span class="text-sm text-gray-500">{m.session_key_balance()}:</span>
+			<span class="text-sm text-gray-500">{m.balance()}:</span>
 			<span class={isBalanceSufficient ? 'text-sm text-gray-700' : 'text-sm font-medium text-orange-600'}>
 				{formattedBalance} ETH
 			</span>
 			{#if !isBalanceSufficient}
-				<span class="text-xs text-orange-500">({m.session_key_low_balance()})</span>
+				<span class="text-xs text-orange-500">({m.low_balance()})</span>
 				<button
 					class="rounded bg-orange-500 px-2 py-0.5 text-xs font-medium text-white transition-colors hover:bg-orange-600 disabled:opacity-50"
 					disabled={isFunding}
 					onclick={handleFund}
 				>
-					{isFunding ? m.session_key_funding() : m.session_key_fund()}
+					{isFunding ? m.funding() : m.fund()}
 				</button>
 			{/if}
 		</div>

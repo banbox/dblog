@@ -29,10 +29,10 @@
 	let connected = $derived(isWalletConnected());
 
 	const tabs: { key: TabType; label: () => string }[] = [
-		{ key: 'liked', label: () => m.library_liked() },
-		{ key: 'disliked', label: () => m.library_disliked() },
-		{ key: 'collected', label: () => m.library_collected() },
-		{ key: 'commented', label: () => m.library_commented() }
+		{ key: 'liked', label: () => m.liked() },
+		{ key: 'disliked', label: () => m.disliked() },
+		{ key: 'collected', label: () => m.collected() },
+		{ key: 'commented', label: () => m.commented() }
 	];
 
 	function getQueryForTab(tab: TabType) {
@@ -148,7 +148,7 @@
 <div class="mx-auto max-w-3xl px-6 py-8">
 	<!-- Page Header -->
 	<div class="mb-8">
-		<h1 class="text-2xl font-bold text-gray-900">{m.nav_library()}</h1>
+		<h1 class="text-2xl font-bold text-gray-900">{m.library()}</h1>
 	</div>
 
 	{#if !connected}
@@ -192,7 +192,7 @@
 				<svg class="mx-auto h-16 w-16 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
 				</svg>
-				<h3 class="mt-4 text-lg font-medium text-gray-900">{m.library_empty()}</h3>
+				<h3 class="mt-4 text-lg font-medium text-gray-900">{m.empty_list()}</h3>
 			</div>
 		{/if}
 

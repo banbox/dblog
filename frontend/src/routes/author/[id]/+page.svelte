@@ -206,12 +206,12 @@
 
 				{#if user}
 					<div class="mt-2 flex items-center gap-4 text-sm text-gray-500">
-						<span>{user.totalArticles} {m.profile_articles().toLowerCase()}</span>
-						<span>{user.totalFollowers} {m.profile_followers().toLowerCase()}</span>
-						<span>{user.totalFollowing} {m.profile_following().toLowerCase()}</span>
+						<span>{user.totalArticles} {m.articles().toLowerCase()}</span>
+						<span>{user.totalFollowers} {m.followers().toLowerCase()}</span>
+						<span>{user.totalFollowing} {m.following_count().toLowerCase()}</span>
 					</div>
 					<p class="mt-1 text-sm text-gray-400">
-						{m.profile_member_since()} {formatDate(user.createdAt)}
+						{m.member_since()} {formatDate(user.createdAt)}
 					</p>
 					{#if user.bio}
 						<p class="mt-3 whitespace-pre-wrap text-gray-600">{user.bio}</p>
@@ -223,7 +223,7 @@
 
 	<!-- Section Header -->
 	<div class="mb-4 border-b border-gray-200 pb-2">
-		<h2 class="text-lg font-semibold text-gray-900">{m.stories_published()}</h2>
+		<h2 class="text-lg font-semibold text-gray-900">{m.published()}</h2>
 	</div>
 
 	<!-- Articles List -->

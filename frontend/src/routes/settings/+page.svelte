@@ -58,7 +58,7 @@
 		if (key === 'defaultGasFeeMultiplier') {
 			const numValue = typeof value === 'string' ? parseInt(value, 10) : value as number;
 			if (isNaN(numValue) || numValue < MIN_DEFAULT_GAS_FEE_MULTIPLIER) {
-				return getLabel('settings_gas_multiplier_min_error').replace('{min}', String(MIN_DEFAULT_GAS_FEE_MULTIPLIER));
+				return getLabel('gas_multiplier_min_error').replace('{min}', String(MIN_DEFAULT_GAS_FEE_MULTIPLIER));
 			}
 		}
 		return null;
@@ -146,7 +146,7 @@
 	<!-- Header -->
 	<div class="mb-8">
 		<h1 class="text-2xl font-bold text-gray-900">{getLabel('settings')}</h1>
-		<p class="mt-2 text-gray-600">{getLabel('settings_description')}</p>
+		<p class="mt-2 text-gray-600">{getLabel('settings_desc')}</p>
 	</div>
 
 	<!-- Save Message -->
@@ -173,7 +173,7 @@
 							{getLabel(field.labelKey)}
 							{#if isConfigOverridden(field.key)}
 								<span class="ml-2 rounded bg-blue-100 px-2 py-0.5 text-xs text-blue-700">
-									{getLabel('settings_customized')}
+									{getLabel('customized')}
 								</span>
 							{/if}
 						</label>
@@ -247,14 +247,14 @@
 									<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
 									</svg>
-									{getLabel('settings_add_gateway')}
+									{getLabel('add_gateway')}
 								</button>
 							</div>
 						{/if}
 
 						<!-- Env default hint -->
 						<p class="mt-1 text-xs text-gray-500">
-							{getLabel('settings_default')}: {
+							{getLabel('default_value')}: {
 								field.type === 'array' 
 									? (getEnvDefault(field.key) as string[]).join(', ')
 									: getEnvDefault(field.key)
@@ -268,7 +268,7 @@
 							type="button"
 							onclick={() => resetField(field.key)}
 							class="ml-4 rounded-lg px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-100"
-							title={getLabel('settings_reset_to_default')}
+							title={getLabel('reset_default')}
 						>
 							<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -284,8 +284,8 @@
 	<div class="mt-8 rounded-lg border border-red-200 bg-red-50 p-4">
 		<div class="flex items-center justify-between">
 			<div>
-				<h3 class="text-sm font-medium text-red-800">{getLabel('settings_reset_all')}</h3>
-				<p class="mt-1 text-sm text-red-600">{getLabel('settings_reset_all_description')}</p>
+				<h3 class="text-sm font-medium text-red-800">{getLabel('reset_all')}</h3>
+				<p class="mt-1 text-sm text-red-600">{getLabel('reset_all_desc')}</p>
 			</div>
 			{#if showResetConfirm}
 				<div class="flex gap-2">
@@ -301,7 +301,7 @@
 						onclick={handleResetAll}
 						class="rounded-lg bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700"
 					>
-						{getLabel('settings_confirm_reset')}
+						{getLabel('confirm_reset')}
 					</button>
 				</div>
 			{:else}
@@ -310,7 +310,7 @@
 					onclick={() => showResetConfirm = true}
 					class="rounded-lg border border-red-300 px-4 py-2 text-sm text-red-600 hover:bg-red-100"
 				>
-					{getLabel('settings_reset_all')}
+					{getLabel('reset_all')}
 				</button>
 			{/if}
 		</div>
@@ -318,14 +318,14 @@
 
 	<!-- App Info -->
 	<div class="mt-8 rounded-lg border border-gray-200 bg-gray-50 p-4">
-		<h3 class="text-sm font-medium text-gray-700">{getLabel('settings_app_info')}</h3>
+		<h3 class="text-sm font-medium text-gray-700">{getLabel('app_info')}</h3>
 		<div class="mt-2 grid grid-cols-2 gap-4 text-sm text-gray-600">
 			<div>
-				<span class="text-gray-500">{getLabel('settings_app_name')}:</span>
+				<span class="text-gray-500">{getLabel('app_name')}:</span>
 				<span class="ml-2 font-medium">DBlog</span>
 			</div>
 			<div>
-				<span class="text-gray-500">{getLabel('settings_app_version')}:</span>
+				<span class="text-gray-500">{getLabel('version')}:</span>
 				<span class="ml-2 font-medium">1.0.0</span>
 			</div>
 		</div>

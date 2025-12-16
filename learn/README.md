@@ -833,3 +833,5 @@ Claude：已完成
 开发者：minGasFeeMultiplier   irysFreeUploadLimit  minActionValue这几个是固定的，不应允许用户修改；另外defaultGasFeeMultiplier的最小值是10，在修改时应进行检查  
 Claude：已完成
 
+#### 2025-12-16 16:48  多语言key简化
+@AGENTS.md @README.md  frontend\messages\en-us.json  frontend\messages\zh-cn.json 当前的多语言文件中，有很多并未遵循要求的范式，请按给定规则，根据value，对key进行简化合并，降低复杂度，允许值相同的key在多处复用；然后修改所有引用的地方，使用修改后的key  
