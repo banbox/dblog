@@ -2,6 +2,7 @@
 	import { page } from '$app/state';
 	import * as m from '$lib/paraglide/messages';
 	import { client, USER_FOLLOWING_QUERY, type FollowData } from '$lib/graphql';
+	import { getAvatarUrl } from '$lib/arweave';
 	import { untrack } from 'svelte';
 
 	interface Props {
@@ -172,17 +173,17 @@
 						{#if user}
 							<li>
 								<a
-									href="/author/{user.id}"
-									class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-gray-50"
+									href="/u/{user.id}"
+									class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors hover:bg-gray-50"
 								>
-									<!-- Avatar placeholder -->
-									<div class="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-400 to-purple-500 text-xs font-medium text-white">
-										{user.id.slice(2, 4).toUpperCase()}
-									</div>
-									<div class="min-w-0 flex-1">
-										<p class="truncate font-medium text-gray-900">{shortAddress(user.id)}</p>
-										<p class="text-xs text-gray-500">{user.totalArticles} {m.articles().toLowerCase()}</p>
-									</div>
+									{#if getAvatarUrl(user.avatar)}
+										<img src={getAvatarUrl(user.avatar)} alt="" class="h-6 w-6 rounded-full object-cover" />
+									{:else}
+										<div class="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-blue-400 to-purple-500 text-xs font-medium text-white">
+											{user.id.slice(2, 4).toUpperCase()}
+										</div>
+									{/if}
+									<span class="truncate text-gray-700">{user.nickname || shortAddress(user.id)}</span>
 								</a>
 							</li>
 						{/if}

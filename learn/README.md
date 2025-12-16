@@ -845,3 +845,10 @@ Claude：ERC-1155 标准要求 tokenId 为 uint256，所以依然需要nextArtic
 
 #### 2025-12-16 19:35  图片组件
 @Developers.md @contracts.md @README.md 当前前端支持用户选择图片作为文章封面，但当前图片有最大限制要求低于100KB；而且有宽高比的要求，不符合时应该允许用户裁剪；所以请你帮我实现一个图片组件，支持裁剪，压缩，预览；支持外部传入要求的宽高比，或者要求的最大图片大小等；然后组件内允许用户进行调整和处理、压缩等；然后在文章发布页面导入，在profile中也导入，允许设置用户头像；  
+
+#### 2025-12-16 20:21  左侧sidebar的优化
+@Developers.md @README.md 
+frontend\src\lib\components\Sidebar.svelte 左侧侧边栏的下面是关注作者列表，这里帮我改为只显示头像和昵称，头像更小一些；在当前的SideBar组件中，显示的用户信息不正确，应该像 frontend\src\lib\components\ArticleListItem.svelte 一样，显示昵称和头像，没有昵称时才显示地址
+然后把查看其他用户的路径改为/u/[address]   
+Claude：已完成
+
