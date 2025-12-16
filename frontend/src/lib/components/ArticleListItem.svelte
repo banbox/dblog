@@ -43,7 +43,8 @@
 		return getCoverImageUrl(arweaveId, true);
 	}
 
-	const coverUrl = $derived(getCoverUrl(article.arweaveId));
+	// article.id is now arweaveId (primary key)
+	const coverUrl = $derived(getCoverUrl(article.id));
 	const categoryName = $derived(getCategoryName(article.categoryId));
 	// Priority: originalAuthor (for reposts) > author nickname > short address
 	const authorDisplay = $derived(

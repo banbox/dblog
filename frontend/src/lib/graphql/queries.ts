@@ -16,7 +16,7 @@ export const ARTICLES_QUERY = gql`
 			where: { categoryId_eq: $categoryId }
 		) {
 			id
-			arweaveId
+			articleId
 			author {
 				id
 				nickname
@@ -48,7 +48,7 @@ export const ALL_ARTICLES_QUERY = gql`
 	query AllArticles($limit: Int!, $offset: Int!) {
 		articles(orderBy: createdAt_DESC, limit: $limit, offset: $offset) {
 			id
-			arweaveId
+			articleId
 			author {
 				id
 				nickname
@@ -96,11 +96,12 @@ export const TOTAL_ARTICLE_COUNT_QUERY = gql`
 
 /**
  * Article data from GraphQL
- * Note: Cover image is accessed via arweaveId/coverImage path in Irys mutable folder
+ * Note: id is now arweaveId (Irys mutable folder manifest ID)
+ * Cover image is accessed via id/coverImage path in Irys mutable folder
  */
 export interface ArticleData {
-	id: string;
-	arweaveId: string;  // Irys mutable folder manifest ID
+	id: string;  // arweaveId (Irys mutable folder manifest ID, used as primary key)
+	articleId: string;  // 链上 articleId（用于合约交互）
 	author: {
 		id: string;
 		nickname?: string | null;
@@ -140,7 +141,7 @@ export const ARTICLE_BY_ID_QUERY = gql`
 	query ArticleById($id: String!) {
 		articleById(id: $id) {
 			id
-			arweaveId
+			articleId
 			author {
 				id
 				nickname
@@ -231,11 +232,12 @@ export interface CollectionData {
 
 /**
  * Article detail data from GraphQL
- * Note: Cover image is accessed via arweaveId/coverImage path in Irys mutable folder
+ * Note: id is now arweaveId (Irys mutable folder manifest ID)
+ * Cover image is accessed via id/coverImage path in Irys mutable folder
  */
 export interface ArticleDetailData {
-	id: string;
-	arweaveId: string;  // Irys mutable folder manifest ID
+	id: string;  // arweaveId (Irys mutable folder manifest ID, used as primary key)
+	articleId: string;  // 链上 articleId（用于合约交互）
 	author: {
 		id: string;
 		nickname?: string | null;
@@ -295,7 +297,7 @@ export const ARTICLES_BY_AUTHOR_QUERY = gql`
 			where: { author: { id_eq: $authorId } }
 		) {
 			id
-			arweaveId
+			articleId
 			author {
 				id
 				nickname
@@ -406,7 +408,7 @@ export const USER_LIKED_ARTICLES_QUERY = gql`
 			id
 			article {
 				id
-				arweaveId
+				articleId
 				author {
 					id
 					nickname
@@ -440,7 +442,7 @@ export const USER_DISLIKED_ARTICLES_QUERY = gql`
 			id
 			article {
 				id
-				arweaveId
+				articleId
 				author {
 					id
 					nickname
@@ -474,7 +476,7 @@ export const USER_COLLECTED_ARTICLES_QUERY = gql`
 			id
 			article {
 				id
-				arweaveId
+				articleId
 				author {
 					id
 					nickname
@@ -511,7 +513,7 @@ export const USER_COMMENTED_ARTICLES_QUERY = gql`
 			content
 			article {
 				id
-				arweaveId
+				articleId
 				author {
 					id
 					nickname

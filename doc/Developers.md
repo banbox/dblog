@@ -499,7 +499,10 @@ const DEFAULT_SPENDING_LIMIT = BigInt('10000000000000000000');
 > - [frontend/src/routes/a/[id]/+page.svelte](../frontend/src/routes/a/[id]/+page.svelte) - 页面组件
 > - [frontend/src/routes/a/[id]/+page.ts](../frontend/src/routes/a/[id]/+page.ts) - 数据加载
 
-**URL 设计**: `/a/[id]` - 使用最短路径，其中 `id` 为文章的链上 ID
+**URL 设计**: `/a/[id]` - 使用最短路径，其中 `id` 为文章的 **ArweaveID**（Irys manifest ID）
+
+> **重要**: 文章使用 ArweaveID 作为主键标识符（而非链上自增 articleId），这样可以：
+> - 保持与 Arweave 存储的稳定对应关系
 
 功能：
 - 从 SubSquid 获取文章元数据（标题、作者、统计等）

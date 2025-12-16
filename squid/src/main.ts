@@ -44,20 +44,25 @@ processor.run(new TypeormDatabase(), async (ctx) => {
         return user
     }
 
-    async function ensureArticle(articleId: string, block: any, log: any): Promise<Article> {
-        let article = articles.find(a => a.id === articleId) || articlesToUpdate.get(articleId)
+    // arweaveId -> Article 的缓存映射，用于在处理其他事件时快速查找
+    const arweaveIdCache = new Map<string, Article>()
+    // articleId -> arweaveId 的映射，用于通过链上 articleId 查找 arweaveId
+    const articleIdToArweaveId = new Map<string, string>()
+
+    async function ensureArticleByArweaveId(arweaveId: string, block: any, log: any): Promise<Article> {
+        let article = articles.find(a => a.id === arweaveId) || articlesToUpdate.get(arweaveId) || arweaveIdCache.get(arweaveId)
         if (!article) {
-            article = await ctx.store.get(Article, articleId)
+            article = await ctx.store.get(Article, arweaveId)
         }
         if (article && (article.author as any) == null) {
             article.author = await ensureUser(UNKNOWN_USER_ID, block)
-            articlesToUpdate.set(articleId, article)
+            articlesToUpdate.set(arweaveId, article)
         }
         if (!article) {
             const unknownUser = await ensureUser(UNKNOWN_USER_ID, block)
             article = new Article({
-                id: articleId,
-                arweaveId: '',
+                id: arweaveId,
+                articleId: 0n,
                 author: unknownUser,
                 originalAuthor: null,
                 trueAuthor: null,
@@ -75,9 +80,28 @@ processor.run(new TypeormDatabase(), async (ctx) => {
                 blockNumber: block.header.height,
                 txHash: log.transactionHash,
             })
-            articlesToUpdate.set(articleId, article)
+            articlesToUpdate.set(arweaveId, article)
         }
+        arweaveIdCache.set(arweaveId, article)
         return article
+    }
+
+    // 通过链上 articleId 查找文章（需要先从数据库或缓存中获取映射）
+    async function getArweaveIdByArticleId(articleIdStr: string): Promise<string | null> {
+        // 先检查本地缓存
+        const cached = articleIdToArweaveId.get(articleIdStr)
+        if (cached) return cached
+        
+        // 从数据库查询
+        const existingArticle = await ctx.store.findOne(Article, {
+            where: { articleId: BigInt(articleIdStr) } as any
+        })
+        if (existingArticle) {
+            articleIdToArweaveId.set(articleIdStr, existingArticle.id)
+            arweaveIdCache.set(existingArticle.id, existingArticle)
+            return existingArticle.id
+        }
+        return null
     }
 
     for (const block of ctx.blocks) {
@@ -105,14 +129,19 @@ processor.run(new TypeormDatabase(), async (ctx) => {
                 usersToUpdate.set(user.id, user)
 
                 // 创建文章（注意：royaltyBps 不在事件中，需要通过合约调用获取或设为默认值）
-                // arweaveId 现在是 Irys 可变文件夹的 manifest ID
+                // 使用 arweaveId 作为实体 ID（主键）
                 // 文章内容固定路径: index.md，封面图片固定路径: coverImage
-                const articleId = event.articleId.toString()
-                let article = articlesToUpdate.get(articleId) || articles.find(a => a.id === articleId)
+                const arweaveId = event.arweaveId
+                const articleIdNum = event.articleId
+                
+                // 建立 articleId -> arweaveId 的映射
+                articleIdToArweaveId.set(articleIdNum.toString(), arweaveId)
+                
+                let article = articlesToUpdate.get(arweaveId) || articles.find(a => a.id === arweaveId)
                 if (!article) {
                     article = new Article({
-                        id: articleId,
-                        arweaveId: event.arweaveId,
+                        id: arweaveId,  // 使用 arweaveId 作为主键
+                        articleId: articleIdNum,  // 保存链上 articleId
                         author: user,
                         originalAuthor: event.originalAuthor || null,
                         title: event.title,
@@ -131,8 +160,9 @@ processor.run(new TypeormDatabase(), async (ctx) => {
                         txHash: log.transactionHash
                     })
                     articles.push(article)
+                    arweaveIdCache.set(arweaveId, article)
                 } else {
-                    article.arweaveId = event.arweaveId
+                    article.articleId = articleIdNum
                     article.author = user
                     article.originalAuthor = event.originalAuthor || null
                     article.title = event.title
@@ -145,7 +175,8 @@ processor.run(new TypeormDatabase(), async (ctx) => {
                     article.createdAt = new Date(block.header.timestamp)
                     article.blockNumber = block.header.height
                     article.txHash = log.transactionHash
-                    articlesToUpdate.set(articleId, article)
+                    articlesToUpdate.set(arweaveId, article)
+                    arweaveIdCache.set(arweaveId, article)
                 }
             }
 
@@ -169,8 +200,14 @@ processor.run(new TypeormDatabase(), async (ctx) => {
                     usersToUpdate.set(user.id, user)
                 }
 
-                const articleId = event.articleId.toString()
-                const article = await ensureArticle(articleId, block, log)
+                const articleIdStr = event.articleId.toString()
+                // 通过 articleId 查找对应的 arweaveId
+                const arweaveId = await getArweaveIdByArticleId(articleIdStr)
+                if (!arweaveId) {
+                    console.warn(`Article not found for articleId ${articleIdStr}, skipping evaluation event`)
+                    continue
+                }
+                const article = await ensureArticleByArweaveId(arweaveId, block, log)
 
                 const evaluation = new Evaluation({
                     id: `${log.transactionHash}-${log.logIndex}`,
@@ -199,8 +236,8 @@ processor.run(new TypeormDatabase(), async (ctx) => {
                             }
                         }
                     }
-                    // 将修改后的文章加入更新队列
-                    articlesToUpdate.set(articleId, article)
+                    // 将修改后的文章加入更新队列（使用 arweaveId 作为 key）
+                    articlesToUpdate.set(article.id, article)
                 }
             }
 
@@ -208,19 +245,25 @@ processor.run(new TypeormDatabase(), async (ctx) => {
             if (log.topics[0] === COMMENT_ADDED) {
                 const event = blogHub.events.CommentAdded.decode(log)
 
-                const articleId = event.articleId.toString()
-                const article = await ensureArticle(articleId, block, log)
+                const articleIdStr = event.articleId.toString()
+                // 通过 articleId 查找对应的 arweaveId
+                const arweaveId = await getArweaveIdByArticleId(articleIdStr)
+                if (!arweaveId) {
+                    console.warn(`Article not found for articleId ${articleIdStr}, skipping comment event`)
+                    continue
+                }
+                const article = await ensureArticleByArweaveId(arweaveId, block, log)
 
-                let nextCommentId = nextCommentIdByArticle.get(articleId)
+                let nextCommentId = nextCommentIdByArticle.get(arweaveId)
                 if (nextCommentId == null) {
                     const last = await ctx.store.findOne(Comment, {
-                        where: {article: {id: articleId} as any} as any,
+                        where: {article: {id: arweaveId} as any} as any,
                         order: {commentId: 'DESC'} as any,
                     })
                     nextCommentId = (last?.commentId ?? 0n) + 1n
                 }
                 const commentId = nextCommentId
-                nextCommentIdByArticle.set(articleId, commentId + 1n)
+                nextCommentIdByArticle.set(arweaveId, commentId + 1n)
                 
                 // 确保用户存在
                 let user = usersToUpdate.get(event.commenter.toLowerCase())
@@ -239,7 +282,7 @@ processor.run(new TypeormDatabase(), async (ctx) => {
                 }
 
                 const comment = new Comment({
-                    id: `${event.articleId.toString()}-${log.transactionHash}-${log.logIndex}`,
+                    id: `${arweaveId}-${log.transactionHash}-${log.logIndex}`,
                     commentId: commentId,
                     article: article,
                     user: user,
@@ -256,12 +299,18 @@ processor.run(new TypeormDatabase(), async (ctx) => {
             if (log.topics[0] === COMMENT_LIKED) {
                 const event = blogHub.events.CommentLiked.decode(log)
 
-                const articleId = event.articleId.toString()
-                await ensureArticle(articleId, block, log)
-                let comment = comments.find(c => (c.article as any)?.id === articleId && c.commentId === event.commentId)
+                const articleIdStr = event.articleId.toString()
+                // 通过 articleId 查找对应的 arweaveId
+                const arweaveId = await getArweaveIdByArticleId(articleIdStr)
+                if (!arweaveId) {
+                    console.warn(`Article not found for articleId ${articleIdStr}, skipping comment like event`)
+                    continue
+                }
+                await ensureArticleByArweaveId(arweaveId, block, log)
+                let comment = comments.find(c => (c.article as any)?.id === arweaveId && c.commentId === event.commentId)
                 if (!comment) {
                     comment = await ctx.store.findOne(Comment, {
-                        where: {article: {id: articleId} as any, commentId: event.commentId} as any,
+                        where: {article: {id: arweaveId} as any, commentId: event.commentId} as any,
                     })
                 }
                 if (comment) {
@@ -269,14 +318,14 @@ processor.run(new TypeormDatabase(), async (ctx) => {
                     commentsToUpdate.set(comment.id, comment)
                 }
 
-                let article = articles.find(a => a.id === articleId)
-                    || articlesToUpdate.get(articleId)
+                let article = articles.find(a => a.id === arweaveId)
+                    || articlesToUpdate.get(arweaveId)
                 if (!article) {
-                    article = await ctx.store.get(Article, articleId)
+                    article = await ctx.store.get(Article, arweaveId)
                 }
                 if (article && event.amountPaid > 0n) {
                     article.totalTips += event.amountPaid
-                    articlesToUpdate.set(articleId, article)
+                    articlesToUpdate.set(arweaveId, article)
                 }
             }
 
@@ -356,8 +405,14 @@ processor.run(new TypeormDatabase(), async (ctx) => {
             if (log.topics[0] === ARTICLE_COLLECTED) {
                 const event = blogHub.events.ArticleCollected.decode(log)
 
-                const articleId = event.articleId.toString()
-                const article = await ensureArticle(articleId, block, log)
+                const articleIdStr = event.articleId.toString()
+                // 通过 articleId 查找对应的 arweaveId
+                const arweaveId = await getArweaveIdByArticleId(articleIdStr)
+                if (!arweaveId) {
+                    console.warn(`Article not found for articleId ${articleIdStr}, skipping collection event`)
+                    continue
+                }
+                const article = await ensureArticleByArweaveId(arweaveId, block, log)
 
                 // 确保用户存在
                 let user = usersToUpdate.get(event.collector.toLowerCase())
@@ -389,7 +444,7 @@ processor.run(new TypeormDatabase(), async (ctx) => {
                 // 更新文章收藏计数
                 if (article) {
                     article.collectCount = (article.collectCount ?? 0n) + 1n
-                    articlesToUpdate.set(articleId, article)
+                    articlesToUpdate.set(arweaveId, article)
                 }
             }
 

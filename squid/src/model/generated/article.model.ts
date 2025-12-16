@@ -1,4 +1,4 @@
-import {Entity as Entity_, Column as Column_, PrimaryColumn as PrimaryColumn_, StringColumn as StringColumn_, ManyToOne as ManyToOne_, Index as Index_, BigIntColumn as BigIntColumn_, IntColumn as IntColumn_, OneToMany as OneToMany_, DateTimeColumn as DateTimeColumn_} from "@subsquid/typeorm-store"
+import {Entity as Entity_, Column as Column_, PrimaryColumn as PrimaryColumn_, BigIntColumn as BigIntColumn_, ManyToOne as ManyToOne_, Index as Index_, StringColumn as StringColumn_, IntColumn as IntColumn_, OneToMany as OneToMany_, DateTimeColumn as DateTimeColumn_} from "@subsquid/typeorm-store"
 import {User} from "./user.model"
 import {Comment} from "./comment.model"
 import {Evaluation} from "./evaluation.model"
@@ -13,8 +13,8 @@ export class Article {
     @PrimaryColumn_()
     id!: string
 
-    @StringColumn_({nullable: false})
-    arweaveId!: string
+    @BigIntColumn_({nullable: false})
+    articleId!: bigint
 
     @Index_()
     @ManyToOne_(() => User, {nullable: true})

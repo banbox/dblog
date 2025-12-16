@@ -44,6 +44,7 @@ export const functions = {
     UPGRADER_ROLE: viewFun("0xf72c0d8b", "UPGRADER_ROLE()", {}, p.bytes32),
     UPGRADE_INTERFACE_VERSION: viewFun("0xad3cb1cc", "UPGRADE_INTERFACE_VERSION()", {}, p.string),
     articles: viewFun("0xedcfafe6", "articles(uint256)", {"_0": p.uint256}, {"author": p.address, "timestamp": p.uint64, "categoryId": p.uint16, "originality": p.uint8, "collectPrice": p.uint96, "maxCollectSupply": p.uint32, "collectCount": p.uint32, "arweaveHash": p.string}),
+    arweaveIdToArticleId: viewFun("0xb055d7aa", "arweaveIdToArticleId(string)", {"_0": p.string}, p.uint256),
     balanceOf: viewFun("0x00fdd58e", "balanceOf(address,uint256)", {"account": p.address, "id": p.uint256}, p.uint256),
     balanceOfBatch: viewFun("0x4e1273f4", "balanceOfBatch(address[],uint256[])", {"accounts": p.array(p.address), "ids": p.array(p.uint256)}, p.array(p.uint256)),
     collect: fun("0x8d3c100a", "collect(uint256,address)", {"_articleId": p.uint256, "_referrer": p.address}, ),
@@ -52,6 +53,8 @@ export const functions = {
     evaluateWithSessionKey: fun("0x63c4ea4d", "evaluateWithSessionKey(address,address,uint256,uint8,string,address,uint256,uint256,bytes)", {"owner": p.address, "sessionKey": p.address, "_articleId": p.uint256, "_score": p.uint8, "_content": p.string, "_referrer": p.address, "_parentCommentId": p.uint256, "deadline": p.uint256, "signature": p.bytes}, ),
     follow: fun("0x63c3cc16", "follow(address,bool)", {"_target": p.address, "_status": p.bool}, ),
     followWithSessionKey: fun("0x5780400b", "followWithSessionKey(address,address,address,bool,uint256,bytes)", {"owner": p.address, "sessionKey": p.address, "_target": p.address, "_status": p.bool, "deadline": p.uint256, "signature": p.bytes}, ),
+    getArticleByArweaveId: viewFun("0x989cfb57", "getArticleByArweaveId(string)", {"_arweaveId": p.string}, p.struct({"author": p.address, "timestamp": p.uint64, "categoryId": p.uint16, "originality": p.uint8, "collectPrice": p.uint96, "maxCollectSupply": p.uint32, "collectCount": p.uint32, "arweaveHash": p.string})),
+    getArticleIdByArweaveId: viewFun("0x4b65f344", "getArticleIdByArweaveId(string)", {"_arweaveId": p.string}, p.uint256),
     getRoleAdmin: viewFun("0x248a9ca3", "getRoleAdmin(bytes32)", {"role": p.bytes32}, p.bytes32),
     grantRole: fun("0x2f2ff15d", "grantRole(bytes32,address)", {"role": p.bytes32, "account": p.address}, ),
     hasRole: viewFun("0x91d14854", "hasRole(bytes32,address)", {"role": p.bytes32, "account": p.address}, p.bool),
@@ -145,12 +148,24 @@ export class Contract extends ContractBase {
         return this.eth_call(functions.articles, {_0})
     }
 
+    arweaveIdToArticleId(_0: ArweaveIdToArticleIdParams["_0"]) {
+        return this.eth_call(functions.arweaveIdToArticleId, {_0})
+    }
+
     balanceOf(account: BalanceOfParams["account"], id: BalanceOfParams["id"]) {
         return this.eth_call(functions.balanceOf, {account, id})
     }
 
     balanceOfBatch(accounts: BalanceOfBatchParams["accounts"], ids: BalanceOfBatchParams["ids"]) {
         return this.eth_call(functions.balanceOfBatch, {accounts, ids})
+    }
+
+    getArticleByArweaveId(_arweaveId: GetArticleByArweaveIdParams["_arweaveId"]) {
+        return this.eth_call(functions.getArticleByArweaveId, {_arweaveId})
+    }
+
+    getArticleIdByArweaveId(_arweaveId: GetArticleIdByArweaveIdParams["_arweaveId"]) {
+        return this.eth_call(functions.getArticleIdByArweaveId, {_arweaveId})
     }
 
     getRoleAdmin(role: GetRoleAdminParams["role"]) {
@@ -275,6 +290,9 @@ export type UPGRADE_INTERFACE_VERSIONReturn = FunctionReturn<typeof functions.UP
 export type ArticlesParams = FunctionArguments<typeof functions.articles>
 export type ArticlesReturn = FunctionReturn<typeof functions.articles>
 
+export type ArweaveIdToArticleIdParams = FunctionArguments<typeof functions.arweaveIdToArticleId>
+export type ArweaveIdToArticleIdReturn = FunctionReturn<typeof functions.arweaveIdToArticleId>
+
 export type BalanceOfParams = FunctionArguments<typeof functions.balanceOf>
 export type BalanceOfReturn = FunctionReturn<typeof functions.balanceOf>
 
@@ -298,6 +316,12 @@ export type FollowReturn = FunctionReturn<typeof functions.follow>
 
 export type FollowWithSessionKeyParams = FunctionArguments<typeof functions.followWithSessionKey>
 export type FollowWithSessionKeyReturn = FunctionReturn<typeof functions.followWithSessionKey>
+
+export type GetArticleByArweaveIdParams = FunctionArguments<typeof functions.getArticleByArweaveId>
+export type GetArticleByArweaveIdReturn = FunctionReturn<typeof functions.getArticleByArweaveId>
+
+export type GetArticleIdByArweaveIdParams = FunctionArguments<typeof functions.getArticleIdByArweaveId>
+export type GetArticleIdByArweaveIdReturn = FunctionReturn<typeof functions.getArticleIdByArweaveId>
 
 export type GetRoleAdminParams = FunctionArguments<typeof functions.getRoleAdmin>
 export type GetRoleAdminReturn = FunctionReturn<typeof functions.getRoleAdmin>

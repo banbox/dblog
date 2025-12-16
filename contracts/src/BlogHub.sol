@@ -102,6 +102,9 @@ contract BlogHub is
 
     // 文章存储
     mapping(uint256 => Article) public articles;
+    
+    // ArweaveID 到 ArticleID 的映射（用于通过 ArweaveID 查找文章）
+    mapping(string => uint256) public arweaveIdToArticleId;
 
     // --- Session Key 管理 ---
     /// @notice Session Key 管理器合约地址
@@ -532,6 +535,9 @@ contract BlogHub is
             collectCount: 1,
             originality: _originality
         });
+        
+        // 建立 ArweaveID 到 ArticleID 的映射
+        arweaveIdToArticleId[_arweaveId] = newId;
 
         _mint(publisher, newId, 1, "");
 
@@ -898,6 +904,9 @@ contract BlogHub is
             collectCount: 1,
             originality: params.originality
         });
+        
+        // 建立 ArweaveID 到 ArticleID 的映射
+        arweaveIdToArticleId[params.arweaveId] = newId;
 
         _mint(owner, newId, 1, "");
 
@@ -991,11 +1000,35 @@ contract BlogHub is
         );
     }
 
+    // =============================================================
+    //                      ArweaveID 查询功能
+    // =============================================================
+
+    /**
+     * @notice 通过 ArweaveID 获取文章的 ArticleID
+     * @param _arweaveId Arweave/Irys 存储 ID
+     * @return articleId 文章 ID（如果不存在返回 0）
+     */
+    function getArticleIdByArweaveId(string calldata _arweaveId) external view returns (uint256) {
+        return arweaveIdToArticleId[_arweaveId];
+    }
+
+    /**
+     * @notice 通过 ArweaveID 获取完整文章信息
+     * @param _arweaveId Arweave/Irys 存储 ID
+     * @return article 文章结构体
+     */
+    function getArticleByArweaveId(string calldata _arweaveId) external view returns (Article memory) {
+        uint256 articleId = arweaveIdToArticleId[_arweaveId];
+        if (articleId == 0) revert ArticleNotFound();
+        return articles[articleId];
+    }
+
     /**
      * @dev 这个 gap 是为了将来升级合约添加新状态变量时，不破坏存储布局。
      * 这是一个最佳实践。
-     * 状态变量: nextArticleId(1) + platformFeeBps+platformTreasury(1) + articles(1) + sessionKeyManager(1) + minActionValue(1) = 5 slots
+     * 状态变量: nextArticleId(1) + platformFeeBps+platformTreasury(1) + articles(1) + sessionKeyManager(1) + minActionValue(1) + arweaveIdToArticleId(1) = 6 slots
      * 总计保留 6 slots 的位置，gap = 50 - 6 = 44
      */
-    uint256[44] private __gap;
+    uint256[43] private __gap;
 }

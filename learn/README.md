@@ -835,3 +835,11 @@ Claude：已完成
 
 #### 2025-12-16 16:48  多语言key简化
 @AGENTS.md @README.md  frontend\messages\en-us.json  frontend\messages\zh-cn.json 当前的多语言文件中，有很多并未遵循要求的范式，请按给定规则，根据value，对key进行简化合并，降低复杂度，允许值相同的key在多处复用；然后修改所有引用的地方，使用修改后的key  
+Claude：已完成
+
+#### 2025-12-16 17:09  文章数字ID改ArweaveID
+@Developers.md @README.md 目前在文章列表点击某个文章时，是通过int类型的id跳转的，这个id是智能合约每次累加生成的；我担心的是每次智能合约更新后，其中的nextArticleId是否会被重置，如果会，这是不是导致之前的文章失效了。另外，id索引给用户的感觉似乎可能不够稳定，直接用文章的ArweaveID可以实现吗？这样也方便保持和Arweave中对应关系稳定；如果可以，帮我修改实现，并修改其他关联的地方。  
+Claude：合约升级不影响nextArticleId,因数据存储在代理合约的数据区，合约代码是在版本实现；改为ArweaveID已完成。  
+开发者：@BlogHub.sol 帮我分析下，智能合约中是否应该将articles的key从uint256改为string，这样能避免引入新的arweaveIdToArticleId；对智能合约的gas费用有影响吗？影响有多少，这是最佳实践吗？请你作为智能合约专家，结合当前项目背景，帮我分析是否应该这样做？  
+Claude：ERC-1155 标准要求 tokenId 为 uint256，所以依然需要nextArticleId; 另外每次点赞评论收藏使用string索引会消耗更多gas，故推荐保持现状；
+

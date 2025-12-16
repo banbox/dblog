@@ -84,11 +84,12 @@
 
 		isCollecting = true;
 		try {
-			const articleId = BigInt(article.id);
+			// Use articleId for contract interaction (not arweaveId)
+			const chainArticleId = BigInt(article.articleId);
 			const priceWei = BigInt(article.collectPrice);
 			await callWithSessionKey(
-				(sk) => collectArticleWithSessionKey(sk, articleId, ZERO_ADDRESS, priceWei),
-				() => collectArticle(articleId, ZERO_ADDRESS, priceWei)
+				(sk) => collectArticleWithSessionKey(sk, chainArticleId, ZERO_ADDRESS, priceWei),
+				() => collectArticle(chainArticleId, ZERO_ADDRESS, priceWei)
 			);
 			localCollectCount = (BigInt(localCollectCount) + 1n).toString();
 			showFeedback('success', 'Collected');
@@ -233,11 +234,12 @@
 		}
 		isDisliking = true;
 		try {
-			const articleId = BigInt(article.id);
+			// Use articleId for contract interaction (not arweaveId)
+			const chainArticleId = BigInt(article.articleId);
 			const dislikeWei = parseEther(dislikeAmount);
 			await callWithSessionKey(
-				(sk) => evaluateArticleWithSessionKey(sk, articleId, EvaluationScore.Dislike, '', ZERO_ADDRESS, 0n, dislikeWei),
-				() => evaluateArticle(articleId, EvaluationScore.Dislike, '', ZERO_ADDRESS, 0n, dislikeWei)
+				(sk) => evaluateArticleWithSessionKey(sk, chainArticleId, EvaluationScore.Dislike, '', ZERO_ADDRESS, 0n, dislikeWei),
+				() => evaluateArticle(chainArticleId, EvaluationScore.Dislike, '', ZERO_ADDRESS, 0n, dislikeWei)
 			);
 			localDislikeAmount = (BigInt(localDislikeAmount) + dislikeWei).toString();
 			showDislikeModal = false;
@@ -278,11 +280,12 @@
 		}
 		isTipping = true;
 		try {
-			const articleId = BigInt(article.id);
+			// Use articleId for contract interaction (not arweaveId)
+			const chainArticleId = BigInt(article.articleId);
 			const tipWei = parseEther(tipAmount);
 			await callWithSessionKey(
-				(sk) => evaluateArticleWithSessionKey(sk, articleId, EvaluationScore.Like, '', ZERO_ADDRESS, 0n, tipWei),
-				() => evaluateArticle(articleId, EvaluationScore.Like, '', ZERO_ADDRESS, 0n, tipWei)
+				(sk) => evaluateArticleWithSessionKey(sk, chainArticleId, EvaluationScore.Like, '', ZERO_ADDRESS, 0n, tipWei),
+				() => evaluateArticle(chainArticleId, EvaluationScore.Like, '', ZERO_ADDRESS, 0n, tipWei)
 			);
 			showTipModal = false;
 			tipAmount = '0.001';
@@ -299,12 +302,13 @@
 		if (!requireWallet() || !commentText.trim()) return;
 		isCommenting = true;
 		try {
-			const articleId = BigInt(article.id);
+			// Use articleId for contract interaction (not arweaveId)
+			const chainArticleId = BigInt(article.articleId);
 			const minValue = getMinActionValue();
 			const text = commentText.trim();
 			await callWithSessionKey(
-				(sk) => evaluateArticleWithSessionKey(sk, articleId, EvaluationScore.Neutral, text, ZERO_ADDRESS, 0n, minValue),
-				() => evaluateArticle(articleId, EvaluationScore.Neutral, text, ZERO_ADDRESS, 0n, minValue)
+				(sk) => evaluateArticleWithSessionKey(sk, chainArticleId, EvaluationScore.Neutral, text, ZERO_ADDRESS, 0n, minValue),
+				() => evaluateArticle(chainArticleId, EvaluationScore.Neutral, text, ZERO_ADDRESS, 0n, minValue)
 			);
 			showFeedback('success', m.comment_success({}));
 		} catch (error) {
@@ -314,7 +318,8 @@
 		}
 	}
 
-	const coverUrl = $derived(getCoverUrl(article.arweaveId));
+	// article.id is now arweaveId (primary key)
+	const coverUrl = $derived(getCoverUrl(article.id));
 	const categoryName = $derived(getCategoryName(article.categoryId));
 	// Display author name: prefer nickname > originalAuthor > short address
 	const displayAuthor = $derived(
@@ -380,7 +385,8 @@
 			}
 		});
 		try {
-			articleContent = await getArticleWithCache(article.arweaveId);
+			// article.id is now arweaveId
+			articleContent = await getArticleWithCache(article.id);
 		} catch (e) {
 			contentError = e instanceof Error ? e.message : 'Failed to load article content';
 			console.error('Failed to fetch article content:', e);
@@ -391,7 +397,7 @@
 </script>
 
 <svelte:head>
-	<title>{article.title || `Article #${article.id}`} - DBlog</title>
+	<title>{article.title || `Article #${article.articleId}`} - DBlog</title>
 	<meta name="description" content={articleContent?.summary || article.title || 'DBlog Article'} />
 </svelte:head>
 
@@ -400,7 +406,7 @@
 	<!-- Title -->
 	<header class="mb-8">
 		<h1 class="mb-6 font-serif text-[32px] font-bold leading-tight text-gray-900 sm:text-[42px]">
-			{article.title || `Article #${article.id}`}
+			{article.title || `Article #${article.articleId}`}
 		</h1>
 
 		<!-- Author Info Bar -->
@@ -596,7 +602,7 @@
 			<div class="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
 				<p class="text-red-700">{contentError}</p>
 				<a
-					href={`https://gateway.irys.xyz/${article.arweaveId}`}
+					href={`https://gateway.irys.xyz/${article.id}`}
 					target="_blank"
 					rel="noopener noreferrer"
 					class="mt-3 inline-block text-sm text-red-600 underline hover:text-red-800"
@@ -627,7 +633,7 @@
 
 	<!-- Comments Section -->
 	<CommentSection
-		articleId={article.id}
+		articleId={article.articleId}
 		comments={article.comments || []}
 		{walletAddress}
 		{sessionKey}
@@ -644,7 +650,7 @@
 		<div class="mt-3 flex flex-wrap gap-x-6 gap-y-2 rounded-lg bg-gray-50 p-4">
 			<div>
 				<span class="font-medium text-gray-700">{m.article_id({})}:</span>
-				{article.id}
+				{article.articleId}
 			</div>
 			<div>
 				<span class="font-medium text-gray-700">{m.block({})}:</span>
@@ -664,12 +670,12 @@
 			<div class="flex items-center gap-1">
 				<span class="font-medium text-gray-700">Arweave:</span>
 				<a
-					href={`https://gateway.irys.xyz/${article.arweaveId}`}
+					href={`https://gateway.irys.xyz/${article.id}`}
 					target="_blank"
 					rel="noopener noreferrer"
 					class="text-blue-600 hover:underline"
 				>
-					{article.arweaveId.slice(0, 10)}...
+					{article.id.slice(0, 10)}...
 				</a>
 			</div>
 		</div>
