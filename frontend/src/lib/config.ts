@@ -1,121 +1,100 @@
 /**
  * Application configuration
- * SvelteKit best practice: use $env/static/public for PUBLIC_ prefixed env vars
- * These are replaced at build time for optimal performance
+ * 
+ * This module provides configuration values that can be:
+ * 1. Set at build time via environment variables (PUBLIC_* vars)
+ * 2. Overridden by users at runtime via localStorage (Settings page)
+ * 
+ * All getter functions return the merged config (user overrides > env defaults)
+ * appName and appVersion are NOT user-overridable
  */
-import {
-	PUBLIC_BLOG_HUB_CONTRACT_ADDRESS,
-	PUBLIC_SESSION_KEY_MANAGER_ADDRESS,
-	PUBLIC_RPC_URL,
-	PUBLIC_CHAIN_ID,
-	PUBLIC_IRYS_NETWORK,
-	PUBLIC_APP_NAME,
-	PUBLIC_APP_VERSION,
-	PUBLIC_ARWEAVE_GATEWAYS,
-	PUBLIC_SUBSQUID_ENDPOINT
-} from '$env/static/public';
+import { 
+	getConfig, 
+	defaults, 
+	envDefaults,
+	getUserConfig,
+	setConfigValue,
+	updateConfig,
+	resetConfigValue,
+	resetAllConfig,
+	isConfigOverridden,
+	getEnvDefault,
+	configFields,
+	MIN_DEFAULT_GAS_FEE_MULTIPLIER,
+	type UserConfig,
+	type UserConfigKey,
+	type ConfigFieldMeta
+} from '$lib/stores/config.svelte';
 
-// Import optional env vars with fallback (these may not be defined in all environments)
-import * as publicEnv from '$env/static/public';
-const PUBLIC_MIN_GAS_FEE_MULTIPLIER = (publicEnv as Record<string, string>)['PUBLIC_MIN_GAS_FEE_MULTIPLIER'] || '';
-const PUBLIC_DEFAULT_GAS_FEE_MULTIPLIER = (publicEnv as Record<string, string>)['PUBLIC_DEFAULT_GAS_FEE_MULTIPLIER'] || '';
-
-// Default values (used when env vars are not set)
-const defaults = {
-	blogHubContractAddress: '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9',
-	sessionKeyManagerAddress: '0x5FbDB2315678afecb367f032d93F642f64180aa3',
-	rpcUrl: 'http://localhost:8545',
-	chainId: 31337, // Anvil default
-	irysNetwork: 'devnet' as const,
-	appName: 'DBlog',
-	appVersion: '1.0.0',
-	arweaveGateways: ['https://gateway.irys.xyz', 'https://arweave.net', 'https://arweave.dev'],
-	subsquidEndpoint: 'http://localhost:4350/graphql',
-	// Gas fee multipliers for funding
-	minGasFeeMultiplier: 10,      // Minimum: 10x gas fee
-	defaultGasFeeMultiplier: 30,  // Default: 30x gas fee
-	// Irys free upload limit (files under this size are free on Irys)
-	irysFreeUploadLimit: 102400,   // 100KB in bytes
-	// Minimum action value for comments (anti-spam, matches contract minActionValue)
-	minActionValue: 20000000000000n  // 0.00002 ether in wei
+// Re-export store functions for settings page
+export {
+	getUserConfig,
+	setConfigValue,
+	updateConfig,
+	resetConfigValue,
+	resetAllConfig,
+	isConfigOverridden,
+	getEnvDefault,
+	configFields,
+	MIN_DEFAULT_GAS_FEE_MULTIPLIER,
+	type UserConfig,
+	type UserConfigKey,
+	type ConfigFieldMeta
 };
 
-/**
- * Parsed configuration from environment variables with fallbacks
- */
-export const config = {
-	blogHubContractAddress: (PUBLIC_BLOG_HUB_CONTRACT_ADDRESS || defaults.blogHubContractAddress) as `0x${string}`,
-	sessionKeyManagerAddress: (PUBLIC_SESSION_KEY_MANAGER_ADDRESS || defaults.sessionKeyManagerAddress) as `0x${string}`,
-	rpcUrl: PUBLIC_RPC_URL || defaults.rpcUrl,
-	chainId: PUBLIC_CHAIN_ID ? parseInt(PUBLIC_CHAIN_ID, 10) : defaults.chainId,
-	irysNetwork: (PUBLIC_IRYS_NETWORK || defaults.irysNetwork) as 'mainnet' | 'devnet',
-	appName: PUBLIC_APP_NAME || defaults.appName,
-	appVersion: PUBLIC_APP_VERSION || defaults.appVersion,
-	arweaveGateways: PUBLIC_ARWEAVE_GATEWAYS
-		? PUBLIC_ARWEAVE_GATEWAYS.split(',').map((g: string) => g.trim())
-		: defaults.arweaveGateways,
-	subsquidEndpoint: PUBLIC_SUBSQUID_ENDPOINT || defaults.subsquidEndpoint,
-	minGasFeeMultiplier: PUBLIC_MIN_GAS_FEE_MULTIPLIER 
-		? parseInt(PUBLIC_MIN_GAS_FEE_MULTIPLIER, 10) 
-		: defaults.minGasFeeMultiplier,
-	defaultGasFeeMultiplier: PUBLIC_DEFAULT_GAS_FEE_MULTIPLIER 
-		? parseInt(PUBLIC_DEFAULT_GAS_FEE_MULTIPLIER, 10) 
-		: defaults.defaultGasFeeMultiplier,
-	irysFreeUploadLimit: defaults.irysFreeUploadLimit,
-	minActionValue: defaults.minActionValue
-} as const;
-
-// Helper functions for backward compatibility
+// Helper functions - now read from reactive store
 export function getBlogHubContractAddress(): `0x${string}` {
-	return config.blogHubContractAddress;
+	return getConfig().blogHubContractAddress;
 }
 
 export function getSessionKeyManagerAddress(): `0x${string}` {
-	return config.sessionKeyManagerAddress;
+	return getConfig().sessionKeyManagerAddress;
 }
 
 export function getRpcUrl(): string {
-	return config.rpcUrl;
+	return getConfig().rpcUrl;
 }
 
 export function getChainId(): number {
-	return config.chainId;
+	return getConfig().chainId;
 }
 
 export function getIrysNetwork(): 'mainnet' | 'devnet' {
-	return config.irysNetwork;
+	return getConfig().irysNetwork;
 }
 
 export function getAppName(): string {
-	return config.appName;
+	return getConfig().appName;
 }
 
 export function getAppVersion(): string {
-	return config.appVersion;
+	return getConfig().appVersion;
 }
 
 export function getArweaveGateways(): string[] {
-	return config.arweaveGateways;
+	return getConfig().arweaveGateways;
 }
 
 export function getSubsquidEndpoint(): string {
-	return config.subsquidEndpoint;
+	return getConfig().subsquidEndpoint;
 }
 
 export function getMinGasFeeMultiplier(): number {
-	return config.minGasFeeMultiplier;
+	return getConfig().minGasFeeMultiplier;
 }
 
 export function getDefaultGasFeeMultiplier(): number {
-	return config.defaultGasFeeMultiplier;
+	return getConfig().defaultGasFeeMultiplier;
 }
 
 export function getIrysFreeUploadLimit(): number {
-	return config.irysFreeUploadLimit;
+	return getConfig().irysFreeUploadLimit;
 }
 
 export function getMinActionValue(): bigint {
-	return config.minActionValue;
+	return getConfig().minActionValue;
 }
 
+// Legacy exports for backward compatibility
 export { defaults as defaultConfig };
+export { envDefaults };

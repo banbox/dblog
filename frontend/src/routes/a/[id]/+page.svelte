@@ -23,6 +23,7 @@
 	import {
 		getStoredSessionKey,
 		isSessionKeyValidForCurrentWallet,
+		ensureSessionKeyBalance,
 		type StoredSessionKey
 	} from '$lib/sessionKey';
 	import { getMinActionValue } from '$lib/config';
@@ -168,11 +169,19 @@
 	}
 
 	// Execute contract call with session key if available, otherwise use regular call
+	// Ensures session key has sufficient balance before calling (prompts MetaMask if needed)
 	async function callWithSessionKey<T>(
 		withSessionKey: (sk: StoredSessionKey) => Promise<T>,
 		withoutSessionKey: () => Promise<T>
 	): Promise<T> {
 		if (hasValidSessionKey && sessionKey) {
+			// Ensure session key has sufficient balance, fund via MetaMask if needed
+			const hasBalance = await ensureSessionKeyBalance(sessionKey.address);
+			if (!hasBalance) {
+				// If user rejected funding, fall back to regular wallet call
+				console.log('Session key funding failed, falling back to regular wallet call');
+				return withoutSessionKey();
+			}
 			return withSessionKey(sessionKey);
 		}
 		return withoutSessionKey();

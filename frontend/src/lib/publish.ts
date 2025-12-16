@@ -9,7 +9,7 @@ import { publishToContractWithSessionKey } from '$lib/contracts';
 import {
 	getStoredSessionKey,
 	createSessionKey,
-	hasSessionKeySufficientBalance,
+	ensureSessionKeyBalance,
 	isSessionKeyValidForCurrentWallet,
 	isSessionKeyValidForPublish,
 	type StoredSessionKey
@@ -145,12 +145,12 @@ async function publishArticleWithSessionKeyInternal(
 		originality = 0
 	} = params;
 
-	// Step 0: Check session key has sufficient balance for gas fees
-	// Note: Session key is funded when created, we only check here (no MetaMask signature needed)
+	// Step 0: Ensure session key has sufficient balance for gas fees
+	// If balance is low, this will prompt MetaMask to refund the session key
 	console.log('Step 0: Checking session key balance...');
-	const hasBalance = await hasSessionKeySufficientBalance(sessionKey.address);
+	const hasBalance = await ensureSessionKeyBalance(sessionKey.address);
 	if (!hasBalance) {
-		throw new Error('Session key balance is insufficient. Please create a new session key to refund.');
+		throw new Error('Failed to fund session key. Please try again.');
 	}
 
 	// Step 1: Upload article folder with session key (content + cover image)

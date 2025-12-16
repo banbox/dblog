@@ -823,4 +823,13 @@ Claude: 已完成
 #### 2025-12-16 15:20  其他graphql语句更新
 @README.md @contracts.md @Developers.md 我增加了用户信息事件UserProfileUpdated，用于将用户数据持久化存储到区块链和SubSquid中；目前已支持了在profile页面显示和编辑个人信息；但在其他查询，如文章列表查询，文章详情查询，点赞过的文章查询等等这些中，也需要同时返回作者对应的昵称和头像，请查阅当前的智能合约代码，以及squid中的schema架构和其他重要内容，了解整体架构，然后帮我分析，是应该在查询其他数据时，使用graphql类似sql的join那样一并查询返回？还是在第一次查询完成后，再查询作者对应的昵称和头像？请根据SubSquid的架构，最佳实践，当前项目要求，帮我分析确定最佳方案，然后改进落实，再所有需要展示用户信息的地方，都需要执行此查询。  
 Claude：GraphQL 嵌套查询（类似 SQL JOIN），已完成  
+开发者：@Developers.md @README.md @AGENTS.md 
+目前发布文章出现下面错误，我希望当临时钱包余额不足时，应该总弹出Metamask要求用户充值，而不是出现错误信息；请帮我修改兼容；其他路径下余额不足时也按此逻辑  
+Claude：已完成
+
+#### 2025-12-16 16:30  配置前端管理
+ @Developers.md  @README.md @AGENTS.md 前端项目中有很多重要配置，目前是通过frontend\src\lib\config.ts进行管理的，但在上线部署后，实际应该允许用户手动修改管理，保存到浏览器localstorage即可，当前使用sveltekit，build是编译为static的静态站点；请你根据sveltekit的最佳实践，以及当前配置项和使用情况，帮我对这部分进行重构，在前端增加一个设置页面，右上角显示设置icon，允许用户修改；env中除了appName和AppVersion不允许修改，其他的都允许用户修改。  
+Claude：已完成  
+开发者：minGasFeeMultiplier   irysFreeUploadLimit  minActionValue这几个是固定的，不应允许用户修改；另外defaultGasFeeMultiplier的最小值是10，在修改时应进行检查  
+Claude：已完成
 

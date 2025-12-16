@@ -2,7 +2,7 @@
 	import * as m from '$lib/paraglide/messages';
 	import type { CommentData } from '$lib/graphql/queries';
 	import { ContractError, likeComment, likeCommentWithSessionKey } from '$lib/contracts';
-	import type { StoredSessionKey } from '$lib/sessionKey';
+	import { ensureSessionKeyBalance, type StoredSessionKey } from '$lib/sessionKey';
 	import { getMinActionValue } from '$lib/config';
 
 	interface Props {
@@ -79,7 +79,18 @@
 			const cId = BigInt(comment.commentId);
 			const commenter = comment.user.id as `0x${string}`;
 
-			if (hasValidSessionKey && sessionKey) {
+			let useSessionKey = hasValidSessionKey && sessionKey;
+			if (useSessionKey && sessionKey) {
+				// Ensure session key has sufficient balance, fund via MetaMask if needed
+				const hasBalance = await ensureSessionKeyBalance(sessionKey.address);
+				if (!hasBalance) {
+					// If user rejected funding, fall back to regular wallet call
+					console.log('Session key funding failed, falling back to regular wallet call');
+					useSessionKey = false;
+				}
+			}
+
+			if (useSessionKey && sessionKey) {
 				await likeCommentWithSessionKey(
 					sessionKey,
 					aId,

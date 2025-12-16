@@ -1,0 +1,333 @@
+<script lang="ts">
+	import * as m from '$lib/paraglide/messages';
+	import {
+		getUserConfig,
+		setConfigValue,
+		resetConfigValue,
+		resetAllConfig,
+		isConfigOverridden,
+		getEnvDefault,
+		configFields,
+		MIN_DEFAULT_GAS_FEE_MULTIPLIER,
+		type UserConfigKey
+	} from '$lib/config';
+
+	// Local form state
+	let formValues = $state<Record<string, string | number | string[]>>({});
+	let showResetConfirm = $state(false);
+	let saveMessage = $state('');
+	let errorMessage = $state('');
+	let errorField = $state<string | null>(null);
+
+	// Initialize form values from current config
+	function initFormValues() {
+		const userConfig = getUserConfig();
+		const values: Record<string, string | number | string[]> = {};
+		
+		for (const field of configFields) {
+			const userValue = userConfig[field.key];
+			const envValue = getEnvDefault(field.key);
+			
+			if (field.type === 'array') {
+				values[field.key] = (userValue as string[] | undefined) || (envValue as string[]) || [];
+			} else {
+				values[field.key] = userValue !== undefined ? userValue : envValue;
+			}
+		}
+		
+		formValues = values;
+	}
+
+	// Initialize on mount
+	$effect(() => {
+		initFormValues();
+	});
+
+	// Get label from message key
+	function getLabel(key: string): string {
+		return (m as unknown as Record<string, () => string>)[key]?.() || key;
+	}
+
+	// Handle input change
+	function handleChange(key: UserConfigKey, value: string | number | string[]) {
+		formValues[key] = value;
+	}
+
+	// Validate field value
+	function validateField(key: UserConfigKey, value: number | string | string[]): string | null {
+		if (key === 'defaultGasFeeMultiplier') {
+			const numValue = typeof value === 'string' ? parseInt(value, 10) : value as number;
+			if (isNaN(numValue) || numValue < MIN_DEFAULT_GAS_FEE_MULTIPLIER) {
+				return getLabel('settings_gas_multiplier_min_error').replace('{min}', String(MIN_DEFAULT_GAS_FEE_MULTIPLIER));
+			}
+		}
+		return null;
+	}
+
+	// Save a single field
+	function saveField(key: UserConfigKey) {
+		const value = formValues[key];
+		const field = configFields.find(f => f.key === key);
+		
+		if (!field) return;
+		
+		let parsedValue: string | number | string[] | undefined = value;
+		
+		if (field.type === 'number') {
+			parsedValue = typeof value === 'string' ? parseInt(value, 10) : value;
+			if (isNaN(parsedValue as number)) return;
+		}
+
+		// Validate
+		const validationError = validateField(key, parsedValue);
+		if (validationError) {
+			errorMessage = validationError;
+			errorField = key;
+			setTimeout(() => {
+				errorMessage = '';
+				errorField = null;
+			}, 3000);
+			return;
+		}
+		
+		setConfigValue(key, parsedValue as never);
+		errorMessage = '';
+		errorField = null;
+		showSaveMessage();
+	}
+
+	// Reset a single field to env default
+	function resetField(key: UserConfigKey) {
+		resetConfigValue(key);
+		const envValue = getEnvDefault(key);
+		formValues[key] = envValue as string | number | string[];
+		showSaveMessage();
+	}
+
+	// Reset all fields
+	function handleResetAll() {
+		resetAllConfig();
+		initFormValues();
+		showResetConfirm = false;
+		showSaveMessage();
+	}
+
+	// Show save message briefly
+	function showSaveMessage() {
+		saveMessage = getLabel('settings_saved');
+		setTimeout(() => {
+			saveMessage = '';
+		}, 2000);
+	}
+
+	// Handle array field (gateways)
+	function handleArrayChange(key: UserConfigKey, index: number, value: string) {
+		const arr = [...(formValues[key] as string[])];
+		arr[index] = value;
+		formValues[key] = arr;
+	}
+
+	function addArrayItem(key: UserConfigKey) {
+		const arr = [...(formValues[key] as string[]), ''];
+		formValues[key] = arr;
+	}
+
+	function removeArrayItem(key: UserConfigKey, index: number) {
+		const arr = (formValues[key] as string[]).filter((_, i) => i !== index);
+		formValues[key] = arr;
+	}
+</script>
+
+<svelte:head>
+	<title>{getLabel('settings')} - DBlog</title>
+</svelte:head>
+
+<div class="mx-auto max-w-3xl px-6 py-8">
+	<!-- Header -->
+	<div class="mb-8">
+		<h1 class="text-2xl font-bold text-gray-900">{getLabel('settings')}</h1>
+		<p class="mt-2 text-gray-600">{getLabel('settings_description')}</p>
+	</div>
+
+	<!-- Save Message -->
+	{#if saveMessage}
+		<div class="mb-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
+			{saveMessage}
+		</div>
+	{/if}
+
+	<!-- Error Message -->
+	{#if errorMessage}
+		<div class="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+			{errorMessage}
+		</div>
+	{/if}
+
+	<!-- Settings Form -->
+	<div class="space-y-6">
+		{#each configFields as field}
+			<div class="rounded-lg border border-gray-200 bg-white p-4">
+				<div class="flex items-start justify-between">
+					<div class="flex-1">
+						<label for={field.key} class="block text-sm font-medium text-gray-900">
+							{getLabel(field.labelKey)}
+							{#if isConfigOverridden(field.key)}
+								<span class="ml-2 rounded bg-blue-100 px-2 py-0.5 text-xs text-blue-700">
+									{getLabel('settings_customized')}
+								</span>
+							{/if}
+						</label>
+						
+						{#if field.type === 'text'}
+							<input
+								type="text"
+								id={field.key}
+								value={formValues[field.key] as string || ''}
+								placeholder={field.placeholder}
+								oninput={(e) => handleChange(field.key, e.currentTarget.value)}
+								onblur={() => saveField(field.key)}
+								class="mt-2 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+							/>
+						{:else if field.type === 'number'}
+							<input
+								type="number"
+								id={field.key}
+								value={formValues[field.key] as number || ''}
+								placeholder={field.placeholder}
+								oninput={(e) => handleChange(field.key, e.currentTarget.value)}
+								onblur={() => saveField(field.key)}
+								class="mt-2 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+							/>
+						{:else if field.type === 'select'}
+							<select
+								id={field.key}
+								value={formValues[field.key] as string || ''}
+								onchange={(e) => {
+									handleChange(field.key, e.currentTarget.value);
+									saveField(field.key);
+								}}
+								class="mt-2 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+							>
+								{#each field.options || [] as option}
+									<option value={option.value}>{getLabel(option.labelKey)}</option>
+								{/each}
+							</select>
+						{:else if field.type === 'array'}
+							<div class="mt-2 space-y-2">
+								{#each (formValues[field.key] as string[] || []) as item, index}
+									<div class="flex gap-2">
+										<input
+											type="text"
+											value={item}
+											placeholder={field.placeholder}
+											oninput={(e) => handleArrayChange(field.key, index, e.currentTarget.value)}
+											onblur={() => saveField(field.key)}
+											class="block flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+										/>
+										<button
+											type="button"
+											onclick={() => {
+												removeArrayItem(field.key, index);
+												saveField(field.key);
+											}}
+											class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-500 hover:bg-gray-50"
+											title={getLabel('remove')}
+										>
+											<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+											</svg>
+										</button>
+									</div>
+								{/each}
+								<button
+									type="button"
+									onclick={() => addArrayItem(field.key)}
+									class="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"
+								>
+									<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+									</svg>
+									{getLabel('settings_add_gateway')}
+								</button>
+							</div>
+						{/if}
+
+						<!-- Env default hint -->
+						<p class="mt-1 text-xs text-gray-500">
+							{getLabel('settings_default')}: {
+								field.type === 'array' 
+									? (getEnvDefault(field.key) as string[]).join(', ')
+									: getEnvDefault(field.key)
+							}
+						</p>
+					</div>
+
+					<!-- Reset button -->
+					{#if isConfigOverridden(field.key)}
+						<button
+							type="button"
+							onclick={() => resetField(field.key)}
+							class="ml-4 rounded-lg px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-100"
+							title={getLabel('settings_reset_to_default')}
+						>
+							<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+							</svg>
+						</button>
+					{/if}
+				</div>
+			</div>
+		{/each}
+	</div>
+
+	<!-- Reset All Section -->
+	<div class="mt-8 rounded-lg border border-red-200 bg-red-50 p-4">
+		<div class="flex items-center justify-between">
+			<div>
+				<h3 class="text-sm font-medium text-red-800">{getLabel('settings_reset_all')}</h3>
+				<p class="mt-1 text-sm text-red-600">{getLabel('settings_reset_all_description')}</p>
+			</div>
+			{#if showResetConfirm}
+				<div class="flex gap-2">
+					<button
+						type="button"
+						onclick={() => showResetConfirm = false}
+						class="rounded-lg px-4 py-2 text-sm text-gray-600 hover:bg-red-100"
+					>
+						{getLabel('cancel')}
+					</button>
+					<button
+						type="button"
+						onclick={handleResetAll}
+						class="rounded-lg bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700"
+					>
+						{getLabel('settings_confirm_reset')}
+					</button>
+				</div>
+			{:else}
+				<button
+					type="button"
+					onclick={() => showResetConfirm = true}
+					class="rounded-lg border border-red-300 px-4 py-2 text-sm text-red-600 hover:bg-red-100"
+				>
+					{getLabel('settings_reset_all')}
+				</button>
+			{/if}
+		</div>
+	</div>
+
+	<!-- App Info -->
+	<div class="mt-8 rounded-lg border border-gray-200 bg-gray-50 p-4">
+		<h3 class="text-sm font-medium text-gray-700">{getLabel('settings_app_info')}</h3>
+		<div class="mt-2 grid grid-cols-2 gap-4 text-sm text-gray-600">
+			<div>
+				<span class="text-gray-500">{getLabel('settings_app_name')}:</span>
+				<span class="ml-2 font-medium">DBlog</span>
+			</div>
+			<div>
+				<span class="text-gray-500">{getLabel('settings_app_version')}:</span>
+				<span class="ml-2 font-medium">1.0.0</span>
+			</div>
+		</div>
+	</div>
+</div>
