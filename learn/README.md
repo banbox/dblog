@@ -949,6 +949,15 @@ Claude: 安装type-graphql解决
 #### 2025-12-17 18:50  搜索功能完善
 @README.md @Developers.md 当前已经给项目的智能合约、SubSquid、前端，都增加了搜索功能，但是我启动前端运行后，并没有看到搜索入口，并且直接访问/search也报错：TypeError: process.cwd is not a function
 我希望搜索作为一个组件，可以在home，Library，profile，等凡是显示文章列表的地方，都集成搜索功能；点击即可搜索，按条件筛选；请根据当前项目现状，以及给定需求，帮我实现  
+Claude：已修改  
+开发者：我启动测试了搜索功能，出现400错误，上面是请求的参数和返回的内容，请帮我解决  
+Claude：已完成
 
 #### 2025-12-17 19:50  删除keywords字段
-@Developers.md @contracts.md @README.md 我感觉keywords字段没必要，请帮我从智能合约、SubSquid、前端中删除这个字段；
+@Developers.md @contracts.md @README.md 我感觉keywords字段没必要，请帮我从智能合约、SubSquid、前端中删除这个字段；  
+Claude: 已完成
+
+#### 2025-12-17 21:30  更新文档
+@Developers.md @contracts.md @README.md 当前是一个去中心化应用；目前已基本开发完成；但上面几个文档大部分内容是旧的，其中有些可能需要更新；请你阅读项目的各个部分的重要代码，了解其逻辑，然后对上面几个文件中有必要的地方进行更新，更新应当克制，避免大段增加或修改；仅当确实有必要增加时才增加，描述有误或不准确时才修改；确保整体指导性强，言简意赅；  
+Claude: 已完成
+

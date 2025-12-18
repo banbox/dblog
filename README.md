@@ -24,11 +24,15 @@ dblog/
 
 ## 智能合约设计
 标准：ERC-1155和ERC-2981（二手交易版税）
-特性：可升级、支持打赏&NFT、版权、易读签名
+特性：可升级、支持打赏&NFT、版权、易读签名、文章编辑、用户资料更新
 采用 ERC-4337 账户抽象实现去中心化代付，结合 Session Keys 实现无感交互体验。
-业务函数有两类（以evaluate为例）：
-* evaluate: MetaMask / EOA 普通用户，使用原生 ETH 支付
-* evaluateWithSessionKey: 高频交互用户，使用"临时密钥"签名 + 原生 ETH 支付
+核心功能：
+* publish: 发布文章（支持原创/转载标记、收藏价格、版税）
+* evaluate: 评价文章（点赞/踩/打赏）、评论、关注
+* collect: 收藏文章NFT
+* editArticle: 编辑文章元数据（标题、摘要、分类）
+* updateUserProfile: 更新用户资料（昵称、头像、简介）
+所有操作支持 Session Key 无感交互（无需每次 MetaMask 签名）
 
 ## SubSquid索引设计
 只索引“关系”和“状态”，不索引文章全文。文章的标题、摘要等 Metadata 由前端获取 Arweave Hash 后在客户端（或 SSR 层）懒加载，或者由 Indexer 的 Worker 异步获取。 为了简化 MVP，我们采用前端懒加载策略，Indexer 只存 Hash。

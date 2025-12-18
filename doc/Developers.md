@@ -137,10 +137,14 @@ npx tsc
 
 - **ArticlePublished** - 文章发布，创建 Article 和 User 实体
 - **ArticleEvaluated** - 文章评价（点赞/踩/打赏），更新统计数据
+- **ArticleCollected** - 文章收藏（NFT），记录收藏关系
 - **CommentAdded** - 评论添加
+- **CommentLiked** - 评论点赞
 - **FollowStatusChanged** - 关注状态变更
+- **ArticleEdited** - 文章编辑（标题、摘要、分类）
+- **UserProfileUpdated** - 用户资料更新
 
-Processor 配置位于 `src/processor.ts`，订阅 BlogHub 合约事件（包含 `ArticleCollected`）。
+Processor 配置位于 `src/processor.ts`，订阅 BlogHub 合约的所有核心事件。
 
 
 ### 3.2 本地运行测试
@@ -414,12 +418,12 @@ SvelteKit 前端使用 viem 直接与钱包和合约交互，无需 wagmi 封装
 > 📁 **实现文件**: [frontend/src/lib/contracts.ts](../frontend/src/lib/contracts.ts)
 
 包含以下功能：
-- `publishToContract()` - 发布文章到合约
-- `evaluateArticle()` - 评价文章（点赞/踩/打赏）
-- `followUser()` - 关注/取消关注用户
-- `getArticle()` - 读取文章信息
-- `EvaluationScore` - 评分枚举（Neutral=0, Like=1, Dislike=2）
-- `ArticleData` - 文章数据接口
+- `publishToContract()` / `publishToContractWithSessionKey()` - 发布文章到合约
+- `evaluateArticle()` / `evaluateArticleWithSessionKey()` - 评价文章（点赞/踩/打赏）
+- `followUser()` / `followUserWithSessionKey()` - 关注/取消关注用户
+- `collectArticle()` / `collectArticleWithSessionKey()` - 收藏文章 NFT
+- `editArticle()` / `editArticleWithSessionKey()` - 编辑文章元数据
+- `updateUserProfile()` / `updateUserProfileWithSessionKey()` - 更新用户资料
 - `ContractError` - 合约错误类（支持 i18n 错误码）
 
 ---
@@ -453,6 +457,9 @@ const ALLOWED_SELECTORS: `0x${string}`[] = [
   '0x8d3c100a'  // collect
 ];
 
+// Session Key 有效期：7 天
+const SESSION_KEY_DURATION = 7 * 24 * 60 * 60; // 604800 秒
+
 // 默认消费额度 (10 ETH)
 const DEFAULT_SPENDING_LIMIT = BigInt('10000000000000000000');
 ```
@@ -480,18 +487,23 @@ const DEFAULT_SPENDING_LIMIT = BigInt('10000000000000000000');
 - 支持 Markdown 内容编辑
 - 封面图片上传预览
 - 分类选择器组件 (SearchSelect)
-- 完整的发布流程：上传到 Arweave → 发布到合约
+- 原创标记选择（Original/SemiOriginal/Reprint）
+- 版税设置（0-100%）
+- 收藏价格和最大收藏数量配置
+- 完整的发布流程：获取/创建 Session Key → 上传到 Arweave → 发布到合约
 - i18n 国际化支持
 - 合约错误处理与友好提示
+- Session Key 自动创建和余额检查
 
 ### 11.3 发布流程编排
 
 > 📁 **实现文件**: [frontend/src/lib/publish.ts](../frontend/src/lib/publish.ts)
 
-发布流程分三步：
-1. 上传封面图片到 Arweave（如有）
-2. 上传文章内容到 Arweave
-3. 调用合约 `publish()` 方法记录链上
+发布流程分四步：
+1. 获取或创建 Session Key（若无有效的则创建新的，需一次 MetaMask 签名）
+2. 检查 Session Key 余额（若不足则自动补充）
+3. 上传文章文件夹到 Arweave（包含内容、摘要、封面图片）
+4. 调用合约 `publish()` 方法记录链上（使用 Session Key 签名，无需 Gas 费）
 
 ### 11.4 文章详情页
 
@@ -503,15 +515,18 @@ const DEFAULT_SPENDING_LIMIT = BigInt('10000000000000000000');
 
 > **重要**: 文章使用 ArweaveID 作为主键标识符（而非链上自增 articleId），这样可以：
 > - 保持与 Arweave 存储的稳定对应关系
+> - 支持文章编辑后的元数据更新
 
 功能：
-- 从 SubSquid 获取文章元数据（标题、作者、统计等）
-- 从 Arweave 获取文章内容（带本地缓存）
+- 从 SubSquid 获取文章元数据（标题、作者、统计、分类、原创标记等）
+- 从 Arweave 获取文章内容（带本地缓存，24小时 TTL）
 - 响应式布局，支持移动端
-- 显示封面图、分类、作者信息
-- 文章统计（点赞、踩、打赏）
+- 显示封面图、分类、作者信息、原创标记
+- 文章统计（点赞、踩、打赏、收藏数）
+- 评论和评价展示
 - 分享功能（Web Share API / 复制链接）
 - 链上信息展示（区块号、交易哈希）
+- 收藏功能（NFT）
 
 ### 11.5 GraphQL 查询
 
@@ -522,28 +537,6 @@ const DEFAULT_SPENDING_LIMIT = BigInt('10000000000000000000');
 - `ALL_ARTICLES_QUERY` - 分页获取所有文章
 - `ARTICLE_BY_ID_QUERY` - 根据 ID 获取单篇文章详情
 - `ARTICLE_COUNT_QUERY` - 获取文章总数
-
----
-
-## 前端集成指南
-
-### 合约 ABI 导出
-
-SvelteKit 前端在 `$lib/contracts.ts` 中直接定义了所需的 ABI，无需单独导出文件。如果需要完整 ABI：
-
-```bash
-# 导出 ABI 文件
-cd contracts
-forge build
-
-# ABI 文件位置:
-# - out/BlogHub.sol/BlogHub.json
-# - out/BlogPaymaster.sol/BlogPaymaster.json
-# - out/SessionKeyManager.sol/SessionKeyManager.json
-
-# 提取纯 ABI (可选)
-cat out/BlogHub.sol/BlogHub.json | jq '.abi' > ../frontend/src/lib/abi/BlogHub.json
-```
 
 ---
 

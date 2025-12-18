@@ -315,19 +315,4 @@
 			{/if}
 		</div>
 	</div>
-
-	<!-- App Info -->
-	<div class="mt-8 rounded-lg border border-gray-200 bg-gray-50 p-4">
-		<h3 class="text-sm font-medium text-gray-700">{getLabel('app_info')}</h3>
-		<div class="mt-2 grid grid-cols-2 gap-4 text-sm text-gray-600">
-			<div>
-				<span class="text-gray-500">{getLabel('app_name')}:</span>
-				<span class="ml-2 font-medium">DBlog</span>
-			</div>
-			<div>
-				<span class="text-gray-500">{getLabel('version')}:</span>
-				<span class="ml-2 font-medium">1.0.0</span>
-			</div>
-		</div>
-	</div>
 </div>

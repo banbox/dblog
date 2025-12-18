@@ -107,17 +107,26 @@ cast call 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512 "sessionKeyManager()(addres
 ### 3.1 发布文章
 
 ```bash
-# publish(string arweaveId, uint64 categoryId, uint96 royaltyBps, string originalAuthor, string title, address trueAuthor, uint256 collectPrice, uint256 maxCollectSupply, uint8 originality)
-# originalAuthor 为展示用的原作者信息（最大 64 字节）
-# title 为文章标题（最大 128 字节）
-# trueAuthor = 0x0 表示真实作者为发布者（用于收款/版税）
+# publish(string arweaveId, uint64 categoryId, uint96 royaltyBps, string originalAuthor, string title, string summary, address trueAuthor, uint256 collectPrice, uint256 maxCollectSupply, uint8 originality)
+# arweaveId: Irys 可变文件夹的 manifest ID（作为文章唯一标识）
+# categoryId: 分类 ID
+# royaltyBps: 版税（基点，100 = 1%，最高 10000 = 100%）
+# originalAuthor: 原作者名称（最大 64 字节）
+# title: 文章标题（最大 128 字节）
+# summary: 文章摘要（最大 512 字节）
+# trueAuthor: 真实作者地址，0x0 表示发布者为作者
+# collectPrice: 收藏价格（0 表示不可收藏）
+# maxCollectSupply: 最大收藏数量
+# originality: 原创标记（0=Original, 1=SemiOriginal, 2=Reprint）
+
 cast send 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9 \
-  "publish(string,uint64,uint96,string,string,address,uint256,uint256,uint8)(uint256)" \
+  "publish(string,uint64,uint96,string,string,string,address,uint256,uint256,uint8)(uint256)" \
   "QmTestArweaveHash987654321" \
   1 \
   500 \
   "RealAuthor.eth" \
   "Web3 Development Guide" \
+  "Learn Web3 development from scratch" \
   0x0000000000000000000000000000000000000000 \
   0 \
   0 \
@@ -128,19 +137,18 @@ cast send 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9 \
 # 验证文章创建
 cast call 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9 "nextArticleId()(uint256)" --rpc-url http://localhost:8545
 # 应返回 2（下一个文章ID）
-
-# 查看文章详情
-cast call 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9 \
-  "articles(uint256)(address,uint64,uint16,uint8,uint96,uint32,uint32,string)" \
-  1 \
-  --rpc-url http://localhost:8545
 ```
 
-### 3.2 评价文章（带打赏）
+### 3.2 评价文章（点赞/踩/打赏）
 
 ```bash
 # evaluate(uint256 articleId, uint8 score, string content, address referrer, uint256 parentCommentId)
 # score: 0=中立, 1=喜欢, 2=不喜欢
+# content: 评论内容（可为空）
+# referrer: 推荐人地址（可为 0x0）
+# parentCommentId: 父评论 ID（顶级评论为 0）
+
+# 点赞（带打赏）
 cast send 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9 \
   "evaluate(uint256,uint8,string,address,uint256)" \
   1 \
@@ -152,34 +160,78 @@ cast send 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9 \
   --private-key 0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a \
   --rpc-url http://localhost:8545
 
-# 注意：支付金额会按平台费/推荐费规则分配，作者无需提取
+# 注意：支付金额会按平台费/推荐费规则分配
 ```
 
 ### 3.3 评论（需支付最小金额）
 
 ```bash
-# 评论内容不为空时需要支付金额 >= minActionValue（默认 0.00002 ether）
+# 评论内容不为空时需要支付金额 >= minActionValue（默认 0.0001 ether）
 cast send 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9 \
   "evaluate(uint256,uint8,string,address,uint256)" \
   1 \
   0 \
-  "This is a comment without tip" \
+  "This is a comment" \
   0x0000000000000000000000000000000000000000 \
   0 \
-  --value 0.00002ether \
+  --value 0.0001ether \
   --private-key 0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a \
   --rpc-url http://localhost:8545
 ```
 
-### 3.4 关注用户
+### 3.4 收藏文章（NFT）
 
 ```bash
+# collect(uint256 articleId, uint256 amount)
+# 收藏文章 NFT，amount 为收藏数量
+cast send 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9 \
+  "collect(uint256,uint256)" \
+  1 \
+  1 \
+  --value 0.01ether \
+  --private-key 0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a \
+  --rpc-url http://localhost:8545
+```
+
+### 3.5 关注用户
+
+```bash
+# follow(address target, bool isFollowing)
 # User2 关注 User1
 cast send 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9 \
   "follow(address,bool)" \
   0x70997970C51812dc3A010C7d01b50e0d17dc79C8 \
   true \
   --private-key 0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a \
+  --rpc-url http://localhost:8545
+```
+
+### 3.6 编辑文章
+
+```bash
+# editArticle(uint256 articleId, string originalAuthor, string title, string summary, uint64 categoryId)
+# 仅可编辑元数据，arweaveId 和 author 不可修改
+cast send 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9 \
+  "editArticle(uint256,string,string,string,uint64)" \
+  1 \
+  "Updated Author" \
+  "Updated Title" \
+  "Updated summary" \
+  2 \
+  --private-key 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d \
+  --rpc-url http://localhost:8545
+```
+
+### 3.7 更新用户资料
+
+```bash
+# updateUserProfile(string nickname, string avatar, string bio)
+cast send 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9 \
+  "updateUserProfile(string,string,string)" \
+  "MyNickname" \
+  "QmAvatarHash" \
+  "My bio here" \
+  --private-key 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d \
   --rpc-url http://localhost:8545
 ```
 
@@ -198,14 +250,16 @@ Session Key 允许用户授权临时密钥执行特定操作，实现无感交�
 
 # 获取当前时间戳
 CURRENT_TIME=$(cast block latest --rpc-url http://localhost:8545 | grep timestamp | awk '{print $2}')
-VALID_UNTIL=$((CURRENT_TIME + 86400))  # 24小时后过期
+VALID_UNTIL=$((CURRENT_TIME + 604800))  # 7天后过期
 
-# 函数选择器:
+# 允许的函数选择器:
 # evaluate: 0xff1f090a
 # likeComment: 0xdffd40f2
 # follow: 0x63c3cc16
 # publish: 0xe7628e4d
 # collect: 0x8d3c100a
+# editArticle: 0x... (需查询)
+# updateUserProfile: 0x... (需查询)
 
 # registerSessionKey(address sessionKey, uint48 validAfter, uint48 validUntil, address allowedContract, bytes4[] allowedSelectors, uint256 spendingLimit)
 cast send 0x5FbDB2315678afecb367f032d93F642f64180aa3 \
@@ -214,8 +268,8 @@ cast send 0x5FbDB2315678afecb367f032d93F642f64180aa3 \
   $CURRENT_TIME \
   $VALID_UNTIL \
   0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9 \
-  "[0xff1f090a,0xdffd40f2,0x63c3cc16]" \
-  1000000000000000000 \
+  "[0xff1f090a,0xdffd40f2,0x63c3cc16,0xe7628e4d,0x8d3c100a]" \
+  10000000000000000000 \
   --private-key 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d \
   --rpc-url http://localhost:8545
 ```
@@ -537,32 +591,46 @@ forge script script/Deploy.s.sol \
 
 | 函数 | 选择器 |
 |------|--------|
-| `publish(string,uint64,uint96,string,string,address,uint256,uint256,uint8)` | `0x...` |
+| `publish(string,uint64,uint96,string,string,string,address,uint256,uint256,uint8)` | `0xe7628e4d` |
 | `evaluate(uint256,uint8,string,address,uint256)` | `0xff1f090a` |
 | `likeComment(uint256,uint256,address,address)` | `0xdffd40f2` |
 | `follow(address,bool)` | `0x63c3cc16` |
-| `publish` | `0xe7628e4d` |
-| `collect` | `0x8d3c100a` |
+| `collect(uint256,uint256)` | `0x8d3c100a` |
+| `editArticle(uint256,string,string,string,uint64)` | `0x...` |
+| `updateUserProfile(string,string,string)` | `0x...` |
 
 ```bash
 # 获取函数选择器
 cast sig "evaluate(uint256,uint8,string,address,uint256)"
+cast sig "publish(string,uint64,uint96,string,string,string,address,uint256,uint256,uint8)"
 ```
 
 ### B. 事件签名
 
 ```bash
 # ArticlePublished
-cast sig-event "ArticlePublished(uint256,address,uint256,string,string,string,uint256,address,uint256,uint256,uint8)"
+cast sig-event "ArticlePublished(uint256,address,uint256,string,string,string,string,address,uint256,uint256,uint8)"
 
 # ArticleEvaluated
-cast sig-event "ArticleEvaluated(uint256,address,uint8,uint256,uint256)"
+cast sig-event "ArticleEvaluated(uint256,address,uint8,uint256)"
+
+# ArticleCollected
+cast sig-event "ArticleCollected(uint256,address,uint256,uint256)"
 
 # CommentAdded
 cast sig-event "CommentAdded(uint256,address,string,uint256,uint8)"
 
+# CommentLiked
+cast sig-event "CommentLiked(uint256,uint256,address,address,uint256)"
+
 # FollowStatusChanged
 cast sig-event "FollowStatusChanged(address,address,bool)"
+
+# ArticleEdited
+cast sig-event "ArticleEdited(uint256,string,string,string,uint64)"
+
+# UserProfileUpdated
+cast sig-event "UserProfileUpdated(address,string,string,string)"
 ```
 
 ### C. 有用的 Cast 命令
