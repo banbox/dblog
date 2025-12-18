@@ -576,3 +576,262 @@ export async function uploadArticleFolderWithSessionKey(
 	const ownerAddress = getSessionKeyOwner(sessionKey);
 	return uploadArticleFolderWithUploader(uploader as unknown as IrysUploader, params, ownerAddress);
 }
+
+// ============================================================
+//                  文章更新功能（Irys Mutable Folders）
+// ============================================================
+
+/** 文章更新参数 */
+export interface ArticleFolderUpdateParams {
+	title: string;
+	summary: string;
+	content: string;         // Markdown 内容
+	coverImage?: File;       // 新封面图片（可选，不提供则保留原有）
+	tags: string[];
+	keepExistingCover?: boolean; // 是否保留现有封面（默认 true）
+}
+
+/** 文章更新结果 */
+export interface ArticleFolderUpdateResult {
+	newManifestTxId: string;  // 新的 manifest 交易 ID（用于 Root-TX 链）
+	indexTxId: string;        // 新的 index.md 交易 ID
+	coverImageTxId?: string;  // 新的 coverImage 交易 ID（如果更新了封面）
+}
+
+/**
+ * 使用指定 uploader 更新文章文件夹（Irys Mutable Folders）
+ * 通过 Root-TX 标签实现可变引用更新
+ * 
+ * @param uploader - Irys uploader 实例
+ * @param originalManifestId - 原始文章的 manifest ID（用作 Root-TX）
+ * @param params - 文章更新参数
+ * @param paidBy - 可选，付费账户地址（Balance Approvals 机制）
+ */
+export async function updateArticleFolderWithUploader(
+	uploader: IrysUploader,
+	originalManifestId: string,
+	params: ArticleFolderUpdateParams,
+	paidBy?: string
+): Promise<ArticleFolderUpdateResult> {
+	const { title, summary, content, coverImage, tags: articleTags, keepExistingCover = true } = params;
+
+	// Debug: log cover image params
+	console.log('Update article params:', {
+		hasCoverImage: !!coverImage,
+		coverImageSize: coverImage?.size,
+		keepExistingCover,
+		originalManifestId
+	});
+
+	// Step 1: 上传新的文章内容（index.md）
+	console.log('Uploading updated article content (index.md)...');
+	const indexTxId = await uploadMarkdownContent(uploader, content, title, articleTags, paidBy);
+
+	// Step 2: 处理封面图片
+	let coverImageTxId: string | undefined;
+	if (coverImage) {
+		// 上传新封面
+		console.log('Uploading new cover image...');
+		coverImageTxId = await uploadCoverImageFile(uploader, coverImage, paidBy);
+	} else if (keepExistingCover) {
+		// 保留现有封面 - 从原始 manifest 获取
+		try {
+			const { downloadManifest, ARTICLE_COVER_IMAGE_FILE } = await import('./folder');
+			console.log('Fetching original manifest to get existing cover...');
+			const originalManifest = await downloadManifest(originalManifestId);
+			console.log('Original manifest paths:', Object.keys(originalManifest.paths));
+			coverImageTxId = originalManifest.paths[ARTICLE_COVER_IMAGE_FILE]?.id;
+			console.log('Existing cover TX ID:', coverImageTxId || '(none found)');
+		} catch (e) {
+			console.warn('Failed to get existing cover image, will skip:', e);
+		}
+	} else {
+		console.log('keepExistingCover is false and no new cover provided, cover will be removed');
+	}
+
+	// Step 3: 生成新的 manifest
+	console.log('Creating updated article folder manifest...');
+	const files = new Map<string, string>();
+	files.set(ARTICLE_INDEX_FILE, indexTxId);
+	if (coverImageTxId) {
+		files.set(ARTICLE_COVER_IMAGE_FILE, coverImageTxId);
+	}
+	
+	// Debug: 显示 manifest 将包含的文件
+	console.log('Manifest files:', {
+		[ARTICLE_INDEX_FILE]: indexTxId,
+		[ARTICLE_COVER_IMAGE_FILE]: coverImageTxId || '(none)'
+	});
+
+	// 使用 SDK 的 generateFolder 生成 manifest
+	const manifest = await generateArticleFolderManifest(uploader, files, ARTICLE_INDEX_FILE);
+	
+	// Debug: 显示生成的 manifest 内容
+	console.log('Generated manifest:', JSON.stringify(manifest, null, 2));
+
+	// Step 4: 上传更新的 manifest（带 Root-TX 标签指向原始 manifest）
+	const manifestTags: IrysTag[] = [
+		{ name: 'Article-Title', value: title },
+		{ name: 'Article-Summary', value: summary.substring(0, 200) },
+		...articleTags.map((tag) => ({ name: 'Article-Tag', value: tag }))
+	];
+
+	// 如果没有 paidBy，需要确保余额
+	if (!paidBy) {
+		const manifestData = JSON.stringify(manifest);
+		const manifestSize = new TextEncoder().encode(manifestData).length;
+		const hasBalance = await ensureIrysBalance(uploader, manifestSize);
+		if (!hasBalance) {
+			throw new Error('Failed to fund Irys for manifest. Please try again.');
+		}
+	}
+
+	// 使用 uploadUpdatedManifest 添加 Root-TX 标签
+	const { uploadUpdatedManifest } = await import('./folder');
+	const newManifestTxId = await uploadUpdatedManifestWithPayer(
+		uploader, 
+		manifest, 
+		originalManifestId, 
+		manifestTags,
+		paidBy
+	);
+
+	console.log(`Article folder updated:`);
+	console.log(`  - Original Manifest: ${originalManifestId}`);
+	console.log(`  - New Manifest TX: ${newManifestTxId}`);
+	console.log(`  - New Index TX: ${indexTxId}`);
+	console.log(`  - Mutable URL: https://gateway.irys.xyz/mutable/${originalManifestId}`);
+	
+	// 验证步骤：对比直接获取和 mutable URL 获取的 manifest
+	try {
+		const { getArweaveGateways } = await import('$lib/config');
+		const gateways = getArweaveGateways();
+		const gateway = gateways[0];
+		
+		// 1. 直接获取新上传的 manifest
+		const directUrl = `${gateway}/${newManifestTxId}`;
+		console.log(`Verifying: fetching new manifest directly from ${directUrl}`);
+		const directResponse = await fetch(directUrl, {
+			headers: { 'Accept': 'application/x.irys-manifest+json' }
+		});
+		if (directResponse.ok) {
+			const directManifest = await directResponse.json();
+			console.log(`Direct manifest index.md TX:`, directManifest.paths?.['index.md']?.id);
+		}
+		
+		// 2. 通过 mutable URL 获取 manifest
+		const mutableUrl = `${gateway}/mutable/${originalManifestId}?_t=${Date.now()}`;
+		console.log(`Verifying: fetching via mutable URL ${mutableUrl}`);
+		const mutableResponse = await fetch(mutableUrl, {
+			headers: { 'Accept': 'application/x.irys-manifest+json' },
+			cache: 'no-store'
+		});
+		if (mutableResponse.ok) {
+			const mutableManifest = await mutableResponse.json();
+			console.log(`Mutable manifest index.md TX:`, mutableManifest.paths?.['index.md']?.id);
+			
+			// 对比是否相同
+			const directIndexId = (await (await fetch(directUrl, { headers: { 'Accept': 'application/x.irys-manifest+json' } })).json()).paths?.['index.md']?.id;
+			if (directIndexId === mutableManifest.paths?.['index.md']?.id) {
+				console.log('✓ Mutable URL returns the latest manifest');
+			} else {
+				console.warn('⚠ Mutable URL returns OLD manifest! Expected:', directIndexId, 'Got:', mutableManifest.paths?.['index.md']?.id);
+			}
+		}
+	} catch (e) {
+		console.warn('Verification failed:', e);
+	}
+
+	return {
+		newManifestTxId,
+		indexTxId,
+		coverImageTxId
+	};
+}
+
+/**
+ * 上传更新的 manifest（带 paidBy 参数）
+ */
+async function uploadUpdatedManifestWithPayer(
+	uploader: IrysUploader,
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	manifest: any,
+	originalManifestId: string,
+	customTags: IrysTag[] = [],
+	paidBy?: string
+): Promise<string> {
+	const appName = getAppName();
+	const appVersion = getAppVersion();
+	const manifestData = JSON.stringify(manifest);
+	const dataSize = new TextEncoder().encode(manifestData).length;
+
+	// Check if within Irys free limit
+	const isFreeUpload = isWithinIrysFreeLimit(dataSize);
+	const effectivePaidBy = isFreeUpload ? undefined : paidBy;
+
+	const tags: IrysTag[] = [
+		{ name: 'Type', value: 'manifest' },
+		{ name: 'Content-Type', value: 'application/x.irys-manifest+json' },
+		{ name: 'Root-TX', value: originalManifestId }, // 关键：指向原始 manifest
+		{ name: 'App-Name', value: appName },
+		{ name: 'App-Version', value: appVersion },
+		...customTags
+	];
+	
+	// Debug: 显示上传的标签
+	console.log('Manifest upload tags:', tags.map(t => `${t.name}=${t.value}`).join(', '));
+	console.log('Manifest data being uploaded:', manifestData);
+
+	const uploadOptions = effectivePaidBy
+		? { tags, upload: { paidBy: effectivePaidBy } }
+		: { tags };
+
+	const receipt = await uploader.upload(manifestData, uploadOptions);
+	console.log(`Updated manifest uploaded:`);
+	console.log(`  - New Manifest TX: ${receipt.id}`);
+	console.log(`  - Root-TX (original): ${originalManifestId}`);
+	console.log(`  - Mutable URL: https://gateway.irys.xyz/mutable/${originalManifestId}`);
+	console.log(`  - Direct URL: https://gateway.irys.xyz/${receipt.id}`);
+	return receipt.id;
+}
+
+/**
+ * 更新文章文件夹到 Arweave（普通钱包模式）
+ * @param originalManifestId - 原始文章的 manifest ID
+ * @param params - 文章更新参数
+ * @param network - 网络类型（默认 devnet）
+ */
+export async function updateArticleFolder(
+	originalManifestId: string,
+	params: ArticleFolderUpdateParams,
+	network: IrysNetwork = 'devnet'
+): Promise<ArticleFolderUpdateResult> {
+	const uploader = network === 'mainnet' ? await getIrysUploader() : await getIrysUploaderDevnet();
+	return updateArticleFolderWithUploader(uploader, originalManifestId, params);
+}
+
+/**
+ * 使用 Session Key 更新文章文件夹到 Arweave（无需 MetaMask 签名）
+ * @param sessionKey - 存储的 Session Key 数据
+ * @param originalManifestId - 原始文章的 manifest ID
+ * @param params - 文章更新参数
+ * @param network - 网络类型（默认 devnet）
+ */
+export async function updateArticleFolderWithSessionKey(
+	sessionKey: StoredSessionKey,
+	originalManifestId: string,
+	params: ArticleFolderUpdateParams,
+	network: IrysNetwork = 'devnet'
+): Promise<ArticleFolderUpdateResult> {
+	if (!isSessionKeyValid(sessionKey)) {
+		throw new Error('Session key is invalid or expired');
+	}
+
+	const uploader =
+		network === 'mainnet'
+			? await getSessionKeyIrysUploader(sessionKey)
+			: await getSessionKeyIrysUploaderDevnet(sessionKey);
+
+	const ownerAddress = getSessionKeyOwner(sessionKey);
+	return updateArticleFolderWithUploader(uploader as unknown as IrysUploader, originalManifestId, params, ownerAddress);
+}

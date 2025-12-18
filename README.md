@@ -46,5 +46,4 @@ Web3交互：viem + @wagmi/core
 
 ## TODO
 * 文章历史版本查看
-* 文章编辑
 * 搜索功能

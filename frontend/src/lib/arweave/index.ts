@@ -70,7 +70,13 @@ export {
 	// 文章文件夹上传功能
 	uploadArticleFolder,
 	uploadArticleFolderWithUploader,
-	uploadArticleFolderWithSessionKey
+	uploadArticleFolderWithSessionKey,
+	// 文章更新功能（Irys Mutable Folders）
+	updateArticleFolder,
+	updateArticleFolderWithUploader,
+	updateArticleFolderWithSessionKey,
+	type ArticleFolderUpdateParams,
+	type ArticleFolderUpdateResult
 } from './upload';
 
 // 获取内容

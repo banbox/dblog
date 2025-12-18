@@ -12,7 +12,7 @@ import * as blogHub from './abi/BlogHub'
 // BlogHub 合约地址
 // Optimism Sepolia: 0x... (部署后填写)
 // Local Anvil:
-const BLOG_HUB_ADDRESS = '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9'
+const BLOG_HUB_ADDRESS = (process.env.BLOG_HUB_ADDRESS || '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9').toLowerCase()
 
 export const processor = new EvmBatchProcessor()
     // Lookup archive by the network name in Subsquid registry
@@ -59,6 +59,7 @@ export const processor = new EvmBatchProcessor()
             blogHub.events.FollowStatusChanged.topic,
             blogHub.events.ArticleCollected.topic,
             blogHub.events.UserProfileUpdated.topic,
+            blogHub.events.ArticleEdited.topic,
         ],
     })
 

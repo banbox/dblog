@@ -28,18 +28,50 @@ interface IrysManifest {
 }
 
 /**
- * 从 Irys 网关下载原始 manifest
- * @param manifestId - Manifest 交易 ID
+ * 从 Irys 网关下载 manifest
+ * 对于 mutable folders，默认使用 /mutable/ 路径获取最新版本
+ * 使用 Accept 头请求 manifest 内容类型，避免网关返回 index 文件内容
+ * @param manifestId - Manifest 交易 ID（对于 mutable folders，是 Root manifest ID）
+ * @param useMutable - 是否使用 mutable URL 获取最新版本（默认 true）
  */
-export async function downloadManifest(manifestId: string): Promise<IrysManifest> {
+export async function downloadManifest(manifestId: string, useMutable = true): Promise<IrysManifest> {
 	const gateways = getArweaveGateways();
+	// 添加时间戳参数绕过网关缓存
+	const cacheBuster = `?_t=${Date.now()}`;
 	
 	for (const gateway of gateways) {
 		try {
-			const response = await fetch(`${gateway}/${manifestId}`);
+			// 对于 mutable folders，使用 /mutable/ 路径获取最新版本的 manifest
+			// 否则使用直接路径获取原始 manifest
+			const url = useMutable 
+				? `${gateway}/mutable/${manifestId}${cacheBuster}`
+				: `${gateway}/${manifestId}${cacheBuster}`;
+			
+			// 使用 Accept 头请求 manifest JSON
+			// 当 manifest 设置了 indexFile 时，直接访问会返回 index 文件内容
+			// 通过指定 Accept 头可以获取原始 manifest
+			const response = await fetch(url, {
+				headers: {
+					'Accept': 'application/x.irys-manifest+json'
+				},
+				// 绕过浏览器缓存
+				cache: 'no-store'
+			});
 			if (!response.ok) continue;
 			
+			const contentType = response.headers.get('content-type') || '';
+			// 验证返回的是 manifest JSON 而不是其他内容
+			if (!contentType.includes('json') && !contentType.includes('manifest')) {
+				console.warn(`Gateway ${gateway} returned non-manifest content type: ${contentType}`);
+				continue;
+			}
+			
 			const manifest = await response.json();
+			// 验证是有效的 manifest 结构
+			if (!manifest.paths || typeof manifest.paths !== 'object') {
+				console.warn(`Gateway ${gateway} returned invalid manifest structure`);
+				continue;
+			}
 			return manifest as IrysManifest;
 		} catch (error) {
 			console.warn(`Gateway ${gateway} failed to fetch manifest:`, error);
@@ -71,22 +103,29 @@ export async function generateArticleFolderManifest(
 }
 
 /**
- * 手动创建文章文件夹 manifest（仅用于向后兼容或特殊情况）
- * @deprecated 推荐使用 generateArticleFolderManifest
+ * 手动创建文章文件夹 manifest
  * @param files - 文件映射 (文件名 -> 交易ID)
+ * @param indexFile - 可选的默认文件路径
  */
-export function createArticleFolderManifest(files: Map<string, string>): IrysManifest {
+export function createArticleFolderManifest(files: Map<string, string>, indexFile?: string): IrysManifest & { index?: { path: string } } {
 	const paths: Record<string, { id: string }> = {};
 	
 	files.forEach((txId, fileName) => {
 		paths[fileName] = { id: txId };
 	});
 	
-	return {
+	const manifest: IrysManifest & { index?: { path: string } } = {
 		manifest: 'irys:manifest',
 		version: '0.1.0',
 		paths
 	};
+	
+	// 添加 index 属性指定默认文件
+	if (indexFile) {
+		manifest.index = { path: indexFile };
+	}
+	
+	return manifest;
 }
 
 /**

@@ -68,6 +68,9 @@ export class Article {
     @DateTimeColumn_({nullable: false})
     createdAt!: Date
 
+    @DateTimeColumn_({nullable: true})
+    editedAt!: Date | undefined | null
+
     @IntColumn_({nullable: false})
     blockNumber!: number
 

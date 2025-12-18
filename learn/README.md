@@ -862,3 +862,40 @@ Claude：两轮交互执行些命令检查后确认是BlogHub 合约中的 sessi
 
 #### 2025-12-16 22:10  评论组件的用户信息更新
 @Developers.md @README.md 参考 frontend\src\lib\components\Sidebar.svelte 中的用户头像和昵称实现方式，帮我对 frontend\src\lib\components\CommentSection.svelte 中的用户头像和昵称显示等进行同步更新；  
+Claude： 已解决
+
+#### 2025-12-17 15:43  点赞后作者信息bug
+@Developers.md @contracts.md @README.md 我发现一个文章刚发布的时候，列表和详情页能正常显示作者的昵称和头像，当有人点赞后，昵称不见了，头像也不见了，可能哪里有bug，请帮我分析相关代码，排查并解决  
+Claude: 已解决；在 squid/src/main.ts 中，处理点赞等事件时，从数据库获取文章时没有加载 author 关系
+
+#### 2025-12-17 16:07  编辑功能问题
+@Developers.md @contracts.md @README.md 
+当前的文章编辑功能有问题，编辑后我没更新图片，但编辑成功后图片消失了；另外就是修改的标题和内容并未生效，下面是控制台输出；请阅读相关代码，帮我分析问题并解决；注意未修改的应保持旧内容不变  
+Claude：已解决  
+开发者：问题依旧，并未解决，请阅读  doc\IRYS.md ，根据irys相关接口，分析定位问题，再次尝试解决  
+Claude：已解决
+开发者：测试通过
+
+#### 2025-12-17 20:37  编辑标题未生效
+@Developers.md @contracts.md @README.md 当前刚支持了文章编辑功能，同时支持了irys和区块链上事件的编辑；不过目前我发现，对于标题和作者，类别等修改后，并未生效；我已经执行了智能合约的更新；并且对squid执行了 Developers.md 中的112-164行命令重新构建和运行；请查看相关代码，帮我继续分析排查原因并解决  
+Claude: 只更新了Arweave，没调用智能合约editArticle，已修复
+
+#### 2025-12-17 11:00  编辑时Session过期错误
+@Developers.md @contracts.md @README.md 
+我在编辑文章保存时，出现下面的错误；当前项目的要求时，当临时的Session Key无效或过期时，应当自动弹出Metamask要求用户签署新的，而不是出现错误；请帮我梳理阅读相关代码，定位问题原因并解决  
+Claude: 已解决
+
+#### 2025-12-17 12:00  图片和内容更新失败
+@README.md @Developers.md  @IRYS.md 当前文章编辑功能，我发现在编辑文章时，如果未修改封面图片，编辑保存后，图片消失不见了，请帮我查找相关逻辑，排查定位分析问题，并解决  
+Claude：downloadManifest 函数使用 ${gateway}/${manifestId} 获取的是原始 manifest，而不是 mutable folder 的最新版本。已修复  
+开发者：现在你修改后，图片未编辑时能显示之前的了；但是我发现内容还是有问题，显示的是倒数第二个版本的内容；比如标题和内容都依次改为“版本1”，“版本2”，“版本3”，“版本4”；修改后我发现始终是标题版本2和内容版本1，标题版本3对内容版本2，标题版本4对内容版本3；请帮我分析定位问题原因并解决  
+Claude：浏览器缓存：fetch() 默认会缓存响应 Irys 网关缓存：网关可能缓存了旧版本的 mutable folder 解析结果  
+开发者：问题依旧，标题和内容都改为“版本5”，保存后，标题版本5，内容版本4；请继续排查；可能需要重点关注irys的用法： @IRYS.md   
+Claude：Session Key 地址不同导致 Irys mutable chain 断裂。Irys mutable references 要求更新必须由相同的钱包地址签名。方案： 1. 通过 GraphQL 查询所有带 Root-TX = originalManifestId 标签的交易; 2. 按时间戳降序排列，获取最新的 manifest TX ID 3. 直接使用该 TX ID 获取内容  
+开发者：现在我编辑保存后，出现下面的错误，请继续排查解决：
+Failed to fetch article content: Error: Failed to fetch index.md from folder  
+Claude：修复完成  
+开发者：你这次修改后，直接显示最初版本的内容了，严重错误，请回滚错误的修复，重新定位修复  
+Claude： manifest 生成的部分恢复使用 SDK 的 generateFolder 方法，而不是手动创建  
+开发者：已解决
+

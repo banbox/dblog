@@ -117,8 +117,10 @@ export function clearOldCache(): void {
  * @param manifestId - Manifest ID
  */
 async function fetchArticleFromFolder(manifestId: string): Promise<ArticleMetadata> {
-	// 获取 markdown 内容
-	const content = await fetchArticleMarkdown(manifestId, false);
+	// 获取 markdown 内容（使用 mutable URL 以获取最新版本）
+	console.log(`Fetching article content from mutable URL: ${manifestId}`);
+	const content = await fetchArticleMarkdown(manifestId, true);
+	console.log(`Fetched content preview (first 100 chars):`, content.substring(0, 100));
 	
 	// 从内容中提取标题（第一个 # 开头的行）
 	let title = '';

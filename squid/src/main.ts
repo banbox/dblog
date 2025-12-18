@@ -11,6 +11,7 @@ const COMMENT_LIKED = blogHub.events.CommentLiked.topic
 const FOLLOW_STATUS_CHANGED = blogHub.events.FollowStatusChanged.topic
 const ARTICLE_COLLECTED = blogHub.events.ArticleCollected.topic
 const USER_PROFILE_UPDATED = blogHub.events.UserProfileUpdated.topic
+const ARTICLE_EDITED = blogHub.events.ArticleEdited.topic
 
 processor.run(new TypeormDatabase(), async (ctx) => {
     const articles: Article[] = []
@@ -55,7 +56,11 @@ processor.run(new TypeormDatabase(), async (ctx) => {
     async function ensureArticleByArweaveId(arweaveId: string, block: any, log: any): Promise<Article> {
         let article = articles.find(a => a.id === arweaveId) || articlesToUpdate.get(arweaveId) || arweaveIdCache.get(arweaveId)
         if (!article) {
-            article = await ctx.store.get(Article, arweaveId)
+            // Load article with author relation to preserve author data
+            article = await ctx.store.findOne(Article, {
+                where: { id: arweaveId } as any,
+                relations: { author: true }
+            }) ?? undefined
         }
         if (article && (article.author as any) == null) {
             article.author = await ensureUser(UNKNOWN_USER_ID, block)
@@ -95,9 +100,10 @@ processor.run(new TypeormDatabase(), async (ctx) => {
         const cached = articleIdToArweaveId.get(articleIdStr)
         if (cached) return cached
         
-        // 从数据库查询
+        // 从数据库查询，加载 author 关系以保留作者昵称和头像
         const existingArticle = await ctx.store.findOne(Article, {
-            where: { articleId: BigInt(articleIdStr) } as any
+            where: { articleId: BigInt(articleIdStr) } as any,
+            relations: { author: true }
         })
         if (existingArticle) {
             articleIdToArweaveId.set(articleIdStr, existingArticle.id)
@@ -333,7 +339,11 @@ processor.run(new TypeormDatabase(), async (ctx) => {
                 let article = articles.find(a => a.id === arweaveId)
                     || articlesToUpdate.get(arweaveId)
                 if (!article) {
-                    article = await ctx.store.get(Article, arweaveId)
+                    // Load article with author relation to preserve author data
+                    article = await ctx.store.findOne(Article, {
+                        where: { id: arweaveId } as any,
+                        relations: { author: true }
+                    }) ?? undefined
                 }
                 if (article && event.amountPaid > 0n) {
                     article.totalTips += event.amountPaid
@@ -498,6 +508,50 @@ processor.run(new TypeormDatabase(), async (ctx) => {
                 user.profileUpdatedAt = new Date(block.header.timestamp)
                 
                 usersToUpdate.set(user.id, user)
+            }
+
+            // 处理文章编辑事件
+            if (log.topics[0] === ARTICLE_EDITED) {
+                const event = blogHub.events.ArticleEdited.decode(log)
+                
+                const arweaveId = event.arweaveId
+                const articleIdStr = event.articleId.toString()
+
+                // 建立 articleId -> arweaveId 的映射（保证后续可以通过链上 articleId 找到文章）
+                articleIdToArweaveId.set(articleIdStr, arweaveId)
+                
+                // 查找已有文章
+                let article = articles.find(a => a.id === arweaveId) 
+                    || articlesToUpdate.get(arweaveId)
+                    || arweaveIdCache.get(arweaveId)
+                
+                if (!article) {
+                    article = await ctx.store.findOne(Article, {
+                        where: { id: arweaveId } as any,
+                        relations: { author: true }
+                    }) ?? undefined
+                }
+                
+                if (!article) {
+                    // 如果文章尚未被 ArticlePublished 索引到（或历史数据缺失），仍然允许 edit 事件创建/补全实体
+                    article = await ensureArticleByArweaveId(arweaveId, block, log)
+
+                    // 尝试补全 articleId 与作者信息
+                    article.articleId = event.articleId
+                    if ((article.author as any)?.id?.toLowerCase() === UNKNOWN_USER_ID) {
+                        article.author = await ensureUser(event.author.toLowerCase(), block)
+                    }
+                }
+
+                // 更新文章信息
+                article.title = event.title
+                article.originalAuthor = event.originalAuthor || null
+                article.categoryId = event.categoryId
+                article.originality = Number(event.originality)
+                article.editedAt = new Date(block.header.timestamp)
+
+                articlesToUpdate.set(arweaveId, article)
+                arweaveIdCache.set(arweaveId, article)
             }
         }
     }

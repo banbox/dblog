@@ -47,6 +47,7 @@ contract BlogHub is
     error CollectPriceTooHigh();
     error CategoryIdTooHigh();
     error MaxCollectSupplyTooHigh();
+    error NotArticleAuthor();
     
     // 定义常量：最大评论长度（字节）
     // 140单词英文大约 700-1000 字节，中文约 400 汉字 = 1200 字节
@@ -180,6 +181,17 @@ contract BlogHub is
     );
     event MinActionValueUpdated(uint256 newValue);
 
+    // 文章编辑事件
+    event ArticleEdited(
+        uint256 indexed articleId,
+        address indexed author,
+        string arweaveId,
+        string originalAuthor,
+        string title,
+        uint64 categoryId,
+        Originality originality
+    );
+
     // 用户资料更新事件
     event UserProfileUpdated(
         address indexed user,
@@ -265,6 +277,50 @@ contract BlogHub is
 
     function _executeFollow(address follower, address target, bool status) internal {
         emit FollowStatusChanged(follower, target, status);
+    }
+
+    /**
+     * @dev 执行文章编辑的核心逻辑（内部函数）
+     * @param sender 操作发起人
+     * @param _articleId 文章ID
+     * @param _originalAuthor 原作者名称
+     * @param _title 文章标题
+     * @param _categoryId 分类ID
+     * @param _originality 原创性
+     */
+    function _executeEditArticle(
+        address sender,
+        uint256 _articleId,
+        string calldata _originalAuthor,
+        string calldata _title,
+        uint64 _categoryId,
+        Originality _originality
+    ) internal {
+        if (_articleId == 0 || _articleId >= nextArticleId) revert ArticleNotFound();
+        
+        Article storage article = articles[_articleId];
+        
+        // 只有文章作者可以编辑
+        if (article.author != sender) revert NotArticleAuthor();
+        
+        // 验证参数
+        if (bytes(_originalAuthor).length > MAX_ORIGINAL_AUTHOR_LENGTH) revert OriginalAuthorTooLong();
+        if (bytes(_title).length > MAX_TITLE_LENGTH) revert TitleTooLong();
+        if (_categoryId > type(uint16).max) revert CategoryIdTooHigh();
+        
+        // 更新文章信息
+        article.categoryId = uint16(_categoryId);
+        article.originality = _originality;
+        
+        emit ArticleEdited(
+            _articleId,
+            sender,
+            article.arweaveHash,
+            _originalAuthor,
+            _title,
+            _categoryId,
+            _originality
+        );
     }
 
     /**
@@ -602,6 +658,24 @@ contract BlogHub is
         _executeFollow(_msgSender(), _target, _status);
     }
 
+    /**
+     * @dev 编辑文章信息（仅作者可调用）
+     * @param _articleId 文章ID
+     * @param _originalAuthor 原作者名称
+     * @param _title 文章标题
+     * @param _categoryId 分类ID
+     * @param _originality 原创性
+     */
+    function editArticle(
+        uint256 _articleId,
+        string calldata _originalAuthor,
+        string calldata _title,
+        uint64 _categoryId,
+        Originality _originality
+    ) external whenNotPaused {
+        _executeEditArticle(_msgSender(), _articleId, _originalAuthor, _title, _categoryId, _originality);
+    }
+
     // =============================================================
     //                          元数据
     // =============================================================
@@ -841,6 +915,50 @@ contract BlogHub is
 
         // 执行关注操作
         _executeFollow(owner, _target, _status);
+
+        emit SessionKeyOperationExecuted(owner, sessionKey, selector);
+    }
+
+    /**
+     * @notice 使用 Session Key 编辑文章（无感交互）
+     */
+    function editArticleWithSessionKey(
+        address owner,
+        address sessionKey,
+        uint256 _articleId,
+        string calldata _originalAuthor,
+        string calldata _title,
+        uint64 _categoryId,
+        Originality _originality,
+        uint256 deadline,
+        bytes calldata signature
+    ) external whenNotPaused {
+        ISessionKeyManager manager = _requireSessionKeyManager();
+        bytes4 selector = BlogHub.editArticle.selector;
+
+        // 构建 callData 用于验证
+        bytes memory callData = abi.encodeWithSelector(
+            selector,
+            _articleId,
+            _originalAuthor,
+            _title,
+            _categoryId,
+            _originality
+        );
+
+        _validateAndUseSessionKey(
+            manager,
+            owner,
+            sessionKey,
+            selector,
+            callData,
+            0,
+            deadline,
+            signature
+        );
+
+        // 执行编辑操作
+        _executeEditArticle(owner, _articleId, _originalAuthor, _title, _categoryId, _originality);
 
         emit SessionKeyOperationExecuted(owner, sessionKey, selector);
     }

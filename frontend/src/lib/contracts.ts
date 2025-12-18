@@ -47,7 +47,17 @@ function parseContractError(error: unknown): ContractError {
 	const errorMessage = error instanceof Error ? error.message : String(error);
 	const lowerMessage = errorMessage.toLowerCase();
 
-	// Session key specific errors
+	// Session key not authorized for specific operation (selector missing)
+	// Keep original message so caller can detect and auto-recreate session key
+	if (lowerMessage.includes('not authorized for this operation')) {
+		return new ContractError(
+			'contract_reverted',
+			errorMessage, // Preserve original message for caller to detect
+			error instanceof Error ? error : undefined
+		);
+	}
+
+	// Session key specific errors (general)
 	if (
 		lowerMessage.includes('sessionkeynotactive') ||
 		lowerMessage.includes('0x62db3e42') ||
@@ -444,6 +454,36 @@ const BLOGHUB_ABI = [
 			{ name: '_nickname', type: 'string' },
 			{ name: '_avatar', type: 'string' },
 			{ name: '_bio', type: 'string' }
+		],
+		outputs: [],
+		stateMutability: 'nonpayable'
+	},
+	{
+		name: 'editArticle',
+		type: 'function',
+		inputs: [
+			{ name: '_articleId', type: 'uint256' },
+			{ name: '_originalAuthor', type: 'string' },
+			{ name: '_title', type: 'string' },
+			{ name: '_categoryId', type: 'uint64' },
+			{ name: '_originality', type: 'uint8' }
+		],
+		outputs: [],
+		stateMutability: 'nonpayable'
+	},
+	{
+		name: 'editArticleWithSessionKey',
+		type: 'function',
+		inputs: [
+			{ name: 'owner', type: 'address' },
+			{ name: 'sessionKey', type: 'address' },
+			{ name: '_articleId', type: 'uint256' },
+			{ name: '_originalAuthor', type: 'string' },
+			{ name: '_title', type: 'string' },
+			{ name: '_categoryId', type: 'uint64' },
+			{ name: '_originality', type: 'uint8' },
+			{ name: 'deadline', type: 'uint256' },
+			{ name: 'signature', type: 'bytes' }
 		],
 		outputs: [],
 		stateMutability: 'nonpayable'
@@ -973,7 +1013,8 @@ const FUNCTION_SELECTORS = {
 	evaluate: '0xff1f090a' as `0x${string}`,     // evaluate(uint256,uint8,string,address,uint256)
 	follow: '0x63c3cc16' as `0x${string}`,       // follow(address,bool)
 	likeComment: '0xdffd40f2' as `0x${string}`,  // likeComment(uint256,uint256,address,address)
-	collect: '0x8d3c100a' as `0x${string}`       // collect(uint256,address)
+	collect: '0x8d3c100a' as `0x${string}`,      // collect(uint256,address)
+	editArticle: '0xaacf0da4' as `0x${string}`   // editArticle(uint256,string,string,uint64,uint8)
 };
 
 /**
@@ -1535,6 +1576,165 @@ export async function updateProfile(
 		return txHash;
 	} catch (error) {
 		console.error('Error updating profile:', error);
+		throw parseContractError(error);
+	}
+}
+
+/**
+ * Edit article metadata on-chain (title, originalAuthor, categoryId, originality)
+ * @param articleId - Chain article ID
+ * @param originalAuthor - Original author name (max 64 bytes)
+ * @param title - Article title (max 128 bytes)
+ * @param categoryId - Category ID
+ * @param originality - 0=Original, 1=SemiOriginal, 2=Reprint
+ * @returns Transaction hash
+ */
+export async function editArticle(
+	articleId: bigint,
+	originalAuthor: string,
+	title: string,
+	categoryId: bigint,
+	originality: number
+): Promise<string> {
+	if (articleId <= 0n) {
+		throw new Error('Article ID must be positive');
+	}
+
+	if (originalAuthor && new TextEncoder().encode(originalAuthor).length > 64) {
+		throw new Error('Original author name is too long (max 64 bytes)');
+	}
+
+	if (title && new TextEncoder().encode(title).length > 128) {
+		throw new Error('Title is too long (max 128 bytes)');
+	}
+
+	if (originality < 0 || originality > 2) {
+		throw new Error('Originality must be 0 (Original), 1 (SemiOriginal), or 2 (Reprint)');
+	}
+
+	try {
+		const walletClient = await getWalletClient();
+
+		const txHash = await walletClient.writeContract({
+			address: getBlogHubContractAddress(),
+			abi: BLOGHUB_ABI,
+			functionName: 'editArticle',
+			args: [articleId, originalAuthor, title, categoryId, originality]
+		});
+
+		console.log(`Article edited. Tx: ${txHash}`);
+		return txHash;
+	} catch (error) {
+		console.error('Error editing article:', error);
+		throw parseContractError(error);
+	}
+}
+
+/**
+ * Edit article metadata using Session Key (no MetaMask popup)
+ * @param sessionKey - Stored session key data
+ * @param articleId - Chain article ID
+ * @param originalAuthor - Original author name (max 64 bytes)
+ * @param title - Article title (max 128 bytes)
+ * @param categoryId - Category ID
+ * @param originality - 0=Original, 1=SemiOriginal, 2=Reprint
+ * @returns Transaction hash
+ */
+export async function editArticleWithSessionKey(
+	sessionKey: StoredSessionKey,
+	articleId: bigint,
+	originalAuthor: string,
+	title: string,
+	categoryId: bigint,
+	originality: number
+): Promise<string> {
+	if (articleId <= 0n) {
+		throw new Error('Article ID must be positive');
+	}
+
+	if (originalAuthor && new TextEncoder().encode(originalAuthor).length > 64) {
+		throw new Error('Original author name is too long (max 64 bytes)');
+	}
+
+	if (title && new TextEncoder().encode(title).length > 128) {
+		throw new Error('Title is too long (max 128 bytes)');
+	}
+
+	if (originality < 0 || originality > 2) {
+		throw new Error('Originality must be 0 (Original), 1 (SemiOriginal), or 2 (Reprint)');
+	}
+
+	// Check session key validity
+	if (Date.now() / 1000 > sessionKey.validUntil) {
+		throw new Error('Session key has expired');
+	}
+
+	try {
+		const chain = getChainConfig();
+		const sessionKeyAccount = privateKeyToAccount(sessionKey.privateKey as `0x${string}`);
+
+		// Create wallet client with session key
+		const walletClient = createWalletClient({
+			account: sessionKeyAccount,
+			chain,
+			transport: http(getRpcUrl())
+		});
+
+		// Set deadline to 5 minutes from now
+		const deadline = BigInt(Math.floor(Date.now() / 1000) + 300);
+
+		// Encode the editArticle function call data
+		const callData = encodeFunctionData({
+			abi: BLOGHUB_ABI,
+			functionName: 'editArticle',
+			args: [articleId, originalAuthor, title, categoryId, originality]
+		});
+
+		// Get current nonce from SessionKeyManager
+		const nonce = await getSessionKeyNonce(
+			sessionKey.owner as `0x${string}`,
+			sessionKey.address as `0x${string}`
+		);
+
+		await assertSessionKeyActive(
+			sessionKey.owner as `0x${string}`,
+			sessionKey.address as `0x${string}`,
+			FUNCTION_SELECTORS.editArticle,
+			0n
+		);
+
+		// Create EIP-712 signature
+		const signature = await createSessionKeySignature(
+			sessionKey,
+			FUNCTION_SELECTORS.editArticle,
+			callData,
+			0n,
+			deadline,
+			nonce
+		);
+
+		// Call editArticleWithSessionKey
+		const txHash = await walletClient.writeContract({
+			address: getBlogHubContractAddress(),
+			abi: BLOGHUB_ABI,
+			functionName: 'editArticleWithSessionKey',
+			args: [
+				sessionKey.owner as `0x${string}`,
+				sessionKey.address as `0x${string}`,
+				articleId,
+				originalAuthor,
+				title,
+				categoryId,
+				originality,
+				deadline,
+				signature
+			]
+		});
+
+		console.log(`Article edited with session key. Tx: ${txHash}`);
+		return txHash;
+	} catch (error) {
+		console.error('Error editing article with session key:', error);
 		throw parseContractError(error);
 	}
 }

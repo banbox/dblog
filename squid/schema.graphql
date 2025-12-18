@@ -41,6 +41,7 @@ type Article @entity {
   collections: [Collection!]! @derivedFrom(field: "article")
   
   createdAt: DateTime!
+  editedAt: DateTime               # 文章最后编辑时间
   blockNumber: Int!
   txHash: String!
 }

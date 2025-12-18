@@ -5,6 +5,7 @@ import type { EventParams as EParams, FunctionArguments, FunctionReturn } from '
 export const events = {
     ApprovalForAll: event("0x17307eab39ab6107e8899845ad3d59bd9653f200f220920489ca2b5937696c31", "ApprovalForAll(address,address,bool)", {"account": indexed(p.address), "operator": indexed(p.address), "approved": p.bool}),
     ArticleCollected: event("0xf6447f421186fdb05672b6b81ee863f6266ccf87f727fc67ed367774af860065", "ArticleCollected(uint256,address,uint256,uint256)", {"articleId": indexed(p.uint256), "collector": indexed(p.address), "amount": p.uint256, "tokenId": p.uint256}),
+    ArticleEdited: event("0xeb1aa45ea98dbf62fbb532271317e02cab1f758ad822b70d1c29faad55336b5d", "ArticleEdited(uint256,address,string,string,string,uint64,uint8)", {"articleId": indexed(p.uint256), "author": indexed(p.address), "arweaveId": p.string, "originalAuthor": p.string, "title": p.string, "categoryId": p.uint64, "originality": p.uint8}),
     ArticleEvaluated: event("0xc199635a11ffccf62419a83e03370cef9ba2a2c0a33d65c2fe60542bd560a0a9", "ArticleEvaluated(uint256,address,uint8,uint256)", {"articleId": indexed(p.uint256), "user": indexed(p.address), "score": p.uint8, "amountPaid": p.uint256}),
     ArticlePublished: event("0x20f06ccd8e783fa38422d2d4d0de66669fed0f0b45f372d88ff723d8063eb4ab", "ArticlePublished(uint256,address,uint256,string,string,string,address,uint256,uint256,uint8)", {"articleId": indexed(p.uint256), "author": indexed(p.address), "categoryId": indexed(p.uint256), "arweaveId": p.string, "originalAuthor": p.string, "title": p.string, "trueAuthor": p.address, "collectPrice": p.uint256, "maxCollectSupply": p.uint256, "originality": p.uint8}),
     CommentAdded: event("0x19a5aae49af5681d63d1a8c6ea9dc7b88af86e08d71ade984e2087fada0d4c4a", "CommentAdded(uint256,address,string,uint256,uint8)", {"articleId": indexed(p.uint256), "commenter": indexed(p.address), "content": p.string, "parentCommentId": p.uint256, "score": p.uint8}),
@@ -49,6 +50,8 @@ export const functions = {
     balanceOfBatch: viewFun("0x4e1273f4", "balanceOfBatch(address[],uint256[])", {"accounts": p.array(p.address), "ids": p.array(p.uint256)}, p.array(p.uint256)),
     collect: fun("0x8d3c100a", "collect(uint256,address)", {"_articleId": p.uint256, "_referrer": p.address}, ),
     collectWithSessionKey: fun("0x795146ef", "collectWithSessionKey(address,address,uint256,address,uint256,bytes)", {"owner": p.address, "sessionKey": p.address, "_articleId": p.uint256, "_referrer": p.address, "deadline": p.uint256, "signature": p.bytes}, ),
+    editArticle: fun("0xaacf0da4", "editArticle(uint256,string,string,uint64,uint8)", {"_articleId": p.uint256, "_originalAuthor": p.string, "_title": p.string, "_categoryId": p.uint64, "_originality": p.uint8}, ),
+    editArticleWithSessionKey: fun("0x484b5eb8", "editArticleWithSessionKey(address,address,uint256,string,string,uint64,uint8,uint256,bytes)", {"owner": p.address, "sessionKey": p.address, "_articleId": p.uint256, "_originalAuthor": p.string, "_title": p.string, "_categoryId": p.uint64, "_originality": p.uint8, "deadline": p.uint256, "signature": p.bytes}, ),
     evaluate: fun("0xff1f090a", "evaluate(uint256,uint8,string,address,uint256)", {"_articleId": p.uint256, "_score": p.uint8, "_content": p.string, "_referrer": p.address, "_parentCommentId": p.uint256}, ),
     evaluateWithSessionKey: fun("0x63c4ea4d", "evaluateWithSessionKey(address,address,uint256,uint8,string,address,uint256,uint256,bytes)", {"owner": p.address, "sessionKey": p.address, "_articleId": p.uint256, "_score": p.uint8, "_content": p.string, "_referrer": p.address, "_parentCommentId": p.uint256, "deadline": p.uint256, "signature": p.bytes}, ),
     follow: fun("0x63c3cc16", "follow(address,bool)", {"_target": p.address, "_status": p.bool}, ),
@@ -224,6 +227,7 @@ export class Contract extends ContractBase {
 /// Event types
 export type ApprovalForAllEventArgs = EParams<typeof events.ApprovalForAll>
 export type ArticleCollectedEventArgs = EParams<typeof events.ArticleCollected>
+export type ArticleEditedEventArgs = EParams<typeof events.ArticleEdited>
 export type ArticleEvaluatedEventArgs = EParams<typeof events.ArticleEvaluated>
 export type ArticlePublishedEventArgs = EParams<typeof events.ArticlePublished>
 export type CommentAddedEventArgs = EParams<typeof events.CommentAdded>
@@ -304,6 +308,12 @@ export type CollectReturn = FunctionReturn<typeof functions.collect>
 
 export type CollectWithSessionKeyParams = FunctionArguments<typeof functions.collectWithSessionKey>
 export type CollectWithSessionKeyReturn = FunctionReturn<typeof functions.collectWithSessionKey>
+
+export type EditArticleParams = FunctionArguments<typeof functions.editArticle>
+export type EditArticleReturn = FunctionReturn<typeof functions.editArticle>
+
+export type EditArticleWithSessionKeyParams = FunctionArguments<typeof functions.editArticleWithSessionKey>
+export type EditArticleWithSessionKeyReturn = FunctionReturn<typeof functions.editArticleWithSessionKey>
 
 export type EvaluateParams = FunctionArguments<typeof functions.evaluate>
 export type EvaluateReturn = FunctionReturn<typeof functions.evaluate>

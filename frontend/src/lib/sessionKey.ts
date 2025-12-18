@@ -82,7 +82,8 @@ const ALLOWED_SELECTORS: `0x${string}`[] = [
 	'0xdffd40f2', // likeComment(uint256,uint256,address,address)
 	'0x63c3cc16', // follow(address,bool)
 	'0xe7628e4d', // publish(string,uint64,uint96,string,string)
-	'0x8d3c100a'
+	'0x8d3c100a', // collect(uint256,address)
+	'0xaacf0da4'  // editArticle(uint256,string,string,uint64,uint8)
 ];
 
 // Default spending limit (10 ETH)

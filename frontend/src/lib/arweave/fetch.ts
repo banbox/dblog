@@ -133,22 +133,33 @@ export async function checkContentExists(arweaveId: string): Promise<boolean> {
  * @param manifestId - 文章文件夹的 manifest ID
  * @param fileName - 文件名
  * @param useMutable - 是否使用可变 URL（默认 true）
+ * @param bypassCache - 是否绕过缓存（默认 true，用于确保获取最新内容）
  */
 export async function fetchFromFolder(
 	manifestId: string,
 	fileName: string,
-	useMutable = true
+	useMutable = true,
+	bypassCache = true
 ): Promise<Response> {
 	const gateways = getArweaveGateways();
 	const pathPrefix = useMutable ? 'mutable/' : '';
+	// 添加时间戳参数绕过网关缓存
+	const cacheBuster = bypassCache ? `?_t=${Date.now()}` : '';
 
 	for (const gateway of gateways) {
 		try {
-			const url = `${gateway}/${pathPrefix}${manifestId}/${fileName}`;
-			const response = await fetch(url);
+			const url = `${gateway}/${pathPrefix}${manifestId}/${fileName}${cacheBuster}`;
+			console.log(`Fetching from folder URL: ${url}`);
+			const response = await fetch(url, {
+				// 绕过浏览器缓存
+				cache: bypassCache ? 'no-store' : 'default'
+			});
 
 			if (response.ok) {
+				console.log(`Fetch successful from: ${url}`);
 				return response;
+			} else {
+				console.warn(`Fetch failed with status ${response.status}: ${url}`);
 			}
 		} catch (error) {
 			console.warn(`Gateway ${gateway} failed to fetch from folder:`, error);
