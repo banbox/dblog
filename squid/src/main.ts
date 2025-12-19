@@ -133,9 +133,9 @@ processor.run(new TypeormDatabase(), async (ctx) => {
                         originalAuthor: event.originalAuthor || null,
                         title: event.title,
                         summary: event.summary || null,
-                        categoryId: event.categoryId,
+                        categoryId: BigInt(event.categoryId),
                         collectPrice: event.collectPrice,
-                        maxCollectSupply: event.maxCollectSupply,
+                        maxCollectSupply: BigInt(event.maxCollectSupply),
                         collectCount: 1n,
                         originality: Number(event.originality),
                         royaltyBps: 0, // 事件中不包含此字段，可通过合约查询或前端处理
@@ -154,9 +154,9 @@ processor.run(new TypeormDatabase(), async (ctx) => {
                     article.originalAuthor = event.originalAuthor || null
                     article.title = event.title
                     article.summary = event.summary || null
-                    article.categoryId = event.categoryId
+                    article.categoryId = BigInt(event.categoryId)
                     article.collectPrice = event.collectPrice
-                    article.maxCollectSupply = event.maxCollectSupply
+                    article.maxCollectSupply = BigInt(event.maxCollectSupply)
                     article.collectCount = article.collectCount ?? 1n
                     article.originality = Number(event.originality)
                     article.createdAt = new Date(block.header.timestamp)
@@ -344,7 +344,7 @@ processor.run(new TypeormDatabase(), async (ctx) => {
                 article.title = event.title
                 article.summary = event.summary || null
                 article.originalAuthor = event.originalAuthor || null
-                article.categoryId = event.categoryId
+                article.categoryId = BigInt(event.categoryId)
                 article.editedAt = new Date(block.header.timestamp)
                 articlesToUpdate.set(article.id, article)
             }

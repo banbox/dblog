@@ -453,7 +453,7 @@ const ALLOWED_SELECTORS: `0x${string}`[] = [
   '0xff1f090a', // evaluate
   '0xdffd40f2', // likeComment
   '0x63c3cc16', // follow
-  '0xe7628e4d', // publish
+  '0x21a25d60', // publish
   '0x8d3c100a'  // collect
 ];
 

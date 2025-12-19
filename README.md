@@ -52,3 +52,4 @@ Web3交互：viem + @wagmi/core
 * 文章内图片支持
 * 赞赏单位统一USD
 * logo修改
+* 文章发布后自动跳转

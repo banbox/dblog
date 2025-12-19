@@ -5,7 +5,7 @@
 	import { shortAddress, formatTips, ZERO_ADDRESS } from '$lib/utils';
 	import { getCoverImageUrl, getAvatarUrl } from '$lib/arweave';
 	import { getArticleWithCache } from '$lib/arweave/cache';
-	import { queryArticleVersions, fetchArticleVersionContent, type ArticleVersion, getStaticFolderUrl, ARTICLE_COVER_IMAGE_FILE } from '$lib/arweave/folder';
+	import { queryArticleVersions, fetchArticleVersionContent, type ArticleVersion, getStaticFolderUrl, getMutableFolderUrl, ARTICLE_COVER_IMAGE_FILE } from '$lib/arweave/folder';
 	import type { ArticleMetadata } from '$lib/arweave/types';
 	import { onMount } from 'svelte';
 	import { marked } from 'marked';
@@ -491,6 +491,38 @@
 		return getStaticFolderUrl(txId, ARTICLE_COVER_IMAGE_FILE);
 	}
 
+	/**
+	 * Process article content to replace relative image URLs with full Irys URLs
+	 * Handles two formats:
+	 * 1. Markdown: ![alt](filename.png) -> ![alt](https://{host}/mutable/{arweaveId}/filename.png)
+	 * 2. HTML: <img src="filename.jpg" ... /> -> <img src="https://{host}/mutable/{arweaveId}/filename.jpg" ... />
+	 * @param content - The markdown content
+	 * @param arweaveId - The article's arweave ID (manifest ID)
+	 * @param useMutable - Whether to use mutable URL (true for latest, false for specific version)
+	 */
+	function processContentImages(content: string, arweaveId: string, useMutable = true): string {
+		// Use getMutableFolderUrl/getStaticFolderUrl which handle devnet/mainnet correctly
+		const baseUrl = useMutable 
+			? getMutableFolderUrl(arweaveId)
+			: getStaticFolderUrl(arweaveId);
+		
+		// Process Markdown image syntax: ![alt](relative-path)
+		// Only replace if the path is relative (not starting with http://, https://, or /)
+		let processed = content.replace(
+			/!\[([^\]]*)\]\((?!https?:\/\/)(?!\/)([\w\-\.]+)\)/g,
+			(_, alt, filename) => `![${alt}](${baseUrl}/${filename})`
+		);
+		
+		// Process HTML img tags: <img src="relative-path" ... />
+		// Only replace if src is relative (not starting with http://, https://, or /)
+		processed = processed.replace(
+			/<img\s+([^>]*?)src=["'](?!https?:\/\/)(?!\/)([^"']+)["']([^>]*?)>/gi,
+			(_, before, filename, after) => `<img ${before}src="${baseUrl}/${filename}"${after}>`
+		);
+		
+		return processed;
+	}
+
 	onMount(async () => {
 		// Fetch author data first
 		fetchAuthorData();
@@ -888,7 +920,7 @@
 			</div>
 		{:else if articleContent?.content}
 			<div class="prose prose-lg prose-gray max-w-none font-serif">
-				{@html DOMPurify.sanitize(marked(articleContent.content) as string)}
+				{@html DOMPurify.sanitize(marked(processContentImages(articleContent.content, versionTxId || article.id, !versionTxId)) as string)}
 			</div>
 		{:else}
 			<div class="py-8 text-center text-gray-500">

@@ -289,16 +289,22 @@ const BLOGHUB_ABI = [
 		name: 'publish',
 		type: 'function',
 		inputs: [
-			{ name: '_arweaveId', type: 'string' },
-			{ name: '_categoryId', type: 'uint64' },
-			{ name: '_royaltyBps', type: 'uint96' },
-			{ name: '_originalAuthor', type: 'string' },
-			{ name: '_title', type: 'string' },
-			{ name: '_summary', type: 'string' },
-			{ name: '_trueAuthor', type: 'address' },
-			{ name: '_collectPrice', type: 'uint256' },
-			{ name: '_maxCollectSupply', type: 'uint256' },
-			{ name: '_originality', type: 'uint8' }
+			{
+				name: 'params',
+				type: 'tuple',
+				components: [
+					{ name: 'arweaveId', type: 'string' },
+					{ name: 'categoryId', type: 'uint16' },
+					{ name: 'royaltyBps', type: 'uint96' },
+					{ name: 'originalAuthor', type: 'string' },
+					{ name: 'title', type: 'string' },
+					{ name: 'summary', type: 'string' },
+					{ name: 'trueAuthor', type: 'address' },
+					{ name: 'collectPrice', type: 'uint96' },
+					{ name: 'maxCollectSupply', type: 'uint32' },
+					{ name: 'originality', type: 'uint8' }
+				]
+			}
 		],
 		outputs: [{ type: 'uint256' }],
 		stateMutability: 'nonpayable'
@@ -373,14 +379,14 @@ const BLOGHUB_ABI = [
 				type: 'tuple',
 				components: [
 					{ name: 'arweaveId', type: 'string' },
-					{ name: 'categoryId', type: 'uint64' },
+					{ name: 'categoryId', type: 'uint16' },
 					{ name: 'royaltyBps', type: 'uint96' },
 					{ name: 'originalAuthor', type: 'string' },
 					{ name: 'title', type: 'string' },
 					{ name: 'summary', type: 'string' },
 					{ name: 'trueAuthor', type: 'address' },
-					{ name: 'collectPrice', type: 'uint256' },
-					{ name: 'maxCollectSupply', type: 'uint256' },
+					{ name: 'collectPrice', type: 'uint96' },
+					{ name: 'maxCollectSupply', type: 'uint32' },
 					{ name: 'originality', type: 'uint8' }
 				]
 			},
@@ -625,22 +631,24 @@ export async function publishToContract(
 	try {
 		const walletClient = await getWalletClientWithChainCheck();
 
-		// Call publish function
+		// Call publish function with PublishParams struct
 		const txHash = await walletClient.writeContract({
 			address: getBlogHubContractAddress(),
 			abi: BLOGHUB_ABI,
 			functionName: 'publish',
 			args: [
-				arweaveId,
-				categoryId,
-				royaltyBps,
-				originalAuthor,
-				title,
-				summary,
-				trueAuthor,
-				collectPrice,
-				maxCollectSupply,
-				originality
+				{
+					arweaveId,
+					categoryId: Number(categoryId),
+					royaltyBps: BigInt(royaltyBps),
+					originalAuthor,
+					title,
+					summary,
+					trueAuthor,
+					collectPrice: BigInt(collectPrice),
+					maxCollectSupply: Number(maxCollectSupply),
+					originality: Number(originality)
+				}
 			]
 		});
 
@@ -986,7 +994,7 @@ async function getSessionKeyNonce(
 // NOTE: These selectors must be recalculated when function signatures change
 // Use: cast sig "functionName(type1,type2,...)" to get selector
 const FUNCTION_SELECTORS = {
-	publish: '0x3dd4e4c7' as `0x${string}`,      // publish(string,uint64,uint96,string,string,string,string,address,uint256,uint256,uint8)
+	publish: '0x21a25d60' as `0x${string}`,      // publish((string,uint16,uint96,string,string,string,address,uint96,uint32,uint8)) - PublishParams struct
 	evaluate: '0xff1f090a' as `0x${string}`,     // evaluate(uint256,uint8,string,address,uint256)
 	follow: '0x63c3cc16' as `0x${string}`,       // follow(address,bool)
 	likeComment: '0xdffd40f2' as `0x${string}`,  // likeComment(uint256,uint256,address,address)
@@ -1109,16 +1117,18 @@ export async function publishToContractWithSessionKey(
 			abi: BLOGHUB_ABI,
 			functionName: 'publish',
 			args: [
-				arweaveId,
-				BigInt(categoryId),
-				BigInt(royaltyBps),
-				originalAuthor,
-				title,
-				summary,
-				trueAuthor,
-				BigInt(collectPrice),
-				BigInt(maxCollectSupply),
-				Number(originality)
+				{
+					arweaveId,
+					categoryId: Number(categoryId),
+					royaltyBps: BigInt(royaltyBps),
+					originalAuthor,
+					title,
+					summary,
+					trueAuthor,
+					collectPrice: BigInt(collectPrice),
+					maxCollectSupply: Number(maxCollectSupply),
+					originality: Number(originality)
+				}
 			]
 		});
 
@@ -1171,14 +1181,14 @@ export async function publishToContractWithSessionKey(
 				sessionKey.address as `0x${string}`,
 				{
 					arweaveId,
-					categoryId: BigInt(categoryId),
+					categoryId: Number(categoryId),
 					royaltyBps: BigInt(royaltyBps),
 					originalAuthor,
 					title,
 					summary,
 					trueAuthor: trueAuthor,
 					collectPrice: BigInt(collectPrice),
-					maxCollectSupply: BigInt(maxCollectSupply),
+					maxCollectSupply: Number(maxCollectSupply),
 					originality: Number(originality)
 				},
 				deadline,

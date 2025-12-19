@@ -73,7 +73,7 @@ const SESSION_KEY_MANAGER_ABI = [
 	}
 ] as const;
 
-const PUBLISH_SELECTOR = '0xe7628e4d' as const;
+const PUBLISH_SELECTOR = '0x21a25d60' as const;
 
 // Allowed function selectors for session key
 // Use: cast sig "functionName(params)" to get selector
@@ -81,7 +81,7 @@ const ALLOWED_SELECTORS: `0x${string}`[] = [
 	'0xff1f090a', // evaluate(uint256,uint8,string,address,uint256)
 	'0xdffd40f2', // likeComment(uint256,uint256,address,address)
 	'0x63c3cc16', // follow(address,bool)
-	'0xe7628e4d', // publish(string,uint64,uint96,string,string)
+	'0x21a25d60', // publish((string,uint16,uint96,string,string,string,address,uint96,uint32,uint8)) - PublishParams struct
 	'0x8d3c100a', // collect(uint256,address)
 	'0xaacf0da4'  // editArticle(uint256,string,string,uint64,uint8)
 ];
@@ -367,7 +367,7 @@ export function getSessionKeyAccount() {
 /**
  * Check if session key is valid on-chain (registered, not expired, has required selectors)
  * @param sessionKey - Session key to validate
- * @param requiredSelector - Optional specific selector to check for (e.g., PUBLISH_SELECTOR '0xe7628e4d')
+ * @param requiredSelector - Optional specific selector to check for (e.g., PUBLISH_SELECTOR '0x21a25d60')
  * @returns true if session key is valid on-chain
  */
 export async function isSessionKeyValidOnChain(

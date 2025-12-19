@@ -13,7 +13,7 @@ import {
 } from '$lib/sessionKey';
 
 // publish selector for validation
-const PUBLISH_SELECTOR = '0xe7628e4d' as `0x${string}`;
+const PUBLISH_SELECTOR = '0x21a25d60' as `0x${string}`;
 
 export interface PublishArticleParams {
 	title: string;

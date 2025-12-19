@@ -256,7 +256,7 @@ VALID_UNTIL=$((CURRENT_TIME + 604800))  # 7天后过期
 # evaluate: 0xff1f090a
 # likeComment: 0xdffd40f2
 # follow: 0x63c3cc16
-# publish: 0xe7628e4d
+# publish: 0x21a25d60
 # collect: 0x8d3c100a
 # editArticle: 0x... (需查询)
 # updateUserProfile: 0x... (需查询)
@@ -268,7 +268,7 @@ cast send 0x5FbDB2315678afecb367f032d93F642f64180aa3 \
   $CURRENT_TIME \
   $VALID_UNTIL \
   0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9 \
-  "[0xff1f090a,0xdffd40f2,0x63c3cc16,0xe7628e4d,0x8d3c100a]" \
+  "[0xff1f090a,0xdffd40f2,0x63c3cc16,0x21a25d60,0x8d3c100a]" \
   10000000000000000000 \
   --private-key 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d \
   --rpc-url http://localhost:8545
@@ -591,7 +591,7 @@ forge script script/Deploy.s.sol \
 
 | 函数 | 选择器 |
 |------|--------|
-| `publish(string,uint64,uint96,string,string,string,address,uint256,uint256,uint8)` | `0xe7628e4d` |
+| `publish((string,uint16,uint96,string,string,string,address,uint96,uint32,uint8))` | `0x21a25d60` |
 | `evaluate(uint256,uint8,string,address,uint256)` | `0xff1f090a` |
 | `likeComment(uint256,uint256,address,address)` | `0xdffd40f2` |
 | `follow(address,bool)` | `0x63c3cc16` |
@@ -602,7 +602,7 @@ forge script script/Deploy.s.sol \
 ```bash
 # 获取函数选择器
 cast sig "evaluate(uint256,uint8,string,address,uint256)"
-cast sig "publish(string,uint64,uint96,string,string,string,address,uint256,uint256,uint8)"
+cast sig "publish((string,uint16,uint96,string,string,string,address,uint96,uint32,uint8))"
 ```
 
 ### B. 事件签名
