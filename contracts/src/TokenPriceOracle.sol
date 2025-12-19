@@ -155,6 +155,7 @@ contract TokenPriceOracle is ITokenPriceOracle, Ownable {
         if (answer <= 0) revert InvalidPrice();
         
         // 转换为 18 位精度
+        // forge-lint: disable-next-line(unsafe-typecast)
         uint8 feedDecimals = priceFeed.decimals();
         if (feedDecimals < 18) {
             price = uint256(answer) * (10 ** (18 - feedDecimals));

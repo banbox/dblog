@@ -1,3 +1,1 @@
-import { SearchResolver } from './resolvers'
-
-export { SearchResolver }
+export { SearchResolver } from './resolvers'

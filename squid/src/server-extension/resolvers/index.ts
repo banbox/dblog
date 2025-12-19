@@ -114,18 +114,13 @@ export class SearchResolver {
             )
         }
 
-        // Filter by categoryId
-        if (categoryId !== undefined && categoryId !== null) {
+        if (categoryId != null) {
             qb = qb.andWhere('article.categoryId = :categoryId', { categoryId: BigInt(categoryId) })
         }
-
-        // Filter by originality
-        if (originality !== undefined && originality !== null) {
+        if (originality != null) {
             qb = qb.andWhere('article.originality = :originality', { originality })
         }
-
-        // Filter by minimum like amount
-        if (minLikeAmount !== undefined && minLikeAmount !== null) {
+        if (minLikeAmount != null) {
             qb = qb.andWhere('article.likeAmount >= :minLikeAmount', { minLikeAmount: BigInt(minLikeAmount) })
         }
 
@@ -144,20 +139,20 @@ export class SearchResolver {
         const articles = await qb.getMany()
 
         return {
-            articles: articles.map(article => ({
-                id: article.id,
-                articleId: article.articleId.toString(),
-                title: article.title,
-                summary: article.summary || undefined,
-                categoryId: article.categoryId.toString(),
-                originality: article.originality,
-                likeAmount: article.likeAmount.toString(),
-                dislikeAmount: article.dislikeAmount.toString(),
-                totalTips: article.totalTips.toString(),
-                collectCount: article.collectCount.toString(),
-                createdAt: article.createdAt,
-                authorId: (article.author as any)?.id,
-                authorNickname: (article.author as any)?.nickname
+            articles: articles.map(a => ({
+                id: a.id,
+                articleId: a.articleId.toString(),
+                title: a.title,
+                summary: a.summary || undefined,
+                categoryId: a.categoryId.toString(),
+                originality: a.originality,
+                likeAmount: a.likeAmount.toString(),
+                dislikeAmount: a.dislikeAmount.toString(),
+                totalTips: a.totalTips.toString(),
+                collectCount: a.collectCount.toString(),
+                createdAt: a.createdAt,
+                authorId: (a.author as any)?.id,
+                authorNickname: (a.author as any)?.nickname
             })),
             total
         }

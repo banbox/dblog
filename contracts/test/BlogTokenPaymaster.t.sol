@@ -3,14 +3,12 @@ pragma solidity ^0.8.30;
 
 import {Test} from "forge-std/Test.sol";
 import {BlogTokenPaymaster} from "../src/BlogTokenPaymaster.sol";
-import {TokenPriceOracle} from "../src/TokenPriceOracle.sol";
 import {SessionKeyManager} from "../src/SessionKeyManager.sol";
 import {MockEntryPoint} from "./mocks/MockEntryPoint.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 import {MockPriceOracle} from "./mocks/MockPriceOracle.sol";
 import {PackedUserOperation} from "../src/interfaces/IEntryPoint.sol";
 import {IPaymaster} from "../src/interfaces/IPaymaster.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title BlogTokenPaymasterTest
