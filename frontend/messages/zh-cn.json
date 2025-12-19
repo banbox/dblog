@@ -282,5 +282,18 @@
 	"search_error": "搜索失败：{error}",
 	"try_different_keywords": "尝试不同的关键词或调整筛选条件",
 	"close": "关闭",
-	"reset_filters": "重置筛选"
+	"reset_filters": "重置筛选",
+	"content_images": "正文图片",
+	"content_images_help": "点击插入按钮添加 Markdown。使用尺寸按钮设置图片大小。",
+	"add_image": "添加图片",
+	"max_images_reached": "最多允许 {max} 张图片",
+	"image_too_large_kb": "图片必须小于 {size}KB",
+	"insert_markdown": "插入 Markdown",
+	"image_size": "图片尺寸",
+	"image_size_settings": "图片尺寸设置",
+	"image_size_help": "留空表示自动尺寸。设置尺寸时使用 HTML img 标签。",
+	"width": "宽度",
+	"height": "高度",
+	"uploading_images": "上传图片中...",
+	"uploading_image": "上传图片 {current}/{total}..."
 }

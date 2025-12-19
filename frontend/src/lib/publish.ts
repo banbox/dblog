@@ -4,7 +4,7 @@
  */
 
 import { uploadArticleFolderWithSessionKey } from '$lib/arweave';
-import type { ArticleFolderUploadParams } from '$lib/arweave';
+import type { ArticleFolderUploadParams, ContentImageInfo } from '$lib/arweave';
 import { publishToContractWithSessionKey } from '$lib/contracts';
 import {
 	ensureSessionKeyReady,
@@ -21,6 +21,7 @@ export interface PublishArticleParams {
 	content: string;
 	tags: string[];
 	coverImage: File | null;
+	contentImages?: ContentImageInfo[];
 	categoryId: bigint;
 	royaltyBps: bigint;
 	originalAuthor?: string;
@@ -80,6 +81,7 @@ async function publishArticleWithSessionKeyInternal(
 		content,
 		tags,
 		coverImage,
+		contentImages,
 		categoryId,
 		royaltyBps,
 		originalAuthor = '',
@@ -90,13 +92,14 @@ async function publishArticleWithSessionKeyInternal(
 	} = params;
 
 	// Note: Session key balance is already ensured by ensureSessionKeyReady
-	// Step 1: Upload article folder with session key (content + cover image)
+	// Step 1: Upload article folder with session key (content + cover image + content images)
 	console.log('Step 1: Uploading article folder to Arweave with Session Key...');
 	const folderParams: ArticleFolderUploadParams = {
 		title: title.trim(),
 		summary: summary.trim(),
 		content: content.trim(),
 		coverImage: coverImage || undefined,
+		contentImages: contentImages,
 		tags
 	};
 

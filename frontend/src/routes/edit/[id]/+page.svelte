@@ -2,8 +2,7 @@
 	import type { PageData } from './$types';
 	import * as m from '$lib/paraglide/messages';
 	import { CATEGORY_KEYS } from '$lib/data';
-	import SearchSelect, { type SelectOption } from '$lib/components/SearchSelect.svelte';
-	import ImageProcessor from '$lib/components/ImageProcessor.svelte';
+	import ArticleEditor, { type ArticleFormData, type ContentImage } from '$lib/components/ArticleEditor.svelte';
 	import { updateArticleFolderWithSessionKey, type ArticleFolderUpdateParams } from '$lib/arweave';
 	import { editArticleWithSessionKey } from '$lib/contracts';
 	import { getArticleWithCache, removeCachedArticle } from '$lib/arweave/cache';
@@ -17,15 +16,6 @@
 
 	let { data }: { data: PageData } = $props();
 	const article = data.article;
-
-	// Category options for SearchSelect
-	let categoryOptions = $derived<SelectOption[]>(
-		CATEGORY_KEYS.map((key, index) => ({
-			key,
-			label: getCategoryLabel(key),
-			value: BigInt(index)
-		}))
-	);
 
 	// Helper function to get category label
 	function getCategoryLabel(key: string): string {
@@ -76,12 +66,21 @@
 	}
 
 	// Form state - initialized with article data
-	let title = $state(article.title || '');
-	let summary = $state('');
-	let selectedCategory = $state<bigint | null>(BigInt(article.categoryId));
-	let author = $state(article.originalAuthor || '');
-	let content = $state('');
-	let coverImageFile = $state<File | null>(null);
+	let formData = $state<ArticleFormData>({
+		title: article.title || '',
+		summary: '',
+		categoryId: BigInt(article.categoryId),
+		author: article.originalAuthor || '',
+		content: '',
+		postscript: '',
+		coverImageFile: null,
+		contentImages: [],
+		royaltyBps: 500n,
+		collectPriceEth: '0',
+		maxCollectSupply: '0',
+		originality: '0'
+	});
+
 	let keepExistingCover = $state(true);
 	let existingCoverUrl = $state<string | null>(null);
 
@@ -94,6 +93,7 @@
 		| 'idle'
 		| 'validating'
 		| 'uploadingCover'
+		| 'uploadingImages'
 		| 'uploadingArticle'
 		| 'updatingContract'
 		| 'success'
@@ -118,8 +118,8 @@
 		try {
 			const articleContent = await getArticleWithCache(article.id);
 			if (articleContent) {
-				content = articleContent.content || '';
-				summary = articleContent.summary || '';
+				formData.content = articleContent.content || '';
+				formData.summary = articleContent.summary || '';
 			}
 		} catch (e) {
 			loadError = e instanceof Error ? e.message : 'Failed to load article content';
@@ -145,21 +145,19 @@
 		}
 	}
 
-	// Handle cover image processed
-	function handleCoverImageProcessed(file: File) {
-		coverImageFile = file;
-		keepExistingCover = false;
-		submitStatus = 'idle';
-	}
-
-	// Handle cover image removed
-	function handleCoverImageRemoved() {
-		coverImageFile = null;
-		keepExistingCover = true;
-	}
-
 	// editArticle selector for validation
 	const EDIT_ARTICLE_SELECTOR = '0xaacf0da4' as `0x${string}`;
+
+	// Convert ContentImage to ContentImageInfo for upload
+	function convertContentImages(images: ContentImage[]) {
+		return images.map(img => ({
+			id: img.id,
+			file: img.file,
+			extension: img.extension,
+			width: img.width,
+			height: img.height
+		}));
+	}
 
 	// Handle form submission
 	async function handleSubmit() {
@@ -171,29 +169,33 @@
 			statusMessage = m.validating();
 
 			// Validation
-			if (!title.trim()) {
+			if (!formData.title.trim()) {
 				throw new Error(m.field_required({ field: m.title() }));
 			}
-			if (!content.trim()) {
+			if (!formData.content.trim()) {
 				throw new Error(m.field_required({ field: m.content() }));
 			}
 
 			// Use selected category as tag
-			const categoryId = selectedCategory ?? 0n;
-			const selectedKey = CATEGORY_KEYS[Number(categoryId)];
+			const selectedKey = CATEGORY_KEYS[Number(formData.categoryId)];
 			const tags = selectedKey ? [getCategoryLabel(selectedKey)] : [];
 
 			// Get or create valid session key with balance check
-			// Uses unified ensureSessionKeyReady - minimizes MetaMask popups
 			const sessionKey = await ensureSessionKeyReady({ requiredSelector: EDIT_ARTICLE_SELECTOR });
 			if (!sessionKey) {
 				throw new Error('Failed to prepare session key. Please try again.');
 			}
 
 			// Update status
-			if (coverImageFile) {
+			if (formData.coverImageFile) {
 				submitStatus = 'uploadingCover';
 				statusMessage = m.uploading_cover();
+			}
+
+			// Update status for content images upload
+			if (formData.contentImages.length > 0) {
+				submitStatus = 'uploadingImages';
+				statusMessage = m.uploading_images ? m.uploading_images() : 'Uploading images...';
 			}
 
 			submitStatus = 'uploadingArticle';
@@ -201,17 +203,18 @@
 
 			// Prepare update params
 			console.log('Edit page cover state:', {
-				coverImageFile: coverImageFile ? `File(${coverImageFile.name}, ${coverImageFile.size} bytes)` : null,
+				coverImageFile: formData.coverImageFile ? `File(${formData.coverImageFile.name}, ${formData.coverImageFile.size} bytes)` : null,
 				keepExistingCover,
 				existingCoverUrl
 			});
+
 			const updateParams: ArticleFolderUpdateParams = {
-				title: title.trim(),
-				summary: summary.trim(),
-				content: content.trim(),
-				coverImage: coverImageFile || undefined,
+				title: formData.title.trim(),
+				summary: formData.summary.trim(),
+				content: formData.content.trim(),
+				coverImage: formData.coverImageFile || undefined,
 				tags,
-				keepExistingCover: keepExistingCover && !coverImageFile
+				keepExistingCover: keepExistingCover && !formData.coverImageFile
 			};
 			console.log('Update params keepExistingCover:', updateParams.keepExistingCover);
 
@@ -230,14 +233,13 @@
 			// Get article's chain ID and call editArticle contract function
 			const chainArticleId = BigInt(article.articleId);
 			
-			// Session key is already validated with editArticle selector by ensureSessionKeyReady
 			const txHash = await editArticleWithSessionKey(
 				sessionKey,
 				chainArticleId,
-				author.trim(),
-				title.trim(),
-				summary.trim(),
-				categoryId,
+				formData.author.trim(),
+				formData.title.trim(),
+				formData.summary.trim(),
+				formData.categoryId,
 				0 // originality - default to Original
 			);
 
@@ -250,11 +252,10 @@
 			submitStatus = 'success';
 			statusMessage = m.edit_success({ txId: result.newManifestTxId });
 			
-			// 记录新的 manifest TX ID 用于调试
 			console.log('New manifest TX ID:', result.newManifestTxId);
 			console.log('New index TX ID:', result.indexTxId);
 
-			// Redirect to article page after 5 seconds (给 Irys 网关时间索引新 manifest)
+			// Redirect to article page after 5 seconds
 			setTimeout(() => {
 				goto(`/a/${article.id}`);
 			}, 5000);
@@ -273,6 +274,8 @@
 		switch (submitStatus) {
 			case 'uploadingCover':
 				return m.uploading_cover();
+			case 'uploadingImages':
+				return m.uploading_images ? m.uploading_images() : 'Uploading images...';
 			case 'uploadingArticle':
 				return m.edit_uploading_to_arweave();
 			case 'updatingContract':
@@ -333,136 +336,14 @@
 			</div>
 		{:else}
 			<form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }} class="space-y-8">
-				<!-- Title -->
-				<div>
-					<label for="title" class="mb-2 block text-sm font-medium text-gray-700">
-						{m.title()} *
-					</label>
-					<input
-						id="title"
-						bind:value={title}
-						type="text"
-						placeholder={m.input_article_title()}
-						class="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-base text-gray-900 placeholder-gray-400 transition-colors focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-300"
-						disabled={isSubmitting}
-					/>
-				</div>
-
-				<!-- Category & Author -->
-				<div class="grid grid-cols-2 gap-4">
-					<div>
-						<span id="category-label" class="mb-2 block text-sm font-medium text-gray-700">
-							{m.category()} *
-						</span>
-						<SearchSelect
-							aria-labelledby="category-label"
-							bind:value={selectedCategory}
-							options={categoryOptions}
-							placeholder={m.search()}
-							disabled={isSubmitting}
-							noResultsText={m.no_results()}
-						/>
-					</div>
-					<div>
-						<label for="author" class="mb-2 block text-sm font-medium text-gray-700">
-							{m.author()}
-						</label>
-						<input
-							id="author"
-							bind:value={author}
-							type="text"
-							placeholder={m.name_or_penname()}
-							class="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-base text-gray-900 placeholder-gray-400 transition-colors focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-300"
-							disabled={isSubmitting}
-						/>
-					</div>
-				</div>
-
-				<!-- Cover Image -->
-				<div>
-					<label class="mb-2 block text-sm font-medium text-gray-700">
-						{m.cover()}
-					</label>
-					
-					<!-- Existing cover preview -->
-					{#if keepExistingCover && existingCoverUrl && !coverImageFile}
-						<div class="mb-4">
-							<p class="mb-2 text-sm text-gray-500">{m.current_cover()}</p>
-							<div class="relative inline-block">
-								<img 
-									src={existingCoverUrl} 
-									alt="Current cover" 
-									class="max-h-48 rounded-lg object-cover"
-									onerror={(e) => {
-										const target = e.currentTarget as HTMLImageElement;
-										target.style.display = 'none';
-									}}
-								/>
-								<button
-									type="button"
-									onclick={() => { keepExistingCover = false; }}
-									class="absolute -right-2 -top-2 rounded-full bg-red-500 p-1 text-white hover:bg-red-600"
-									title={m.remove_cover()}
-								>
-									<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-									</svg>
-								</button>
-							</div>
-						</div>
-					{/if}
-
-					<!-- Upload new cover -->
-					<ImageProcessor
-						label={coverImageFile ? m.new_cover() : (keepExistingCover ? m.replace_cover() : m.upload_cover())}
-						aspectRatio={16 / 9}
-						maxFileSize={100 * 1024}
-						maxOutputWidth={1200}
-						maxOutputHeight={675}
-						disabled={isSubmitting}
-						onImageProcessed={handleCoverImageProcessed}
-						onImageRemoved={handleCoverImageRemoved}
-					/>
-				</div>
-
-				<!-- Content -->
-				<div>
-					<label for="content" class="mb-2 block text-sm font-medium text-gray-700">
-						{m.content()} ({m.markdown_supported()}) *
-					</label>
-					<textarea
-						id="content"
-						bind:value={content}
-						placeholder={m.write_article_here()}
-						rows="16"
-						class="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 font-mono text-sm text-gray-900 placeholder-gray-400 transition-colors focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-300"
-						disabled={isSubmitting}
-					></textarea>
-				</div>
-
-				<!-- Summary -->
-				<div>
-					<label for="summary" class="mb-2 block text-sm font-medium text-gray-700">
-						{m.summary()}
-					</label>
-					<textarea
-						id="summary"
-						bind:value={summary}
-						placeholder={m.optional_summary()}
-						rows="3"
-						class="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-base text-gray-900 placeholder-gray-400 transition-colors focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-300"
-						disabled={isSubmitting}
-					></textarea>
-				</div>
-
-				<!-- Info box about limitations -->
-				<div class="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
-					<p class="font-medium">{m.edit_note_title()}</p>
-					<ul class="mt-2 list-inside list-disc space-y-1">
-						<li>{m.edit_note_content()}</li>
-						<li>{m.edit_note_nft()}</li>
-					</ul>
-				</div>
+				<ArticleEditor
+					bind:formData
+					disabled={isSubmitting}
+					mode="edit"
+					{existingCoverUrl}
+					bind:keepExistingCover
+					showNftSettings={false}
+				/>
 
 				<!-- Status Message -->
 				{#if submitStatus !== 'idle'}

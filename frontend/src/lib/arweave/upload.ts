@@ -12,7 +12,7 @@ import {
 	isWithinIrysFreeLimit,
 	type IrysUploader
 } from './irys';
-import type { ArticleMetadata, IrysTag, IrysNetwork, ArticleFolderUploadParams, ArticleFolderUploadResult } from './types';
+import type { ArticleMetadata, IrysTag, IrysNetwork, ArticleFolderUploadParams, ArticleFolderUploadResult, ContentImageInfo } from './types';
 import { getAppName, getAppVersion } from '$lib/config';
 import type { StoredSessionKey } from '$lib/sessionKey';
 import {
@@ -420,6 +420,53 @@ async function uploadCoverImageFile(
 }
 
 /**
+ * 上传内容图片到 Arweave
+ * @param uploader - Irys uploader 实例
+ * @param imageInfo - 图片信息
+ * @param paidBy - 可选，付费账户地址（Balance Approvals 机制）
+ * @returns 文件名和交易 ID
+ */
+async function uploadContentImageFile(
+	uploader: IrysUploader,
+	imageInfo: ContentImageInfo,
+	paidBy?: string
+): Promise<{ filename: string; txId: string }> {
+	const appName = getAppName();
+	const filename = `${imageInfo.id}.${imageInfo.extension}`;
+
+	// Check if within Irys free limit (100KB) - if so, don't use paidBy
+	const isFreeUpload = isWithinIrysFreeLimit(imageInfo.file.size);
+	const effectivePaidBy = isFreeUpload ? undefined : paidBy;
+
+	// 如果没有 paidBy 或者是免费上传，需要确保 Irys 余额充足
+	if (!effectivePaidBy) {
+		const hasBalance = await ensureIrysBalance(uploader, imageInfo.file.size);
+		if (!hasBalance) {
+			throw new Error(`Failed to fund Irys for content image ${filename}. Please try again.`);
+		}
+	}
+
+	const tags: IrysTag[] = [
+		{ name: 'Content-Type', value: imageInfo.file.type },
+		{ name: 'App-Name', value: appName },
+		{ name: 'Type', value: 'article-content-image' },
+		{ name: 'Image-Id', value: imageInfo.id }
+	];
+
+	try {
+		const uploadOptions = effectivePaidBy 
+			? { tags, upload: { paidBy: effectivePaidBy } }
+			: { tags };
+		const receipt = await uploader.uploadFile(imageInfo.file, uploadOptions);
+		console.log(`Content image ${filename} uploaded ==> https://gateway.irys.xyz/${receipt.id}`);
+		return { filename, txId: receipt.id };
+	} catch (e) {
+		console.error(`Error when uploading content image ${filename}:`, e);
+		throw e;
+	}
+}
+
+/**
  * 使用指定 uploader 上传文章文件夹
  * 将文章内容和封面图片打包为一个链上文件夹
  * 
@@ -432,31 +479,46 @@ export async function uploadArticleFolderWithUploader(
 	params: ArticleFolderUploadParams,
 	paidBy?: string
 ): Promise<ArticleFolderUploadResult> {
-	const { title, summary, content, coverImage, tags: articleTags } = params;
+	const { title, summary, content, coverImage, contentImages, tags: articleTags } = params;
 
-	// Step 1: 上传文章内容（index.md）
-	console.log('Uploading article content (index.md)...');
-	const indexTxId = await uploadMarkdownContent(uploader, content, title, articleTags, paidBy);
-
-	// Step 2: 上传封面图片（如果有）
+	// Step 1: 上传封面图片（如果有）- 先上传封面
 	let coverImageTxId: string | undefined;
 	if (coverImage) {
-		console.log('Uploading cover image...');
+		console.log('Step 1: Uploading cover image...');
 		coverImageTxId = await uploadCoverImageFile(uploader, coverImage, paidBy);
 	}
 
-	// Step 3: 使用 Irys SDK 生成文件夹 manifest
-	console.log('Creating article folder manifest using Irys SDK...');
+	// Step 2: 逐个上传内容图片
+	const contentImageTxIds: Record<string, string> = {};
+	if (contentImages && contentImages.length > 0) {
+		console.log(`Step 2: Uploading ${contentImages.length} content image(s)...`);
+		for (const imageInfo of contentImages) {
+			const { filename, txId } = await uploadContentImageFile(uploader, imageInfo, paidBy);
+			contentImageTxIds[filename] = txId;
+			console.log(`  - ${filename} uploaded`);
+		}
+	}
+
+	// Step 3: 上传文章内容（index.md）
+	console.log('Step 3: Uploading article content (index.md)...');
+	const indexTxId = await uploadMarkdownContent(uploader, content, title, articleTags, paidBy);
+
+	// Step 4: 使用 Irys SDK 生成文件夹 manifest
+	console.log('Step 4: Creating article folder manifest using Irys SDK...');
 	const files = new Map<string, string>();
 	files.set(ARTICLE_INDEX_FILE, indexTxId);
 	if (coverImageTxId) {
 		files.set(ARTICLE_COVER_IMAGE_FILE, coverImageTxId);
 	}
+	// 添加内容图片到 manifest
+	for (const [filename, txId] of Object.entries(contentImageTxIds)) {
+		files.set(filename, txId);
+	}
 
 	// 使用 SDK 的 generateFolder 方法生成正确格式的 manifest
 	const manifest = await generateArticleFolderManifest(uploader, files, ARTICLE_INDEX_FILE);
 
-	// Step 4: 上传 manifest，添加文章元数据标签
+	// Step 5: 上传 manifest，添加文章元数据标签
 	const manifestTags: IrysTag[] = [
 		{ name: 'Article-Title', value: title },
 		{ name: 'Article-Summary', value: summary.substring(0, 200) }, // 限制长度
@@ -481,11 +543,15 @@ export async function uploadArticleFolderWithUploader(
 	if (coverImageTxId) {
 		console.log(`  - Cover:    https://gateway.irys.xyz/${manifestId}/${ARTICLE_COVER_IMAGE_FILE}`);
 	}
+	if (Object.keys(contentImageTxIds).length > 0) {
+		console.log(`  - Content Images: ${Object.keys(contentImageTxIds).length} file(s)`);
+	}
 
 	return {
 		manifestId,
 		indexTxId,
-		coverImageTxId
+		coverImageTxId,
+		contentImageTxIds: Object.keys(contentImageTxIds).length > 0 ? contentImageTxIds : undefined
 	};
 }
 

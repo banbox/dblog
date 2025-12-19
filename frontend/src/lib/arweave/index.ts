@@ -31,7 +31,8 @@ export type {
 	IrysConfig,
 	ArticleFolderManifest,
 	ArticleFolderUploadParams,
-	ArticleFolderUploadResult
+	ArticleFolderUploadResult,
+	ContentImageInfo
 } from './types';
 
 // Irys 客户端（包含 MetaMask 模式和 Session Key 模式）

@@ -3,18 +3,8 @@
 	import { publishArticle } from '$lib/publish';
 	import { ContractError } from '$lib/contracts';
 	import { CATEGORY_KEYS } from '$lib/data';
-	import SearchSelect, { type SelectOption } from '$lib/components/SearchSelect.svelte';
-	import ImageProcessor from '$lib/components/ImageProcessor.svelte';
+	import ArticleEditor, { type ArticleFormData, type ContentImage } from '$lib/components/ArticleEditor.svelte';
 	import { parseEther } from 'viem';
-
-	// Category options for SearchSelect
-	let categoryOptions = $derived<SelectOption[]>(
-		CATEGORY_KEYS.map((key, index) => ({
-			key,
-			label: getCategoryLabel(key),
-			value: BigInt(index)
-		}))
-	);
 
 	// Helper function to get category label
 	function getCategoryLabel(key: string): string {
@@ -64,27 +54,28 @@
 		return labels[key]?.() ?? key;
 	}
 
-	// Selected category value (null means no selection)
-	let selectedCategory = $state<bigint | null>(null);
-
-	// Form state
-	let title = $state('');
-	let summary = $state('');
-	let categoryId = $derived(selectedCategory ?? 0n);
-	let author = $state('');
-	let content = $state('');
-	let postscript = $state('');
-	let coverImageFile = $state<File | null>(null);
-	let royaltyBps = $state<bigint>(500n);
-	let collectPriceEth = $state<string | number>('0');
-	let maxCollectSupply = $state<string | number>('0');
-	let originality = $state<'0' | '1' | '2'>('0');
+	// Form state using ArticleEditor's data structure
+	let formData = $state<ArticleFormData>({
+		title: '',
+		summary: '',
+		categoryId: 0n,
+		author: '',
+		content: '',
+		postscript: '',
+		coverImageFile: null,
+		contentImages: [],
+		royaltyBps: 500n,
+		collectPriceEth: '0',
+		maxCollectSupply: '0',
+		originality: '0'
+	});
 
 	// Submit state
 	type SubmitStatus =
 		| 'idle'
 		| 'validating'
 		| 'uploadingCover'
+		| 'uploadingImages'
 		| 'uploadingArticle'
 		| 'publishingContract'
 		| 'success'
@@ -93,31 +84,38 @@
 	let submitStatus = $state<SubmitStatus>('idle');
 	let statusMessage = $state('');
 
-	// Handle cover image processed
-	function handleCoverImageProcessed(file: File) {
-		coverImageFile = file;
-		submitStatus = 'idle';
-	}
-
-	// Handle cover image removed
-	function handleCoverImageRemoved() {
-		coverImageFile = null;
-	}
-
 	// Reset form
 	let resetImageKey = $state(0);
 	function resetForm() {
-		title = '';
-		summary = '';
-		selectedCategory = null;
-		author = '';
-		content = '';
-		postscript = '';
-		coverImageFile = null;
-		resetImageKey++; // Force ImageProcessor to reset
+		formData = {
+			title: '',
+			summary: '',
+			categoryId: 0n,
+			author: '',
+			content: '',
+			postscript: '',
+			coverImageFile: null,
+			contentImages: [],
+			royaltyBps: 500n,
+			collectPriceEth: '0',
+			maxCollectSupply: '0',
+			originality: '0'
+		};
+		resetImageKey++;
 		isSubmitting = false;
 		submitStatus = 'idle';
 		statusMessage = '';
+	}
+
+	// Convert ContentImage to ContentImageInfo for upload
+	function convertContentImages(images: ContentImage[]) {
+		return images.map(img => ({
+			id: img.id,
+			file: img.file,
+			extension: img.extension,
+			width: img.width,
+			height: img.height
+		}));
 	}
 
 	// Handle form submission
@@ -130,28 +128,35 @@
 			statusMessage = m.validating();
 
 			// Validation
-			if (!title.trim()) {
+			if (!formData.title.trim()) {
 				throw new Error(m.field_required({ field: m.title() }));
 			}
-			if (!content.trim()) {
+			if (!formData.content.trim()) {
 				throw new Error(m.field_required({ field: m.content() }));
 			}
-			if (categoryId < 0n) {
+			if (formData.categoryId < 0n) {
 				throw new Error(m.invalid_category());
 			}
+
 			// Use selected category as tag
-			const selectedKey = CATEGORY_KEYS[Number(categoryId)];
+			const selectedKey = CATEGORY_KEYS[Number(formData.categoryId)];
 			const tags = selectedKey ? [getCategoryLabel(selectedKey)] : [];
 
 			// Combine content with postscript if provided
-			const fullContent = postscript.trim()
-				? `${content.trim()}\n\n---\n\n${postscript.trim()}`
-				: content.trim();
+			const fullContent = formData.postscript.trim()
+				? `${formData.content.trim()}\n\n---\n\n${formData.postscript.trim()}`
+				: formData.content.trim();
 
 			// Update status for cover upload
-			if (coverImageFile) {
+			if (formData.coverImageFile) {
 				submitStatus = 'uploadingCover';
 				statusMessage = m.uploading_cover();
+			}
+
+			// Update status for content images upload
+			if (formData.contentImages.length > 0) {
+				submitStatus = 'uploadingImages';
+				statusMessage = m.uploading_images ? m.uploading_images() : 'Uploading images...';
 			}
 
 			// Update status for article upload
@@ -160,15 +165,15 @@
 
 			let collectPrice = 0n;
 			try {
-				const collectPriceEthTrimmed = String(collectPriceEth ?? '0').trim();
+				const collectPriceEthTrimmed = String(formData.collectPriceEth ?? '0').trim();
 				collectPrice = parseEther(collectPriceEthTrimmed || '0');
 			} catch {
 				throw new Error(
-					`Invalid collect price: expected a non-negative number string in ETH with up to 18 decimals (example: 0, 0.01, 1.5). Got: "${String(collectPriceEth ?? '').trim()}"`
+					`Invalid collect price: expected a non-negative number string in ETH with up to 18 decimals (example: 0, 0.01, 1.5). Got: "${String(formData.collectPriceEth ?? '').trim()}"`
 				);
 			}
 
-			const maxSupplyTrimmed = String(maxCollectSupply ?? '0').trim();
+			const maxSupplyTrimmed = String(formData.maxCollectSupply ?? '0').trim();
 			if (!/^(0|[1-9]\d*)$/.test(maxSupplyTrimmed)) {
 				throw new Error(
 					`Invalid max collect supply: expected a non-negative integer (example: 0, 1, 1000). Got: "${maxSupplyTrimmed}"`
@@ -176,23 +181,24 @@
 			}
 			const maxSupply = BigInt(maxSupplyTrimmed);
 
-			const originalityNum = Number.parseInt(originality, 10);
+			const originalityNum = Number.parseInt(formData.originality, 10);
 			if (![0, 1, 2].includes(originalityNum)) {
 				throw new Error(
-					`Invalid originality: expected one of 0, 1, 2. Got: "${originality}"`
+					`Invalid originality: expected one of 0, 1, 2. Got: "${formData.originality}"`
 				);
 			}
 
 			// Call publishArticle from lib
 			const result = await publishArticle({
-				title: title.trim(),
-				summary: summary.trim(),
+				title: formData.title.trim(),
+				summary: formData.summary.trim(),
 				content: fullContent,
 				tags,
-				coverImage: coverImageFile,
-				categoryId: categoryId,
-				royaltyBps: royaltyBps,
-				originalAuthor: author.trim() || undefined,
+				coverImage: formData.coverImageFile,
+				contentImages: convertContentImages(formData.contentImages),
+				categoryId: formData.categoryId,
+				royaltyBps: formData.royaltyBps,
+				originalAuthor: formData.author.trim() || undefined,
 				collectPrice,
 				maxCollectSupply: maxSupply,
 				originality: originalityNum
@@ -223,6 +229,8 @@
 		switch (submitStatus) {
 			case 'uploadingCover':
 				return m.uploading_cover();
+			case 'uploadingImages':
+				return m.uploading_images ? m.uploading_images() : 'Uploading images...';
 			case 'uploadingArticle':
 				return m.uploading_to_arweave();
 			case 'publishingContract':
@@ -253,158 +261,15 @@
 		</header>
 
 		<form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }} class="space-y-8">
-			<!-- Title -->
-			<div>
-				<label for="title" class="mb-2 block text-sm font-medium text-gray-700">
-					{m.title()} *
-				</label>
-				<input
-					id="title"
-					bind:value={title}
-					type="text"
-					placeholder={m.input_article_title()}
-					class="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-base text-gray-900 placeholder-gray-400 transition-colors focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-300"
-					disabled={isSubmitting}
-				/>
-			</div>
-
-			<!-- Category & Author -->
-			<div class="grid grid-cols-2 gap-4">
-				<div>
-					<span id="category-label" class="mb-2 block text-sm font-medium text-gray-700">
-						{m.category()} *
-					</span>
-					<SearchSelect
-						aria-labelledby="category-label"
-						bind:value={selectedCategory}
-						options={categoryOptions}
-						placeholder={m.search()}
-						disabled={isSubmitting}
-						noResultsText={m.no_results()}
-					/>
-				</div>
-				<div>
-					<label for="author" class="mb-2 block text-sm font-medium text-gray-700">
-						{m.author()}
-					</label>
-					<input
-						id="author"
-						bind:value={author}
-						type="text"
-						placeholder={m.name_or_penname()}
-						class="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-base text-gray-900 placeholder-gray-400 transition-colors focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-300"
-						disabled={isSubmitting}
-					/>
-				</div>
-			</div>
-
-			<!-- Cover Image -->
 			{#key resetImageKey}
-				<ImageProcessor
-					label={m.cover()}
-					aspectRatio={16 / 9}
-					maxFileSize={100 * 1024}
-					maxOutputWidth={1200}
-					maxOutputHeight={675}
+				<ArticleEditor
+					bind:formData
 					disabled={isSubmitting}
-					onImageProcessed={handleCoverImageProcessed}
-					onImageRemoved={handleCoverImageRemoved}
+					mode="publish"
+					showNftSettings={true}
+					resetKey={resetImageKey}
 				/>
 			{/key}
-
-			<!-- Content -->
-			<div>
-				<label for="content" class="mb-2 block text-sm font-medium text-gray-700">
-					{m.content()} ({m.markdown_supported()}) *
-				</label>
-				<textarea
-					id="content"
-					bind:value={content}
-					placeholder={m.write_article_here()}
-					rows="12"
-					class="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 font-mono text-sm text-gray-900 placeholder-gray-400 transition-colors focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-300"
-					disabled={isSubmitting}
-				></textarea>
-			</div>
-
-			<!-- Postscript -->
-			<div>
-				<label for="postscript" class="mb-2 block text-sm font-medium text-gray-700">
-					{m.postscript()}
-				</label>
-				<textarea
-					id="postscript"
-					bind:value={postscript}
-					placeholder={m.optional_postscript()}
-					rows="4"
-					class="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-base text-gray-900 placeholder-gray-400 transition-colors focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-300"
-					disabled={isSubmitting}
-				></textarea>
-			</div>
-			
-			<!-- Summary -->
-			<div>
-				<label for="summary" class="mb-2 block text-sm font-medium text-gray-700">
-					Summary
-				</label>
-				<textarea
-					id="summary"
-					bind:value={summary}
-					placeholder="Brief summary of the article (max 512 bytes)"
-					rows="2"
-					class="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-base text-gray-900 placeholder-gray-400 transition-colors focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-300"
-					disabled={isSubmitting}
-				></textarea>
-			</div>
-
-			<div class="grid grid-cols-2 gap-4">
-				<div>
-					<label for="originality" class="mb-2 block text-sm font-medium text-gray-700">
-						Originality
-					</label>
-					<select
-						id="originality"
-						bind:value={originality}
-						disabled={isSubmitting}
-						class="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-base text-gray-900 transition-colors focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-300"
-					>
-						<option value="0">Original</option>
-						<option value="1">SemiOriginal</option>
-						<option value="2">Reprint</option>
-					</select>
-				</div>
-			</div>
-
-			<div class="grid grid-cols-2 gap-4">
-				<div>
-					<label for="collectPrice" class="mb-2 block text-sm font-medium text-gray-700">
-						Collect Price (ETH)
-					</label>
-					<input
-						id="collectPrice"
-						bind:value={collectPriceEth}
-						type="number"
-						min="0"
-						step="0.000001"
-						class="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-base text-gray-900 placeholder-gray-400 transition-colors focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-300"
-						disabled={isSubmitting}
-					/>
-				</div>
-				<div>
-					<label for="maxCollectSupply" class="mb-2 block text-sm font-medium text-gray-700">
-						Max Collect Supply (0 = disable)
-					</label>
-					<input
-						id="maxCollectSupply"
-						bind:value={maxCollectSupply}
-						type="number"
-						min="0"
-						step="1"
-						class="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-base text-gray-900 placeholder-gray-400 transition-colors focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-300"
-						disabled={isSubmitting}
-					/>
-				</div>
-			</div>
 
 			<!-- Status Message -->
 			{#if submitStatus !== 'idle'}

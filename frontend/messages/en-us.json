@@ -282,5 +282,18 @@
 	"search_error": "Search failed: {error}",
 	"try_different_keywords": "Try different keywords or adjust filters",
 	"close": "Close",
-	"reset_filters": "Reset Filters"
+	"reset_filters": "Reset Filters",
+	"content_images": "Content Images",
+	"content_images_help": "Click insert button to add markdown. Use size button to set dimensions.",
+	"add_image": "Add Image",
+	"max_images_reached": "Maximum {max} images allowed",
+	"image_too_large_kb": "Image must be smaller than {size}KB",
+	"insert_markdown": "Insert Markdown",
+	"image_size": "Image Size",
+	"image_size_settings": "Image Size Settings",
+	"image_size_help": "Leave empty for auto size. Uses HTML img tag when size is set.",
+	"width": "Width",
+	"height": "Height",
+	"uploading_images": "Uploading images...",
+	"uploading_image": "Uploading image {current}/{total}..."
 }

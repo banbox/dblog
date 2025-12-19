@@ -48,3 +48,7 @@ Web3交互：viem + @wagmi/core
 数据查询：@urql/svelte
 其他：prettier，eslint，tailwindcss，vitest，playwright，@inlang/paraglide-sveltekit
 
+## TODO
+* 文章内图片支持
+* 赞赏单位统一USD
+* logo修改
