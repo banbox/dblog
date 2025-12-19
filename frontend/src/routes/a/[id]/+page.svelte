@@ -26,7 +26,7 @@
 	import {
 		getStoredSessionKey,
 		isSessionKeyValidForCurrentWallet,
-		ensureSessionKeyBalance,
+		ensureSessionKeyReady,
 		type StoredSessionKey
 	} from '$lib/sessionKey';
 	import { getMinActionValue } from '$lib/config';
@@ -172,23 +172,46 @@
 		return true;
 	}
 
-	// Execute contract call with session key if available, otherwise use regular call
-	// Ensures session key has sufficient balance before calling (prompts MetaMask if needed)
+	/**
+	 * Execute contract call with session key, auto-creating if needed.
+	 * Minimizes MetaMask popups:
+	 * - Uses existing valid session key if available
+	 * - Creates new session key only if needed (one popup)
+	 * - Funds session key only if balance is low (one popup)
+	 * - Falls back to regular wallet call if user rejects
+	 * 
+	 * @param withSessionKey - Function to call with session key
+	 * @param withoutSessionKey - Fallback function for regular wallet call
+	 * @param autoCreate - If true, auto-create session key if not available (default: true)
+	 */
 	async function callWithSessionKey<T>(
 		withSessionKey: (sk: StoredSessionKey) => Promise<T>,
-		withoutSessionKey: () => Promise<T>
+		withoutSessionKey: () => Promise<T>,
+		autoCreate: boolean = true
 	): Promise<T> {
-		if (hasValidSessionKey && sessionKey) {
-			// Ensure session key has sufficient balance, fund via MetaMask if needed
-			const hasBalance = await ensureSessionKeyBalance(sessionKey.address);
-			if (!hasBalance) {
-				// If user rejected funding, fall back to regular wallet call
-				console.log('Session key funding failed, falling back to regular wallet call');
-				return withoutSessionKey();
+		try {
+			// Use unified ensureSessionKeyReady - handles validation, creation, and funding
+			const sk = autoCreate 
+				? await ensureSessionKeyReady()
+				: (hasValidSessionKey && sessionKey ? sessionKey : null);
+			
+			if (sk) {
+				// Update local state if we got a new session key
+				if (!sessionKey || sessionKey.address !== sk.address) {
+					sessionKey = sk;
+					hasValidSessionKey = true;
+				}
+				return await withSessionKey(sk);
 			}
-			return withSessionKey(sessionKey);
+			
+			// User rejected or no session key available, fall back to regular wallet
+			console.log('Session key not available, using regular wallet call');
+			return await withoutSessionKey();
+		} catch (error) {
+			// If session key operation fails, try regular wallet as fallback
+			console.error('Session key operation failed, falling back to regular wallet:', error);
+			return await withoutSessionKey();
 		}
-		return withoutSessionKey();
 	}
 
 	// Get error message from ContractError

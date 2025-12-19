@@ -96,33 +96,10 @@ const SESSION_KEY_DURATION = 7 * 24 * 60 * 60;
 const ESTIMATED_GAS_UNITS = 200000n;
 
 
-/**
- * Get current gas price from the network
- * @returns Gas price in wei
- */
-async function getCurrentGasPrice(): Promise<bigint> {
-	const publicClient = getPublicClient();
-	return await publicClient.getGasPrice();
-}
-
-/**
- * Calculate minimum required balance based on gas price
- * @returns Minimum balance in wei (minMultiplier * gasPrice * estimatedGas)
- */
-async function calculateMinBalance(): Promise<bigint> {
-	const gasPrice = await getCurrentGasPrice();
-	const minMultiplier = BigInt(getMinGasFeeMultiplier());
-	return gasPrice * ESTIMATED_GAS_UNITS * minMultiplier;
-}
-
-/**
- * Calculate default fund amount based on gas price
- * @returns Fund amount in wei (defaultMultiplier * gasPrice * estimatedGas)
- */
-async function calculateFundAmount(): Promise<bigint> {
-	const gasPrice = await getCurrentGasPrice();
-	const defaultMultiplier = BigInt(getDefaultGasFeeMultiplier());
-	return gasPrice * ESTIMATED_GAS_UNITS * defaultMultiplier;
+/** Calculate gas-based amount: gasPrice * estimatedGas * multiplier */
+async function calculateGasAmount(multiplier: number): Promise<bigint> {
+	const gasPrice = await getPublicClient().getGasPrice();
+	return gasPrice * ESTIMATED_GAS_UNITS * BigInt(multiplier);
 }
 
 /**
@@ -141,8 +118,10 @@ export async function getSessionKeyBalance(address: string): Promise<bigint> {
  * @returns true if balance is sufficient
  */
 export async function hasSessionKeySufficientBalance(address: string): Promise<boolean> {
-	const balance = await getSessionKeyBalance(address);
-	const minBalance = await calculateMinBalance();
+	const [balance, minBalance] = await Promise.all([
+		getSessionKeyBalance(address),
+		calculateGasAmount(getMinGasFeeMultiplier())
+	]);
 	return balance >= minBalance;
 }
 
@@ -157,12 +136,8 @@ export async function fundSessionKey(
 	amount?: bigint
 ): Promise<string> {
 	const walletClient = await getWalletClient();
-	
-	// Calculate fund amount if not provided
-	const fundAmount = amount ?? await calculateFundAmount();
-	
-	// Ensure fund amount meets minimum requirement
-	const minBalance = await calculateMinBalance();
+	const minBalance = await calculateGasAmount(getMinGasFeeMultiplier());
+	const fundAmount = amount ?? await calculateGasAmount(getDefaultGasFeeMultiplier());
 	const actualAmount = fundAmount >= minBalance ? fundAmount : minBalance;
 	
 	console.log(`Funding session key with ${formatEther(actualAmount)} ETH (min: ${formatEther(minBalance)} ETH)`);
@@ -186,16 +161,17 @@ export async function fundSessionKey(
  * @returns true if balance is now sufficient
  */
 export async function ensureSessionKeyBalance(sessionKeyAddress: string): Promise<boolean> {
-	const balance = await getSessionKeyBalance(sessionKeyAddress);
-	const minBalance = await calculateMinBalance();
+	const [balance, minBalance] = await Promise.all([
+		getSessionKeyBalance(sessionKeyAddress),
+		calculateGasAmount(getMinGasFeeMultiplier())
+	]);
 	
 	if (balance >= minBalance) {
-		console.log(`Session key balance sufficient: ${formatEther(balance)} ETH (min: ${formatEther(minBalance)} ETH)`);
+		console.log(`Session key balance sufficient: ${formatEther(balance)} ETH`);
 		return true;
 	}
 	
-	console.log(`Session key balance low (${formatEther(balance)} ETH), need at least ${formatEther(minBalance)} ETH, funding...`);
-	
+	console.log(`Session key balance low (${formatEther(balance)} ETH), funding...`);
 	try {
 		await fundSessionKey(sessionKeyAddress);
 		return true;
@@ -280,10 +256,19 @@ async function createIrysBalanceApproval(
 
 /**
  * Generate and register a new session key
- * Also creates Irys Balance Approval for gasless uploads
+ * NOTE: This only registers the session key on-chain and saves to localStorage.
+ * Irys approval and ETH funding are done lazily when needed to minimize MetaMask popups.
+ * @param options - Optional configuration
+ * @param options.skipFunding - If true, skip initial ETH funding (default: true for lazy funding)
+ * @param options.skipIrysApproval - If true, skip Irys balance approval (default: true for lazy approval)
  * @returns Created session key data
  */
-export async function createSessionKey(): Promise<StoredSessionKey> {
+export async function createSessionKey(options?: {
+	skipFunding?: boolean;
+	skipIrysApproval?: boolean;
+}): Promise<StoredSessionKey> {
+	const { skipFunding = true, skipIrysApproval = true } = options ?? {};
+	
 	const account = await getEthereumAccount();
 	const sessionKeyManager = getSessionKeyManagerAddress();
 	const blogHub = getBlogHubContractAddress();
@@ -298,7 +283,7 @@ export async function createSessionKey(): Promise<StoredSessionKey> {
 	const validAfter = Number(latestBlock.timestamp);
 	const validUntil = validAfter + SESSION_KEY_DURATION;
 
-	// 3. Get wallet client and register session key on blockchain
+	// 3. Get wallet client and register session key on blockchain (ONE MetaMask popup)
 	const walletClient = await getWalletClient();
 
 	const txHash = await walletClient.writeContract({
@@ -316,30 +301,25 @@ export async function createSessionKey(): Promise<StoredSessionKey> {
 	});
 	await publicClient.waitForTransactionReceipt({ hash: txHash });
 
-	// 4. Create Irys Balance Approval for the Session Key
-	// This allows the Session Key to upload using the main account's Irys balance
-	try {
-		const irysNetwork = getIrysNetwork();
-		const uploader = irysNetwork === 'mainnet' 
-			? await getIrysUploader() 
-			: await getIrysUploaderDevnet();
-		await createIrysBalanceApproval(uploader, sessionKeyAccount.address, SESSION_KEY_DURATION);
-	} catch (error) {
-		console.warn('Failed to create Irys Balance Approval, continuing anyway:', error);
-	}
-
-	// 5. Save to localStorage
+	// 4. Save to localStorage immediately after registration
 	const sessionKeyData: StoredSessionKey = {
 		address: sessionKeyAccount.address,
 		privateKey: privateKey,
 		owner: account,
 		validUntil
 	};
-
 	localStorage.setItem(SESSION_KEY_STORAGE, JSON.stringify(sessionKeyData));
+	console.log(`Session key created and registered: ${sessionKeyAccount.address}`);
 
-	// 6. Fund session key with initial balance for gas fees (for smart contract calls)
-	await ensureSessionKeyBalance(sessionKeyAccount.address);
+	// 5. Optionally create Irys Balance Approval (lazy by default)
+	if (!skipIrysApproval) {
+		await ensureIrysApproval(sessionKeyData);
+	}
+
+	// 6. Optionally fund session key (lazy by default)
+	if (!skipFunding) {
+		await ensureSessionKeyBalance(sessionKeyAccount.address);
+	}
 
 	return sessionKeyData;
 }
@@ -374,7 +354,26 @@ export function clearLocalSessionKey(): void {
 	}
 }
 
-export async function isSessionKeyValidForPublish(sessionKey: StoredSessionKey): Promise<boolean> {
+/**
+ * Get session key account for signing
+ * @returns Account instance or null if no valid session key
+ */
+export function getSessionKeyAccount() {
+	const sessionKey = getStoredSessionKey();
+	if (!sessionKey) return null;
+	return privateKeyToAccount(sessionKey.privateKey as `0x${string}`);
+}
+
+/**
+ * Check if session key is valid on-chain (registered, not expired, has required selectors)
+ * @param sessionKey - Session key to validate
+ * @param requiredSelector - Optional specific selector to check for (e.g., PUBLISH_SELECTOR '0xe7628e4d')
+ * @returns true if session key is valid on-chain
+ */
+export async function isSessionKeyValidOnChain(
+	sessionKey: StoredSessionKey,
+	requiredSelector?: `0x${string}`
+): Promise<boolean> {
 	try {
 		const publicClient = getPublicClient();
 		const sessionKeyManager = getSessionKeyManagerAddress();
@@ -390,12 +389,18 @@ export async function isSessionKeyValidForPublish(sessionKey: StoredSessionKey):
 			publicClient.getBlock({ blockTag: 'latest' })
 		]);
 
+		// Check if registered
 		if ((data.sessionKey as string).toLowerCase() === '0x0000000000000000000000000000000000000000') return false;
+		// Check target contract
 		if ((data.allowedContract as string).toLowerCase() !== blogHub.toLowerCase()) return false;
 
-		const selectors = (data.allowedSelectors as readonly string[]).map((s) => s.toLowerCase());
-		if (!selectors.includes(PUBLISH_SELECTOR.toLowerCase())) return false;
+		// Check required selector if specified
+		if (requiredSelector) {
+			const selectors = (data.allowedSelectors as readonly string[]).map((s) => s.toLowerCase());
+			if (!selectors.includes(requiredSelector.toLowerCase())) return false;
+		}
 
+		// Check time validity
 		const now = Number(latestBlock.timestamp);
 		if (now < Number(data.validAfter)) return false;
 		if (now > Number(data.validUntil)) return false;
@@ -407,12 +412,106 @@ export async function isSessionKeyValidForPublish(sessionKey: StoredSessionKey):
 }
 
 /**
- * Get session key account for signing
- * @returns Account instance or null if no valid session key
+ * Get or create a valid session key for the current wallet.
+ * This is the unified entry point for all session key operations.
+ * Only triggers MetaMask popup if no valid session key exists.
+ * 
+ * @param options - Optional configuration
+ * @param options.requiredSelector - Specific function selector that must be authorized
+ * @param options.autoCreate - If true, automatically create new session key if needed (default: true)
+ * @returns Valid session key or null if autoCreate is false and no valid key exists
  */
-export function getSessionKeyAccount() {
-	const sessionKey = getStoredSessionKey();
-	if (!sessionKey) return null;
+export async function getOrCreateValidSessionKey(options?: {
+	requiredSelector?: `0x${string}`;
+	autoCreate?: boolean;
+}): Promise<StoredSessionKey | null> {
+	const { requiredSelector, autoCreate = true } = options ?? {};
+	
+	// 1. Check if we have a stored session key
+	let sessionKey = getStoredSessionKey();
+	
+	if (sessionKey) {
+		// 2. Verify it belongs to current wallet
+		const isOwnerValid = await isSessionKeyValidForCurrentWallet();
+		if (!isOwnerValid) {
+			console.log('Stored session key belongs to different wallet, clearing...');
+			clearLocalSessionKey();
+			sessionKey = null;
+		} else {
+			// 3. Verify it's valid on-chain
+			const isOnChainValid = await isSessionKeyValidOnChain(sessionKey, requiredSelector);
+			if (!isOnChainValid) {
+				console.log('Stored session key is invalid or missing required selector, clearing...');
+				clearLocalSessionKey();
+				sessionKey = null;
+			} else {
+				console.log('Using existing valid session key:', sessionKey.address);
+				return sessionKey;
+			}
+		}
+	}
+	
+	// 4. No valid session key - create new one if autoCreate is enabled
+	if (!autoCreate) {
+		return null;
+	}
+	
+	console.log('Creating new session key (requires MetaMask signature)...');
+	sessionKey = await createSessionKey();
+	console.log(`New session key created: ${sessionKey.address}`);
+	
+	return sessionKey;
+}
 
-	return privateKeyToAccount(sessionKey.privateKey as `0x${string}`);
+/**
+ * Ensure session key is ready for use: valid and has sufficient balance.
+ * This is the unified function to call before any session key operation.
+ * Minimizes MetaMask popups by:
+ * - Only creating session key if needed (one popup for registration)
+ * - Only funding if balance is insufficient (one popup for transfer)
+ * 
+ * @param options - Optional configuration
+ * @param options.requiredSelector - Specific function selector that must be authorized
+ * @returns Ready session key, or null if user rejected or operation failed
+ */
+export async function ensureSessionKeyReady(options?: {
+	requiredSelector?: `0x${string}`;
+}): Promise<StoredSessionKey | null> {
+	try {
+		// 1. Get or create valid session key
+		const sessionKey = await getOrCreateValidSessionKey(options);
+		if (!sessionKey) {
+			return null;
+		}
+		
+		// 2. Ensure sufficient balance (may trigger MetaMask for funding)
+		const hasBalance = await ensureSessionKeyBalance(sessionKey.address);
+		if (!hasBalance) {
+			console.log('User rejected session key funding');
+			return null;
+		}
+		
+		return sessionKey;
+	} catch (error) {
+		console.error('Failed to ensure session key ready:', error);
+		return null;
+	}
+}
+
+/** Get Irys uploader based on network config */
+async function getIrysUploaderByNetwork(): Promise<IrysUploader> {
+	return getIrysNetwork() === 'mainnet' ? getIrysUploader() : getIrysUploaderDevnet();
+}
+
+/**
+ * Ensure Irys balance approval exists for session key.
+ * Call this lazily before Arweave uploads.
+ */
+export async function ensureIrysApproval(sessionKey: StoredSessionKey): Promise<void> {
+	try {
+		const uploader = await getIrysUploaderByNetwork();
+		await createIrysBalanceApproval(uploader, sessionKey.address, SESSION_KEY_DURATION);
+	} catch (error) {
+		console.warn('Failed to create Irys Balance Approval:', error);
+	}
 }

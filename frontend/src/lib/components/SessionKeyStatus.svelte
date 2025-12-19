@@ -51,7 +51,8 @@
 		isLoading = true;
 		errorMessage = '';
 		try {
-			await createSessionKey();
+			// Create session key with funding enabled (user explicitly requested creation)
+			await createSessionKey({ skipFunding: false, skipIrysApproval: false });
 			await checkSessionKey();
 		} catch (error) {
 			console.error('Failed to create session key:', error);

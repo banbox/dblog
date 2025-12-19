@@ -11,10 +11,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import {
-		getStoredSessionKey,
-		createSessionKey,
-		ensureSessionKeyBalance,
-		isSessionKeyValidForCurrentWallet,
+		ensureSessionKeyReady,
 		type StoredSessionKey
 	} from '$lib/sessionKey';
 
@@ -161,18 +158,8 @@
 		keepExistingCover = true;
 	}
 
-	// Get or create valid session key
-	async function getOrCreateValidSessionKey(): Promise<StoredSessionKey> {
-		let sessionKey = getStoredSessionKey();
-		if (sessionKey) {
-			const isValid = await isSessionKeyValidForCurrentWallet();
-			if (isValid) {
-				return sessionKey;
-			}
-		}
-		sessionKey = await createSessionKey();
-		return sessionKey;
-	}
+	// editArticle selector for validation
+	const EDIT_ARTICLE_SELECTOR = '0xaacf0da4' as `0x${string}`;
 
 	// Handle form submission
 	async function handleSubmit() {
@@ -196,13 +183,11 @@
 			const selectedKey = CATEGORY_KEYS[Number(categoryId)];
 			const tags = selectedKey ? [getCategoryLabel(selectedKey)] : [];
 
-			// Get session key
-			const sessionKey = await getOrCreateValidSessionKey();
-
-			// Ensure session key has balance
-			const hasBalance = await ensureSessionKeyBalance(sessionKey.address);
-			if (!hasBalance) {
-				throw new Error('Failed to fund session key. Please try again.');
+			// Get or create valid session key with balance check
+			// Uses unified ensureSessionKeyReady - minimizes MetaMask popups
+			const sessionKey = await ensureSessionKeyReady({ requiredSelector: EDIT_ARTICLE_SELECTOR });
+			if (!sessionKey) {
+				throw new Error('Failed to prepare session key. Please try again.');
 			}
 
 			// Update status
@@ -245,38 +230,16 @@
 			// Get article's chain ID and call editArticle contract function
 			const chainArticleId = BigInt(article.articleId);
 			
-			// Try with current session key, if it fails due to missing selector, create a new one
-			let currentSessionKey = sessionKey;
-			let txHash: string;
-			try {
-				txHash = await editArticleWithSessionKey(
-						currentSessionKey,
-						chainArticleId,
-						author.trim(),
-						title.trim(),
-						summary.trim(),
-						categoryId,
-						0 // originality - default to Original
-					);
-			} catch (editError) {
-				// If the error is about unauthorized selector, create a new session key and retry
-				if (editError instanceof Error && editError.message.includes('not authorized for this operation')) {
-					console.log('Session key does not support editArticle, creating new session key...');
-					currentSessionKey = await createSessionKey();
-					await ensureSessionKeyBalance(currentSessionKey.address);
-					txHash = await editArticleWithSessionKey(
-							currentSessionKey,
-							chainArticleId,
-							author.trim(),
-							title.trim(),
-							summary.trim(),
-							categoryId,
-							0
-						);
-				} else {
-					throw editError;
-				}
-			}
+			// Session key is already validated with editArticle selector by ensureSessionKeyReady
+			const txHash = await editArticleWithSessionKey(
+				sessionKey,
+				chainArticleId,
+				author.trim(),
+				title.trim(),
+				summary.trim(),
+				categoryId,
+				0 // originality - default to Original
+			);
 
 			console.log(`Article metadata updated on-chain. Tx: ${txHash}`);
 
