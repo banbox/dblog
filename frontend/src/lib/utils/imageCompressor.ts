@@ -10,13 +10,13 @@ export interface CompressOptions {
 	maxSize: number;
 	/** Initial quality (0-1), default 0.9 */
 	initialQuality?: number;
-	/** Minimum quality before scaling, default 0.3 */
+	/** Minimum quality before scaling, default 0.2 */
 	minQuality?: number;
 	/** Quality reduction step, default 0.1 */
 	qualityStep?: number;
-	/** Scale reduction factor per iteration, default 0.8 */
+	/** Scale reduction factor per iteration, default 0.75 */
 	scaleFactor?: number;
-	/** Maximum iterations to prevent infinite loop, default 20 */
+	/** Maximum iterations to prevent infinite loop, default 30 */
 	maxIterations?: number;
 }
 
@@ -36,8 +36,9 @@ export interface CompressResult {
  * Algorithm:
  * 1. Start with initial quality (0.9)
  * 2. If still too large, reduce quality by step (0.1)
- * 3. When quality reaches minimum (0.3), scale down dimensions
- * 4. Repeat until size requirement is met
+ * 3. When quality reaches minimum (0.2), scale down dimensions and continue with min quality
+ * 4. Repeat until size requirement is met or minimum dimensions reached
+ * 5. Throw error if final size still exceeds limit
  */
 export async function compressImage(
 	file: File,
@@ -46,10 +47,10 @@ export async function compressImage(
 	const {
 		maxSize,
 		initialQuality = 0.9,
-		minQuality = 0.3,
+		minQuality = 0.2,
 		qualityStep = 0.1,
-		scaleFactor = 0.8,
-		maxIterations = 20
+		scaleFactor = 0.75,
+		maxIterations = 30
 	} = options;
 
 	// If already small enough, return as-is
@@ -102,19 +103,30 @@ export async function compressImage(
 			quality = Math.max(minQuality, quality - qualityStep);
 		} else {
 			// Quality at minimum, scale down dimensions
+			// Keep quality at minimum for continued compression
 			width *= scaleFactor;
 			height *= scaleFactor;
-			quality = initialQuality; // Reset quality for new size
 		}
 
-		// Safety check: don't go too small
-		if (width < 100 || height < 100) {
+		// Safety check: don't go too small (50px minimum)
+		if (width < 50 || height < 50) {
 			break;
 		}
 	}
 
 	if (!blob) {
 		throw new Error('Failed to compress image');
+	}
+
+	// Final size validation - throw error if still exceeds limit
+	if (blob.size > maxSize) {
+		throw new Error(
+			`Unable to compress image to target size. ` +
+			`Original: ${Math.round(file.size / 1024)}KB, ` +
+			`Best compression: ${Math.round(blob.size / 1024)}KB, ` +
+			`Target: ${Math.round(maxSize / 1024)}KB. ` +
+			`Try using a smaller image or reducing image complexity.`
+		);
 	}
 
 	// Create file from blob

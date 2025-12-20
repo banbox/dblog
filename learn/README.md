@@ -1046,3 +1046,9 @@ Gemini：首选viem查询Chainlink Price Feeds；次选Pyth Network；或者Unis
 
 #### 2025-12-20 14:15  统一USD计价金额
 @README.md @help.md @Developers.md 当前项目中多处涉及打赏和支付等金额，包括发布文章时充值，赞赏，不喜欢的赞赏等；后续此应用会发布到多个区块链上，如OP和POL等，每个链的币价格都不一样，当前的固定数量对用户很不友好。所以我希望改为统一使用USD计价，需要使用金额时，自动根据最新价格计算折算后币的数量；价格的获取是前端调用去中心化的接口查询的，应当使用Chainlink Price Feeds，基于viem实现；需要维护任何配置或接口时，应当统一维护在 frontend\src\lib\stores\config.svelte.ts；并允许用户在settings页面修改配置  
+Claude: 已实现
+
+### 2025-12-20 14:39  图片大小压缩不正确
+@help.md 当前已经在文章发布和编辑时，增加了内容中图片上传的自动压缩功能，确保上传图片最大不会超过配置的irys大小限制；不过我刚测试发现上传900K的图片，最后输出的是112k，依然超过了100k的限制；目前按说在压缩时已经支持了压缩后大小检测，超过时重试压缩功能，不应该还超出限制，请分析相关代码，排查原因，帮我解决  
+Claude: 调整frontend\src\lib\utils\imageCompressor.ts中的若干参数解决
+
