@@ -11,7 +11,7 @@ import { browser } from '$app/environment';
 import { getIrysUploaderDevnet, getIrysUploader, type IrysUploader } from '$lib/arweave/irys';
 import { getIrysNetwork } from '$lib/config';
 
-const SESSION_KEY_STORAGE = 'dblog_session_key';
+const SESSION_KEY_STORAGE = 'amberink_session_key';
 
 /**
  * Stored session key data structure

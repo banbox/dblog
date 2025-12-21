@@ -21,7 +21,7 @@ import * as publicEnv from '$env/static/public';
 const PUBLIC_MIN_GAS_FEE_MULTIPLIER = (publicEnv as Record<string, string>)['PUBLIC_MIN_GAS_FEE_MULTIPLIER'] || '';
 const PUBLIC_DEFAULT_GAS_FEE_MULTIPLIER = (publicEnv as Record<string, string>)['PUBLIC_DEFAULT_GAS_FEE_MULTIPLIER'] || '';
 
-const CONFIG_STORAGE_KEY = 'dblog_user_config';
+const CONFIG_STORAGE_KEY = 'amberink_user_config';
 
 // Pyth Network contract addresses for different chains
 // See https://docs.pyth.network/price-feeds/contract-addresses/evm
@@ -131,7 +131,7 @@ export const defaults = {
 	rpcUrl: 'http://localhost:8545',
 	chainId: 31337,
 	irysNetwork: 'devnet' as const,
-	appName: 'DBlog',
+	appName: 'AmberInk',
 	appVersion: '1.0.0',
 	arweaveGateways: ['https://gateway.irys.xyz', 'https://arweave.net', 'https://arweave.dev'],
 	subsquidEndpoint: 'http://localhost:4350/graphql',

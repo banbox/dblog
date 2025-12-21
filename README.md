@@ -1,15 +1,17 @@
-# DBlog去中心化博客
-此项目完全去中心化，无后端参与，相关角色：前端 + 智能合约 + 索引查询 + 存储。
+# AmberInk 永久性发布平台
+> Ink Once, Exist Forever
+
+完全去中心化，无后端参与，相关角色：前端 + 智能合约 + 索引查询 + 存储。
 基于Optimism(solidity) + Arweave(Irys) + Subsquid + SvelteKit
 
 ## 如何学习？
 [最细节的手把手开发日志](learn/README.md)
 
-此项目基本都是AI开发完成的，上面包含了最细的完整项目开发细节，逐步尝试即可复现你的dblog
+此项目基本都是AI开发完成的，上面包含了最细的完整项目开发细节，逐步尝试即可复现你的dapp
 
 
 ```perl
-dblog/
+amberink/
 ├── contracts/        # Foundry 智能合约
 ├── frontend/         # SvelteKit
 ├── squid/            # Subsquid 链上索引
@@ -49,7 +51,7 @@ Web3交互：viem + @wagmi/core
 其他：prettier，eslint，tailwindcss，vitest，playwright，@inlang/paraglide-sveltekit
 
 ## TODO
-* 赞赏单位统一USD
-* logo修改
-* 文章发布后自动跳转
+* 支持多标签索引（类别，话题，地区等）
 * 支持markdown编辑器[cherry-markdown](https://github.com/Tencent/cherry-markdown)
+* 接入去中心化身份DID
+

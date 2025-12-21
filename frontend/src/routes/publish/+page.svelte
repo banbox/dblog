@@ -1,6 +1,7 @@
 <script lang="ts">
 	import * as m from '$lib/paraglide/messages';
 	import { publishArticle } from '$lib/publish';
+	import { goto } from '$app/navigation';
 	import { ContractError } from '$lib/contracts';
 	import { CATEGORY_KEYS } from '$lib/data';
 	import ArticleEditor, { type ArticleFormData, type ContentImage } from '$lib/components/ArticleEditor.svelte';
@@ -212,6 +213,11 @@
 			// Success
 			submitStatus = 'success';
 			statusMessage = m.publish_success({ arweaveId: result.arweaveId, txHash: result.txHash });
+
+			// Redirect to article detail page after 2 seconds
+			setTimeout(() => {
+				goto(`/a/${result.arweaveId}`);
+			}, 2000);
 		} catch (error) {
 			submitStatus = 'error';
 			// Handle ContractError with i18n

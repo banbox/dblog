@@ -255,10 +255,10 @@
 			console.log('New manifest TX ID:', result.newManifestTxId);
 			console.log('New index TX ID:', result.indexTxId);
 
-			// Redirect to article page after 5 seconds
+			// Redirect to article page after 2 seconds
 			setTimeout(() => {
 				goto(`/a/${article.id}`);
-			}, 5000);
+			}, 2000);
 		} catch (error) {
 			submitStatus = 'error';
 			const errorMessage = error instanceof Error ? error.message : String(error);
@@ -299,7 +299,7 @@
 </script>
 
 <svelte:head>
-	<title>{m.edit_article()} - {article.title} - DBlog</title>
+	<title>{m.edit_article()} - {article.title} - AmberInk</title>
 </svelte:head>
 
 <div class="min-h-screen bg-white">

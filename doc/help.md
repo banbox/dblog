@@ -1,8 +1,8 @@
-# DBlog 去中心化博客项目概述
+# AmberInk 去中心化博客项目概述
 
 ## 项目整体概述
 
-DBlog 是一个完全去中心化的博客平台，无后端参与。采用 Optimism（Solidity）+ Arweave（Irys）+ Subsquid + SvelteKit 技术栈。用户可发布文章、评价、点赞、关注、收藏等，所有数据存储在链上和 Arweave 上，通过 Subsquid 索引查询。核心特性：文章即 NFT（ERC-1155），支持 ERC-4337 账户抽象和 Session Keys 实现无感交互体验。
+AmberInk 是一个完全去中心化的博客平台，无后端参与。采用 Optimism（Solidity）+ Arweave（Irys）+ Subsquid + SvelteKit 技术栈。用户可发布文章、评价、点赞、关注、收藏等，所有数据存储在链上和 Arweave 上，通过 Subsquid 索引查询。核心特性：文章即 NFT（ERC-1155），支持 ERC-4337 账户抽象和 Session Keys 实现无感交互体验。
 
 ## 技术架构与实现方案
 

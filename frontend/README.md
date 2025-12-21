@@ -14,7 +14,7 @@ npm run build
 ## IRYS存储
 配置的标签：
 ```text
-application-id: dblog
+application-id: AmberInk
 creator: address
 ```
 每篇文章对应一个irys的可变链上文件夹；文章内容固定子路径index.md；封面图固定coverImage

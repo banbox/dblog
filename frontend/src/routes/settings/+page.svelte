@@ -139,7 +139,7 @@
 </script>
 
 <svelte:head>
-	<title>{getLabel('settings')} - DBlog</title>
+	<title>{getLabel('settings')} - AmberInk</title>
 </svelte:head>
 
 <div class="mx-auto max-w-3xl px-6 py-8">

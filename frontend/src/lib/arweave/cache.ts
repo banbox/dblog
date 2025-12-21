@@ -5,7 +5,7 @@ import { fetchArticleMarkdown } from './fetch';
 import type { ArticleMetadata, CachedArticle } from './types';
 import { browser } from '$app/environment';
 
-const CACHE_PREFIX = 'dblog_article_';
+const CACHE_PREFIX = 'amberink_article_';
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 小时
 
 /**

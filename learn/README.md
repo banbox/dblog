@@ -269,7 +269,7 @@ Claude: 改为0.00002 eth，按价格500，大概0.01USD
 
 #### 2025-11-29 22:10 完善开发文档指南
 @Developers.md @README.md 当前智能合约部分已基本完成。接下来还有SubSquid、Irys+Arweave、和前端尚未开始；请你根据当前项目技术栈，和现在进度现状。帮我更新 @Developers.md 给出后续如何一步步落实完善整个项目的各个环节。要给出具体细节  
-Claude：见[github](https://github.com/banbox/dblog/blob/f2f8b0af8424cb9b7d651da0cb98e4b7ce6be979/doc/Developers.md)
+Claude：见[github](https://github.com/banbox/amberink/blob/f2f8b0af8424cb9b7d651da0cb98e4b7ce6be979/doc/Developers.md)
 
 #### 2025-11-29 22:20 修复squid错误
 Claude：文档有误，在`npx squid-typeorm-migration generate`前需执行`npx tsc`
@@ -1068,3 +1068,15 @@ Gemini：给出表格，让Claude更新到frontend\src\lib\stores\config.svelte.
 
 ### 2025-12-20 14:39  代币显示错误纠正
 @help.md 当前支持了多链部署智能合约；大部分链的代币都是ETH，不过Polygon Pos和Mantle的代币是不一样的；为了测试我把本地Anvil的对应代币在 frontend\src\lib\stores\config.svelte.ts 的124行改为了ANVIL；不过我发现在多个页面涉及代币的地方，显示的依然是ETH；这些地方或许硬编码了，或许使用错误；请帮我找到并全部从配置中读取；涉及文章详情，文章列表项等等  
+
+### 2025-12-20 15:30  logo更新
+描述产品特点，对标，希望命名风格，告知ID，输出若干挑选一个；然后设计slogan，以及logo  
+测试AI：Gemini > Chatgpt(not plus) > grok  
+
+### 2025-12-20 17:40  Footer移动到SideBar中
+帮我将Footer部分中的github和about页面，以及Copyright部分，从当前页面删除，移动到SideBar的底部，确保用户访问页面时，始终在左下角看到这部分信息，适当弱化，比如字号小些，颜色略浅些  
+Claude：已完成
+
+### 2025-12-20 18:00  文章发布&编辑自动跳转
+@help.md  文章在发布和编辑成功后，应当自动跳转到详情页，请帮我实现  
+Claude：已完成

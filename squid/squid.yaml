@@ -1,7 +1,7 @@
 manifestVersion: subsquid.io/v0.1
 name: squid
 version: 1
-description: 'DBlog decentralized blog indexer'
+description: 'AmberInk decentralized blog indexer'
 build: 
 deploy:
   addons:

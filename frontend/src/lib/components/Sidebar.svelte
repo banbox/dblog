@@ -101,18 +101,9 @@
 <aside class="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-gray-200 bg-white">
 	<!-- Logo -->
 	<div class="flex h-16 items-center border-b border-gray-100 px-6">
-		<a href="/" class="flex items-center gap-2">
-			<div class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600">
-				<svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						stroke-width="2"
-						d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-					/>
-				</svg>
-			</div>
-			<span class="text-xl font-bold text-gray-900">DBlog</span>
+		<a href="/" class="flex items-center gap-2" title={m.slogan()}>
+			<img src="/logo.png" alt="AmberInk" class="h-8 w-8 rounded-lg" />
+			<img src="/logo_t.png" alt="AmberInk" class="h-6" />
 		</a>
 	</div>
 
@@ -209,6 +200,27 @@
 			{/if}
 		</div>
 	</nav>
+
+	<!-- Footer Info -->
+	<div class="border-t border-gray-100 px-4 py-3">
+		<div class="flex items-center gap-3 text-xs text-gray-600">
+			<a
+				href="https://github.com/banbox/amberink"
+				target="_blank"
+				rel="noopener"
+				class="transition-colors"
+			>
+				GitHub
+			</a>
+			<span class="text-gray-300">·</span>
+			<a href="/about" class="transition-colors">
+				{m.about()}
+			</a>
+		</div>
+		<p class="mt-1 text-xs text-gray-400">
+			© {new Date().getFullYear()} AmberInk
+		</p>
+	</div>
 </aside>
 
 <!-- Search Modal -->

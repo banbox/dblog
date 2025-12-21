@@ -628,8 +628,8 @@
 </script>
 
 <svelte:head>
-	<title>{currentVersionMeta?.title || article.title || `Article #${article.articleId}`} - DBlog</title>
-	<meta name="description" content={articleContent?.summary || currentVersionMeta?.title || article.title || 'DBlog Article'} />
+	<title>{currentVersionMeta?.title || article.title || `Article #${article.articleId}`} - AmberInk</title>
+	<meta name="description" content={articleContent?.summary || currentVersionMeta?.title || article.title || 'AmberInk Article'} />
 </svelte:head>
 
 <!-- Medium-style article layout -->

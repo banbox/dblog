@@ -1,5 +1,6 @@
 {
 	"$schema": "https://inlang.com/schema/inlang-message-format",
+	"slogan": "落墨即永恒",
 	"publish_article": "发布文章",
 	"category": "分类",
 	"select_category": "选择分类",
@@ -214,7 +215,7 @@
 	"followers_count": "{count} 位粉丝",
 	"view_all": "查看全部",
 	"settings": "设置",
-	"settings_desc": "自定义 DBlog 配置。更改会保存到浏览器本地存储。",
+	"settings_desc": "自定义 AmberInk 配置。更改会保存到浏览器本地存储。",
 	"settings_saved": "设置已保存",
 	"customized": "已自定义",
 	"default_value": "默认值",

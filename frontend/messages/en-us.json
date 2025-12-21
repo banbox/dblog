@@ -1,5 +1,6 @@
 {
 	"$schema": "https://inlang.com/schema/inlang-message-format",
+	"slogan": "Ink Once, Exist Forever",
 	"publish_article": "Publish Article",
 	"category": "Category",
 	"select_category": "Select a category",
@@ -214,7 +215,7 @@
 	"followers_count": "{count} followers",
 	"view_all": "View all",
 	"settings": "Settings",
-	"settings_desc": "Customize your DBlog configuration. Changes are saved to your browser.",
+	"settings_desc": "Customize your AmberInk configuration. Changes are saved to your browser.",
 	"settings_saved": "Settings saved",
 	"customized": "Customized",
 	"default_value": "Default",

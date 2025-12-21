@@ -9,7 +9,7 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 
 /**
  * @title DeployScript
- * @dev 部署所有 DBlog 合约的脚本
+ * @dev 部署所有 dapp 合约的脚本
  * 
  * 使用方法:
  * 1. 本地测试: forge script script/Deploy.s.sol --rpc-url http://localhost:8545 --broadcast --tc DeployScript
@@ -41,7 +41,7 @@ contract DeployScript is Script {
         address entryPoint = vm.envOr("ENTRY_POINT", OPTIMISM_ENTRYPOINT);
         address treasury = vm.envOr("TREASURY", deployer);
 
-        console.log("=== DBlog Deployment ===");
+        console.log("=== dapp Deployment ===");
         console.log("Deployer:", deployer);
         console.log("EntryPoint:", entryPoint);
         console.log("Treasury:", treasury);
