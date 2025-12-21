@@ -169,7 +169,7 @@
 				const collectPriceUsdTrimmed = String(formData.collectPriceUsd ?? '0').trim();
 				const usdValue = parseFloat(collectPriceUsdTrimmed || '0');
 				if (usdValue > 0) {
-					// Convert USD to wei using Chainlink price
+					// Convert USD to wei using Pyth price
 					collectPrice = await usdToWei(collectPriceUsdTrimmed);
 				}
 			} catch {

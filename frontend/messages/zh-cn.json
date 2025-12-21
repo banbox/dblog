@@ -309,5 +309,8 @@
 	"approx_native": "≈ {amount} {symbol}",
 	"tip_in_usd": "打赏（美元）",
 	"dislike_in_usd": "不喜欢（美元）",
-	"collect_price_usd": "收藏价格（美元）"
+	"collect_price_usd": "收藏价格（美元）",
+	"compressing_image": "压缩图片中...",
+	"compression_complete": "已压缩：{original} → {compressed}",
+	"compression_failed": "图片压缩失败"
 }

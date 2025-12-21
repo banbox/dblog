@@ -23,25 +23,105 @@ const PUBLIC_DEFAULT_GAS_FEE_MULTIPLIER = (publicEnv as Record<string, string>)[
 
 const CONFIG_STORAGE_KEY = 'dblog_user_config';
 
-// Chainlink Price Feed addresses for different chains
-// ETH/USD price feeds - see https://docs.chain.link/data-feeds/price-feeds/addresses
-export const CHAINLINK_PRICE_FEEDS: Record<number, `0x${string}`> = {
+// Pyth Network contract addresses for different chains
+// See https://docs.pyth.network/price-feeds/contract-addresses/evm
+export const PYTH_CONTRACT_ADDRESSES: Record<number, `0x${string}`> = {
 	// Ethereum Mainnet
-	1: '0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419',
-	// Optimism Mainnet
-	10: '0x13e3Ee699D1909E989722E753853AE30b17e08c5',
-	// Polygon Mainnet (MATIC/USD)
-	137: '0xAB594600376Ec9fD91F8e885dADF0CE036862dE0',
-	// Arbitrum One
-	42161: '0x639Fe6ab55C921f74e7fac1ee960C0B6293ba612',
-	// Base Mainnet
-	8453: '0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70',
-	// Optimism Sepolia (testnet)
-	11155420: '0x61Ec26aA57019C486B10502285c5A3D4A4750AD7',
+	1: '0x4305FB66699C3B2702D4d05CF36551390A4c69C6',
 	// Sepolia (testnet)
-	11155111: '0x694AA1769357215DE4FAC081bf1f309aDC325306',
+	11155111: '0xDd24F84d36BF92C65F92307595335bdFab5Bbd21',
+
+	// Arbitrum One
+	42161: '0xff1a0f4744e8582DF1aE09D5611b887B6a12925C',
+	// Arbitrum Nova
+	42170: '0xff1a0f4744e8582DF1aE09D5611b887B6a12925C',
+	// Arbitrum Sepolia (Testnet)
+	421614: '0x4374e5a8b9C22271E9EB878A2AA31DE97DF15DAF',
+
+	// Optimism Mainnet
+	10: '0xff1a0f4744e8582DF1aE09D5611b887B6a12925C',
+	11155420: '0x0708325268dF9F66270F1401206434524814508b',
+
+	// Base Mainnet
+	8453: '0x8250f4aF4B972684F7b336503E2D6dFeDeB1487a',
+	84532: '0xA2aa501b19aff244D90cc15a4Cf739D2725B5729',
+
+	// zkSync Era
+	324: '0xf087c864AEccFb6A2Bf1Af6A0382B0d0f6c5D834',
+	300: '0x056f829183Ec806A78c26C98961678c24faB71af',
+
+	// Polygon zkEVM
+	1101: '0xC5E56d6b40F3e3B5fbfa266bCd35C37426537c65',
+	2442: '0xFf255f800044225f54Af4510332Aa3D67CC77635',
+	
+	// Polygon PoS
+	137: '0xff1a0f4744e8582DF1aE09D5611b887B6a12925C',
+	80002: '0x2880aB155794e7179c9eE2e38200202908C17B43',
+	
+	// Mantle
+	5000: '0xA2aa501b19aff244D90cc15a4Cf739D2725B5729',
+	5003: '0x98046Bd286715D3B0BC227Dd7a956b83D8978603',
+	
+	// Scroll
+	534352: '0xA2aa501b19aff244D90cc15a4Cf739D2725B5729',
+	534351: '0x41c9e39574F40Ad34c79f1C99B66A45eFB830d4c',
+	
 	// Local Anvil (mock - will use fallback price)
 	31337: '0x0000000000000000000000000000000000000000'
+};
+
+// Pyth Price Feed IDs - same across all chains
+// See https://pyth.network/developers/price-feed-ids
+export const PYTH_PRICE_FEED_IDS: Record<string, `0x${string}`> = {
+	// ETH/USD - used for ETH, OP, Arbitrum, Base, Polygon zkEvm
+	'ETH': '0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace',
+	// POL/USD - Polygon Pos
+	'POL': '0xffd11c5a1cfd42f80afb2df4d9f264c15f956d68153335374ec10722edd70472',
+	// MNT/USD - Mantle
+	'MNT': '0x4e3037c822d852d79af3ac80e35eb420ee3b870dca49f9344a38ef4773fb0585'
+};
+
+// Map chain ID to native token symbol for price lookup
+export const CHAIN_NATIVE_TOKEN: Record<number, string> = {
+	// Ethereum
+	1: 'ETH',           // Ethereum Mainnet
+	11155111: 'ETH',    // Sepolia (Testnet)
+	
+	// Arbitrum
+	42161: 'ETH',       // Arbitrum One (Mainnet)
+	42170: 'ETH',       // Arbitrum Nova (Mainnet)
+	421614: 'ETH',      // Arbitrum Sepolia (Testnet)
+	
+	// Optimism
+	10: 'ETH',          // Optimism Mainnet (OP Mainnet)
+	11155420: 'ETH',    // Optimism Sepolia (Testnet)
+	
+	// Base
+	8453: 'ETH',        // Base Mainnet
+	84532: 'ETH',       // Base Sepolia (Testnet)
+	
+	// zkSync Era
+	324: 'ETH',         // zkSync Era Mainnet
+	300: 'ETH',         // zkSync Sepolia (Testnet)
+	
+	// Polygon zkEVM
+	1101: 'ETH',        // Polygon zkEVM Mainnet
+	2442: 'ETH',        // Polygon zkEVM Cardona (Testnet)
+	
+	// Polygon PoS
+	137: 'POL',         // Polygon PoS Mainnet
+	80002: 'POL',       // Polygon Amoy (Testnet)
+	
+	// Mantle
+	5000: 'MNT',        // Mantle Mainnet
+	5003: 'MNT',        // Mantle Sepolia (Testnet)
+	
+	// Scroll
+	534352: 'ETH',      // Scroll Mainnet
+	534351: 'ETH',      // Scroll Sepolia (Testnet)
+	
+	// Local Development
+	31337: 'ANVIL'      // Local Anvil
 };
 
 // Default values (used when env vars are not set)
@@ -278,10 +358,17 @@ export function getConfig() {
 	};
 }
 
-// Get Chainlink Price Feed address for current chain
-export function getChainlinkPriceFeedAddress(): `0x${string}` {
+// Get Pyth contract address for current chain
+export function getPythContractAddress(): `0x${string}` {
 	const chainId = getConfig().chainId;
-	return CHAINLINK_PRICE_FEEDS[chainId] || '0x0000000000000000000000000000000000000000';
+	return PYTH_CONTRACT_ADDRESSES[chainId] || '0x0000000000000000000000000000000000000000';
+}
+
+// Get Pyth Price Feed ID for current chain's native token
+export function getPythPriceFeedId(): `0x${string}` {
+	const chainId = getConfig().chainId;
+	const tokenSymbol = CHAIN_NATIVE_TOKEN[chainId] || 'ETH';
+	return PYTH_PRICE_FEED_IDS[tokenSymbol] || PYTH_PRICE_FEED_IDS['ETH'];
 }
 
 // Get current user overrides

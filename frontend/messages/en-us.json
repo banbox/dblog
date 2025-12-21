@@ -309,5 +309,8 @@
 	"approx_native": "≈ {amount} {symbol}",
 	"tip_in_usd": "Tip (USD)",
 	"dislike_in_usd": "Dislike (USD)",
-	"collect_price_usd": "Collect Price (USD)"
+	"collect_price_usd": "Collect Price (USD)",
+	"compressing_image": "Compressing image...",
+	"compression_complete": "Compressed: {original} → {compressed}",
+	"compression_failed": "Failed to compress image"
 }

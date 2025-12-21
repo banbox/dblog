@@ -11,6 +11,7 @@
 		hasSessionKeySufficientBalance,
 		fundSessionKey
 	} from '$lib/sessionKey';
+	import { getNativeTokenSymbol } from '$lib/priceService';
 
 	let hasSessionKey = $state(false);
 	let validUntil = $state<Date | null>(null);
@@ -115,7 +116,7 @@
 		<div class="mb-4 flex items-center gap-2">
 			<span class="text-sm text-gray-500">{m.balance()}:</span>
 			<span class={isBalanceSufficient ? 'text-sm text-gray-700' : 'text-sm font-medium text-orange-600'}>
-				{formattedBalance} ETH
+				{formattedBalance} {getNativeTokenSymbol()}
 			</span>
 			{#if !isBalanceSufficient}
 				<span class="text-xs text-orange-500">({m.low_balance()})</span>

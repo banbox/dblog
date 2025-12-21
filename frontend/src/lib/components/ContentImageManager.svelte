@@ -103,21 +103,19 @@
 		if (file.size > effectiveMaxFileSize) {
 			try {
 				isCompressing = true;
-				compressionStatus = m.compressing_image ? m.compressing_image() : 'Compressing image...';
+				compressionStatus = m.compressing_image();
 
 				const result = await compressImage(file, {
 					maxSize: effectiveMaxFileSize
 				});
 
 				file = result.file;
-				compressionStatus = m.compression_complete 
-					? m.compression_complete({ original: formatFileSize(result.originalSize), compressed: formatFileSize(result.compressedSize) })
-					: `Compressed: ${formatFileSize(result.originalSize)} → ${formatFileSize(result.compressedSize)}`;
+				compressionStatus = m.compression_complete({ original: formatFileSize(result.originalSize), compressed: formatFileSize(result.compressedSize) });
 
 				// Clear status after 3 seconds
 				setTimeout(() => { compressionStatus = ''; }, 3000);
 			} catch (err) {
-				error = m.compression_failed ? m.compression_failed() : 'Failed to compress image';
+				error = m.compression_failed();
 				isCompressing = false;
 				return;
 			} finally {

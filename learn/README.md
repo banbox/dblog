@@ -1052,3 +1052,19 @@ Claude: 已实现
 @help.md 当前已经在文章发布和编辑时，增加了内容中图片上传的自动压缩功能，确保上传图片最大不会超过配置的irys大小限制；不过我刚测试发现上传900K的图片，最后输出的是112k，依然超过了100k的限制；目前按说在压缩时已经支持了压缩后大小检测，超过时重试压缩功能，不应该还超出限制，请分析相关代码，排查原因，帮我解决  
 Claude: 调整frontend\src\lib\utils\imageCompressor.ts中的若干参数解决
 
+### 2025-12-20 16:46  价格改Pyth Network
+@README.md @help.md 当前项目中多处涉及打赏和支付等金额，包括发布文章时充值，赞赏，不喜欢的赞赏等；后续此应用会发布到多个区块链上，如OP和POL等，每个链的币价格都不一样，当前的固定数量对用户很不友好。所以我希望改为统一使用USD计价，需要使用金额时，自动根据最新价格计算折算后币的数量；需要维护任何配置或接口时，应当统一维护在 frontend\src\lib\stores\config.svelte.ts；并允许用户在settings页面修改配置  
+目前上面内容已全部实现。
+当前价格的获取是前端调用Chainlink Price Feeds获取的，基于viem实现；而在Chainlink中每个交易对都有一个单独的合约地址，这很不方便；所以请帮我改为使用Pyth Network；重点应该是修改 frontend\src\lib\priceService.ts 和相关配置；其他的使用的地方可能也需要适当修改；  
+Claude：已完成
+
+### 2025-12-20 13:21  多链支持
+EVM兼容链，layer 2的，目前最流行的top 20是哪些链？  
+综合多个AI：Arbitrum, Optimism, Base, zkSync Era, Polygon zkEVM, Polygon PoS, Mantle, Scroll  
+开发者：这些链中，他们各自默认的转账代币是什么？我在开发dapp  
+Gemini：Polygon PoS是POL，Mantle是MNT；其他都是ETH  
+开发者：帮我找出上面几个链各自的链ID是多少，包括主网和测试网  
+Gemini：给出表格，让Claude更新到frontend\src\lib\stores\config.svelte.ts  
+
+### 2025-12-20 14:39  代币显示错误纠正
+@help.md 当前支持了多链部署智能合约；大部分链的代币都是ETH，不过Polygon Pos和Mantle的代币是不一样的；为了测试我把本地Anvil的对应代币在 frontend\src\lib\stores\config.svelte.ts 的124行改为了ANVIL；不过我发现在多个页面涉及代币的地方，显示的依然是ETH；这些地方或许硬编码了，或许使用错误；请帮我找到并全部从配置中读取；涉及文章详情，文章列表项等等  
