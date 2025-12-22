@@ -89,6 +89,12 @@
 
 	async function handleCollect() {
 		if (!requireWallet() || isCollecting) return;
+		// Security check: prevent self-collect
+		if (isAuthor) {
+			showFeedback('error', m.cannot_self_collect({}));
+			showCollectModal = false;
+			return;
+		}
 
 		const maxSupply = BigInt(article.maxCollectSupply);
 		const currentCount = BigInt(localCollectCount);
@@ -277,6 +283,12 @@
 	// Handle Dislike
 	async function handleDislike() {
 		if (!requireWallet()) return;
+		// Security check: prevent self-evaluation
+		if (isAuthor) {
+			showFeedback('error', m.cannot_self_evaluate({}));
+			showDislikeModal = false;
+			return;
+		}
 		const amount = parseFloat(dislikeAmountUsd);
 		if (isNaN(amount) || amount <= 0) {
 			showFeedback('error', 'Invalid amount');
@@ -306,6 +318,11 @@
 	// Handle Follow
 	async function handleFollow() {
 		if (!requireWallet()) return;
+		// Security check: prevent self-follow
+		if (isAuthor) {
+			showFeedback('error', m.cannot_self_follow({}));
+			return;
+		}
 		isFollowing = true;
 		try {
 			const targetAddress = (authorId || article.author?.id || '') as `0x${string}`;
@@ -324,6 +341,12 @@
 	// Handle Tip
 	async function handleTip() {
 		if (!requireWallet()) return;
+		// Security check: prevent self-evaluation
+		if (isAuthor) {
+			showFeedback('error', m.cannot_self_evaluate({}));
+			showTipModal = false;
+			return;
+		}
 		const amount = parseFloat(tipAmountUsd);
 		if (isNaN(amount) || amount <= 0) {
 			showFeedback('error', 'Invalid tip amount');

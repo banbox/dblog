@@ -313,5 +313,9 @@
 	"collect_price_usd": "Collect Price (USD)",
 	"compressing_image": "Compressing image...",
 	"compression_complete": "Compressed: {original} → {compressed}",
-	"compression_failed": "Failed to compress image"
+	"compression_failed": "Failed to compress image",
+	"cannot_self_evaluate": "You cannot like or dislike your own article",
+	"cannot_self_follow": "You cannot follow yourself",
+	"cannot_self_collect": "You cannot collect your own article",
+	"cannot_like_own_comment": "You cannot like your own comment"
 }

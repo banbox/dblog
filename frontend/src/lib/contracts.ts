@@ -101,6 +101,39 @@ function parseContractError(error: unknown): ContractError {
 		);
 	}
 
+	// Security errors - self-actions
+	if (lowerMessage.includes('cannotselfevaluate')) {
+		return new ContractError(
+			'contract_reverted',
+			'You cannot like or dislike your own article.',
+			error instanceof Error ? error : undefined
+		);
+	}
+
+	if (lowerMessage.includes('cannotselffollow')) {
+		return new ContractError(
+			'contract_reverted',
+			'You cannot follow yourself.',
+			error instanceof Error ? error : undefined
+		);
+	}
+
+	if (lowerMessage.includes('cannotselfcollect')) {
+		return new ContractError(
+			'contract_reverted',
+			'You cannot collect your own article.',
+			error instanceof Error ? error : undefined
+		);
+	}
+
+	if (lowerMessage.includes('cannotlikeowncomment')) {
+		return new ContractError(
+			'contract_reverted',
+			'You cannot like your own comment.',
+			error instanceof Error ? error : undefined
+		);
+	}
+
 	// User rejected transaction
 	if (
 		lowerMessage.includes('user rejected') ||

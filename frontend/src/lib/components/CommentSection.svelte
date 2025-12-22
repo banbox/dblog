@@ -69,6 +69,11 @@
 	async function handleLikeComment(comment: CommentData) {
 		if (!walletAddress) return;
 		if (likingCommentIds.has(comment.id)) return;
+		// Security check: prevent liking own comment
+		if (walletAddress.toLowerCase() === comment.user.id.toLowerCase()) {
+			alert(m.cannot_like_own_comment({}));
+			return;
+		}
 
 		likingCommentIds = new Set([...likingCommentIds, comment.id]);
 		try {

@@ -313,5 +313,9 @@
 	"collect_price_usd": "收藏价格（美元）",
 	"compressing_image": "压缩图片中...",
 	"compression_complete": "已压缩：{original} → {compressed}",
-	"compression_failed": "图片压缩失败"
+	"compression_failed": "图片压缩失败",
+	"cannot_self_evaluate": "您不能给自己的文章点赞或踩",
+	"cannot_self_follow": "您不能关注自己",
+	"cannot_self_collect": "您不能收藏自己的文章",
+	"cannot_like_own_comment": "您不能给自己的评论点赞"
 }

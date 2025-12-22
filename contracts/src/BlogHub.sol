@@ -46,6 +46,10 @@ contract BlogHub is
     error MaxSupplyReached();
     error CollectNotEnabled();
     error NotArticleAuthor();
+    error CannotSelfEvaluate();
+    error CannotSelfFollow();
+    error CannotSelfCollect();
+    error CannotLikeOwnComment();
     
     // 定义常量：最大评论长度（字节）
     // 140单词英文大约 700-1000 字节，中文约 400 汉字 = 1200 字节
@@ -418,6 +422,9 @@ contract BlogHub is
         Article storage article = articles[_articleId];
         address articleAuthor = article.author;
 
+        // --- 安全检查：禁止作者自我评价 ---
+        if (sender == articleAuthor) revert CannotSelfEvaluate();
+
         // --- 资金处理 ---
         if (amount > 0) {
             // 资金分配
@@ -461,6 +468,9 @@ contract BlogHub is
 
         Article storage article = articles[_articleId];
         address articleAuthor = article.author;
+
+        // --- 安全检查：禁止作者自我收藏 ---
+        if (sender == articleAuthor) revert CannotSelfCollect();
 
         uint256 maxSupply = article.maxCollectSupply;
         if (maxSupply == 0) revert CollectNotEnabled();
@@ -513,6 +523,8 @@ contract BlogHub is
         if (_articleId >= nextArticleId) revert ArticleNotFound();
         if (_commenter == address(0)) revert InvalidCommenter();
         if (amount == 0) revert SpamProtection();
+        // --- 安全检查：禁止给自己的评论点赞 ---
+        if (sender == _commenter) revert CannotLikeOwnComment();
 
         Article storage article = articles[_articleId];
         address articleAuthor = article.author;
@@ -638,6 +650,8 @@ contract BlogHub is
      * @dev 关注用户
      */
     function follow(address _target, bool _status) external whenNotPaused {
+        // --- 安全检查：禁止自我关注 ---
+        if (_msgSender() == _target) revert CannotSelfFollow();
         emit FollowStatusChanged(_msgSender(), _target, _status);
     }
 
@@ -817,6 +831,8 @@ contract BlogHub is
         uint256 deadline,
         bytes calldata signature
     ) external whenNotPaused {
+        // --- 安全检查：禁止自我关注 ---
+        if (owner == _target) revert CannotSelfFollow();
         {
             ISessionKeyManager manager = _requireSessionKeyManager();
             bytes4 selector = BlogHub.follow.selector;
