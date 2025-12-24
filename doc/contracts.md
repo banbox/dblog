@@ -421,7 +421,7 @@ forge script script/Deploy.s.sol --rpc-url http://localhost:8545 --broadcast --t
 
 ```bash
 # 1. 获取测试币
-# Optimism Sepolia Faucet: https://www.alchemy.com/faucets/optimism-sepolia
+# Optimism Sepolia Faucet: https://console.optimism.io/faucet
 
 # 2. 设置环境变量
 export PRIVATE_KEY=your_private_key_here
@@ -460,9 +460,9 @@ forge script script/Deploy.s.sol \
 
 ```bash
 # 检查合约是否正确部署
-cast call <BLOG_HUB_PROXY> "platformTreasury()(address)" --rpc-url $OP_SEPOLIA_RPC
-cast call <BLOG_HUB_PROXY> "sessionKeyManager()(address)" --rpc-url $OP_SEPOLIA_RPC
-cast call <PAYMASTER> "getEntryPointDeposit()(uint256)" --rpc-url $OP_SEPOLIA_RPC
+cast call $BLOG_HUB_PROXY "platformTreasury()(address)" --rpc-url $OP_SEPOLIA_RPC
+cast call $BLOG_HUB_PROXY "sessionKeyManager()(address)" --rpc-url $OP_SEPOLIA_RPC
+cast call $PAYMASTER "getEntryPointDeposit()(uint256)" --rpc-url $OP_SEPOLIA_RPC
 ```
 
 ---
