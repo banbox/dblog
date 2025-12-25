@@ -11,8 +11,6 @@ import {
 	PUBLIC_RPC_URL,
 	PUBLIC_CHAIN_ID,
 	PUBLIC_IRYS_NETWORK,
-	PUBLIC_APP_NAME,
-	PUBLIC_APP_VERSION,
 	PUBLIC_ARWEAVE_GATEWAYS,
 	PUBLIC_SUBSQUID_ENDPOINT
 } from '$env/static/public';
@@ -53,19 +51,19 @@ export const PYTH_CONTRACT_ADDRESSES: Record<number, `0x${string}`> = {
 	// Polygon zkEVM
 	1101: '0xC5E56d6b40F3e3B5fbfa266bCd35C37426537c65',
 	2442: '0xFf255f800044225f54Af4510332Aa3D67CC77635',
-	
+
 	// Polygon PoS
 	137: '0xff1a0f4744e8582DF1aE09D5611b887B6a12925C',
 	80002: '0x2880aB155794e7179c9eE2e38200202908C17B43',
-	
+
 	// Mantle
 	5000: '0xA2aa501b19aff244D90cc15a4Cf739D2725B5729',
 	5003: '0x98046Bd286715D3B0BC227Dd7a956b83D8978603',
-	
+
 	// Scroll
 	534352: '0xA2aa501b19aff244D90cc15a4Cf739D2725B5729',
 	534351: '0x41c9e39574F40Ad34c79f1C99B66A45eFB830d4c',
-	
+
 	// Local Anvil (mock - will use fallback price)
 	31337: '0x0000000000000000000000000000000000000000'
 };
@@ -86,40 +84,40 @@ export const CHAIN_NATIVE_TOKEN: Record<number, string> = {
 	// Ethereum
 	1: 'ETH',           // Ethereum Mainnet
 	11155111: 'ETH',    // Sepolia (Testnet)
-	
+
 	// Arbitrum
 	42161: 'ETH',       // Arbitrum One (Mainnet)
 	42170: 'ETH',       // Arbitrum Nova (Mainnet)
 	421614: 'ETH',      // Arbitrum Sepolia (Testnet)
-	
+
 	// Optimism
 	10: 'ETH',          // Optimism Mainnet (OP Mainnet)
 	11155420: 'ETH',    // Optimism Sepolia (Testnet)
-	
+
 	// Base
 	8453: 'ETH',        // Base Mainnet
 	84532: 'ETH',       // Base Sepolia (Testnet)
-	
+
 	// zkSync Era
 	324: 'ETH',         // zkSync Era Mainnet
 	300: 'ETH',         // zkSync Sepolia (Testnet)
-	
+
 	// Polygon zkEVM
 	1101: 'ETH',        // Polygon zkEVM Mainnet
 	2442: 'ETH',        // Polygon zkEVM Cardona (Testnet)
-	
+
 	// Polygon PoS
 	137: 'POL',         // Polygon PoS Mainnet
 	80002: 'POL',       // Polygon Amoy (Testnet)
-	
+
 	// Mantle
 	5000: 'MNT',        // Mantle Mainnet
 	5003: 'MNT',        // Mantle Sepolia (Testnet)
-	
+
 	// Scroll
 	534352: 'ETH',      // Scroll Mainnet
 	534351: 'ETH',      // Scroll Sepolia (Testnet)
-	
+
 	// Local Development
 	31337: 'ANVIL'      // Local Anvil
 };
@@ -157,17 +155,15 @@ export const envDefaults = {
 	rpcUrl: PUBLIC_RPC_URL || defaults.rpcUrl,
 	chainId: PUBLIC_CHAIN_ID ? parseInt(PUBLIC_CHAIN_ID, 10) : defaults.chainId,
 	irysNetwork: (PUBLIC_IRYS_NETWORK || defaults.irysNetwork) as 'mainnet' | 'devnet',
-	appName: PUBLIC_APP_NAME || defaults.appName,
-	appVersion: PUBLIC_APP_VERSION || defaults.appVersion,
 	arweaveGateways: PUBLIC_ARWEAVE_GATEWAYS
 		? PUBLIC_ARWEAVE_GATEWAYS.split(',').map((g: string) => g.trim())
 		: defaults.arweaveGateways,
 	subsquidEndpoint: PUBLIC_SUBSQUID_ENDPOINT || defaults.subsquidEndpoint,
-	minGasFeeMultiplier: PUBLIC_MIN_GAS_FEE_MULTIPLIER 
-		? parseInt(PUBLIC_MIN_GAS_FEE_MULTIPLIER, 10) 
+	minGasFeeMultiplier: PUBLIC_MIN_GAS_FEE_MULTIPLIER
+		? parseInt(PUBLIC_MIN_GAS_FEE_MULTIPLIER, 10)
 		: defaults.minGasFeeMultiplier,
-	defaultGasFeeMultiplier: PUBLIC_DEFAULT_GAS_FEE_MULTIPLIER 
-		? parseInt(PUBLIC_DEFAULT_GAS_FEE_MULTIPLIER, 10) 
+	defaultGasFeeMultiplier: PUBLIC_DEFAULT_GAS_FEE_MULTIPLIER
+		? parseInt(PUBLIC_DEFAULT_GAS_FEE_MULTIPLIER, 10)
 		: defaults.defaultGasFeeMultiplier,
 	irysFreeUploadLimit: defaults.irysFreeUploadLimit,
 	minActionValue: defaults.minActionValue,
@@ -181,8 +177,8 @@ export const envDefaults = {
 };
 
 // User-overridable config keys
-// NOT overridable: appName, appVersion, minGasFeeMultiplier, irysFreeUploadLimit, minActionValue
-export type UserConfigKey = 
+// NOT overridable: minGasFeeMultiplier, irysFreeUploadLimit, minActionValue
+export type UserConfigKey =
 	| 'blogHubContractAddress'
 	| 'sessionKeyManagerAddress'
 	| 'rpcUrl'
@@ -332,9 +328,6 @@ let userConfig = $state<UserConfig>(loadUserConfig());
 // Merged config (user overrides + env defaults)
 export function getConfig() {
 	return {
-		// Non-overridable (always from env)
-		appName: envDefaults.appName,
-		appVersion: envDefaults.appVersion,
 		// Overridable
 		blogHubContractAddress: (userConfig.blogHubContractAddress || envDefaults.blogHubContractAddress) as `0x${string}`,
 		sessionKeyManagerAddress: (userConfig.sessionKeyManagerAddress || envDefaults.sessionKeyManagerAddress) as `0x${string}`,

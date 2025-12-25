@@ -425,11 +425,11 @@ forge script script/Deploy.s.sol --rpc-url http://localhost:8545 --broadcast --t
 
 # 2. 设置环境变量
 export PRIVATE_KEY=your_private_key_here
-export OP_SEPOLIA_RPC=https://sepolia.optimism.io
+export ETHERSCAN_RPC=https://sepolia.optimism.io
 export ETHERSCAN_API_KEY=your_etherscan_api_key
 
 # 3. 验证余额
-cast balance $(cast wallet address --private-key $PRIVATE_KEY) --rpc-url $OP_SEPOLIA_RPC
+cast balance $(cast wallet address --private-key $PRIVATE_KEY) --rpc-url $ETHERSCAN_RPC
 ```
 
 ### 6.2 部署到 Optimism Sepolia
@@ -439,10 +439,10 @@ cd contracts
 
 # 部署所有合约
 forge script script/Deploy.s.sol \
-  --rpc-url $OP_SEPOLIA_RPC \
+  --rpc-url $ETHERSCAN_RPC \
   --broadcast \
   --verify \
-  --etherscan-api-key $ETHERSCAN_API_KEY \
+  --etherscan-api-key $ETHERSCAN_API_KEY \  # optional
   --tc DeployScript
 
 # 配置 Paymaster
@@ -451,7 +451,7 @@ DEPOSIT_AMOUNT=100000000000000000 \
 STAKE_AMOUNT=100000000000000000 \
 UNSTAKE_DELAY=86400 \
 forge script script/Deploy.s.sol \
-  --rpc-url $OP_SEPOLIA_RPC \
+  --rpc-url $ETHERSCAN_RPC \
   --broadcast \
   --tc ConfigurePaymaster
 ```
@@ -460,9 +460,9 @@ forge script script/Deploy.s.sol \
 
 ```bash
 # 检查合约是否正确部署
-cast call $BLOG_HUB_PROXY "platformTreasury()(address)" --rpc-url $OP_SEPOLIA_RPC
-cast call $BLOG_HUB_PROXY "sessionKeyManager()(address)" --rpc-url $OP_SEPOLIA_RPC
-cast call $PAYMASTER "getEntryPointDeposit()(uint256)" --rpc-url $OP_SEPOLIA_RPC
+cast call $BLOG_HUB_PROXY "platformTreasury()(address)" --rpc-url $ETHERSCAN_RPC
+cast call $BLOG_HUB_PROXY "sessionKeyManager()(address)" --rpc-url $ETHERSCAN_RPC
+cast call $PAYMASTER "getEntryPointDeposit()(uint256)" --rpc-url $ETHERSCAN_RPC
 ```
 
 ---

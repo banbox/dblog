@@ -1,16 +1,16 @@
 /**
  * Application configuration
- * 
+ *
  * This module provides configuration values that can be:
  * 1. Set at build time via environment variables (PUBLIC_* vars)
  * 2. Overridden by users at runtime via localStorage (Settings page)
- * 
+ *
  * All getter functions return the merged config (user overrides > env defaults)
  * appName and appVersion are NOT user-overridable
  */
-import { 
-	getConfig, 
-	defaults, 
+import {
+	getConfig,
+	defaults,
 	envDefaults,
 	getUserConfig,
 	setConfigValue,
@@ -74,11 +74,11 @@ export function getIrysNetwork(): 'mainnet' | 'devnet' {
 }
 
 export function getAppName(): string {
-	return getConfig().appName;
+	return defaults.appName;
 }
 
 export function getAppVersion(): string {
-	return getConfig().appVersion;
+	return defaults.appVersion;
 }
 
 export function getArweaveGateways(): string[] {

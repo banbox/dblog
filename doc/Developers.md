@@ -48,6 +48,23 @@
 
 ---
 
+# 重要约定
+### 环境变量配置
+
+项目提供三套环境配置文件，根据开发阶段选择使用：
+
+| 环境 | 配置文件 | 区块链 | SubSquid | Irys/Arweave |
+|------|----------|--------|----------|--------------|
+| **dev** | `.env.dev` | 本地 Anvil (31337) | 本地 localhost:4350 | Devnet (测试) |
+| **test** | `.env.test` | Optimism Sepolia (11155420) | SubSquid Cloud (测试) | Devnet (测试) |
+| **prod** | `.env.prod` | Optimism Mainnet (10) | SubSquid Cloud (生产) | Mainnet (永久) |
+
+**切换环境：**
+
+```bash
+cp .env.example .env
+```
+
 # Part 2: SubSquid 索引
 
 ## 1. SubSquid 项目初始化
@@ -153,6 +170,9 @@ Processor 配置位于 `src/processor.ts`，订阅 BlogHub 合约的所有核心
 # 启动本地 PostgreSQL（使用 Docker）
 docker compose up -d
 
+# 应用数据库迁移（先应用已有的迁移文件）
+npx squid-typeorm-migration apply
+
 # 生成数据库迁移
 npx squid-typeorm-migration generate
 
@@ -186,16 +206,20 @@ sqd auth -k YOUR_DEPLOYMENT_KEY
 sqd deploy .
 ```
 
-### 4.3 前端集成
+### 4.3 部署到自己服务器
 
-```shell
-# 创建 SvelteKit 项目
-npx sv create frontend
-cd frontend
-npm install
-npm run dev
+```bash
+cd squid
+npx squid-evm-typegen src/abi src/abi/BlogHub.json
+npx squid-typeorm-codegen
+npx tsc
+cp .env.example .env.test  # or prod
+vim .env.test
+npx squid-typeorm-migration apply
+npm run build
+pm2 start ecosystem.config.js [--env production]
 ```
-
+在nginx中配置4350端口到某个域名
 
 # Part 3: Irys + Arweave 存储
 
@@ -358,29 +382,6 @@ frontend/
 ├── svelte.config.js          # Svelte 配置
 ├── vite.config.ts            # Vite 配置
 └── package.json
-```
-
-### 8.4 环境变量配置
-
-项目提供三套环境配置文件，根据开发阶段选择使用：
-
-| 环境 | 配置文件 | 区块链 | SubSquid | Irys/Arweave |
-|------|----------|--------|----------|--------------|
-| **dev** | `.env.dev` | 本地 Anvil (31337) | 本地 localhost:4350 | Devnet (测试) |
-| **test** | `.env.test` | Optimism Sepolia (11155420) | SubSquid Cloud (测试) | Devnet (测试) |
-| **prod** | `.env.prod` | Optimism Mainnet (10) | SubSquid Cloud (生产) | Mainnet (永久) |
-
-**切换环境：**
-
-```bash
-# 开发环境（本地 Anvil + 本地 SubSquid）
-cp .env.dev .env
-
-# 测试环境（Optimism Sepolia + SubSquid Cloud 测试）
-cp .env.test .env
-
-# 生产环境（Optimism Mainnet + SubSquid Cloud 生产）
-cp .env.prod .env
 ```
 
 ---
