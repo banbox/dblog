@@ -18,6 +18,19 @@ const envFinalityConfirmation = process.env.FINALITY_CONFIRMATION
 const envBlockRangeFrom = process.env.BLOCK_RANGE_FROM
 const envGatewayUrl = process.env.GATEWAY_URL
 
+// 启动时输出重要环境变量配置
+console.log('========================================')
+console.log('🚀 Squid Processor Starting...')
+console.log('========================================')
+console.log('📋 Environment Configuration:')
+console.log(`   RPC_ETH_HTTP:          ${process.env.RPC_ETH_HTTP || 'http://localhost:8545 (default)'}`)
+console.log(`   BLOG_HUB_ADDRESS:      ${BLOG_HUB_ADDRESS}`)
+console.log(`   RPC_RATE_LIMIT:        ${envRateLimit || '10 (default)'}`)
+console.log(`   FINALITY_CONFIRMATION: ${envFinalityConfirmation || '75 (default)'}`)
+console.log(`   BLOCK_RANGE_FROM:      ${envBlockRangeFrom || '0 (default)'}`)
+console.log(`   GATEWAY_URL:           ${envGatewayUrl || 'Not configured'}`)
+console.log('========================================')
+
 // 创建 processor 实例
 const processorBuilder = new EvmBatchProcessor()
 
