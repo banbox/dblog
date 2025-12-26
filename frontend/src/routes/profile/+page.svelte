@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
+	import { page } from '$app/stores';
 	import * as m from '$lib/paraglide/messages';
 	import {
 		client,
@@ -7,20 +8,34 @@
 		ARTICLES_BY_AUTHOR_QUERY,
 		USER_FOLLOWERS_QUERY,
 		USER_FOLLOWING_QUERY,
+		SESSION_KEY_TRANSACTIONS_QUERY,
 		type ArticleData,
 		type UserData,
-		type FollowData
+		type FollowData,
+		type TransactionData
 	} from '$lib/graphql';
 	import { getWalletAddress, isWalletConnected } from '$lib/stores/wallet.svelte';
 	import { updateProfile } from '$lib/contracts';
 	import ArticleListItem from '$lib/components/ArticleListItem.svelte';
 	import { getAvatarUrl, uploadImage } from '$lib/arweave';
 	import { getIrysNetwork, getConfig } from '$lib/config';
-	import { shortAddress, formatDate } from '$lib/utils';
+	import { shortAddress, formatDate, formatEth } from '$lib/utils';
 	import ImageProcessor from '$lib/components/ImageProcessor.svelte';
 	import { LockIcon, SpinnerIcon } from '$lib/components/icons';
+	import { 
+		getStoredSessionKey, 
+		isSessionKeyExpired, 
+		getSessionKeyBalance,
+		reauthorizeSessionKey,
+		revokeSessionKey,
+		withdrawAllFromSessionKey,
+		createNewSessionKey,
+		type StoredSessionKey
+	} from '$lib/sessionKey';
+	import { formatEther } from 'viem';
+	import { getBlockExplorerTxUrl } from '$lib/chain';
 
-	type TabType = 'articles' | 'followers' | 'following' | 'about';
+	type TabType = 'articles' | 'followers' | 'following' | 'about' | 'sessionkey';
 
 	const PAGE_SIZE = 20;
 
@@ -46,11 +61,26 @@
 	let walletAddress = $derived(getWalletAddress());
 	let connected = $derived(isWalletConnected());
 
+	// Session Key state
+	let sessionKey = $state<StoredSessionKey | null>(null);
+	let sessionKeyBalance = $state<bigint>(0n);
+	let sessionKeyTransactions = $state<TransactionData[]>([]);
+	let loadingSessionKey = $state(false);
+	let loadingTransactions = $state(false);
+	let reauthorizing = $state(false);
+	let withdrawing = $state(false);
+	let creatingNewKey = $state(false);
+	let sessionKeyError = $state('');
+	let transactionsOffset = $state(0);
+	let hasMoreTransactions = $state(true);
+	const TRANSACTIONS_PAGE_SIZE = 10;
+
 	const tabs: { key: TabType; label: () => string }[] = [
 		{ key: 'articles', label: () => m.articles() },
 		{ key: 'followers', label: () => m.followers() },
 		{ key: 'following', label: () => m.following_count() },
-		{ key: 'about', label: () => m.about_me() }
+		{ key: 'about', label: () => m.about_me() },
+		{ key: 'sessionkey', label: () => 'Session Key' }
 	];
 
 	async function fetchUserProfile() {
@@ -168,6 +198,144 @@
 		}
 	}
 
+	async function fetchSessionKeyInfo() {
+		if (loadingSessionKey) return;
+		loadingSessionKey = true;
+
+		try {
+			const sk = getStoredSessionKey();
+			if (sk) {
+				sessionKey = sk;
+				const balance = await getSessionKeyBalance(sk.address);
+				sessionKeyBalance = balance;
+				// Reset transactions and fetch first page
+				await fetchSessionKeyTransactions(true);
+			} else {
+				sessionKey = null;
+				sessionKeyBalance = 0n;
+				sessionKeyTransactions = [];
+				transactionsOffset = 0;
+				hasMoreTransactions = true;
+			}
+		} catch (e) {
+			console.error('Failed to fetch session key info:', e);
+		} finally {
+			loadingSessionKey = false;
+		}
+	}
+
+	async function fetchSessionKeyTransactions(reset = false) {
+		if (!sessionKey || loadingTransactions) return;
+
+		loadingTransactions = true;
+		const currentOffset = reset ? 0 : transactionsOffset;
+
+		try {
+			const result = await client
+				.query(SESSION_KEY_TRANSACTIONS_QUERY, {
+					sessionKey: sessionKey.address.toLowerCase(),
+					limit: TRANSACTIONS_PAGE_SIZE,
+					offset: currentOffset
+				})
+				.toPromise();
+
+			const newTransactions = result.data?.transactions || [];
+
+			if (reset) {
+				sessionKeyTransactions = newTransactions;
+				transactionsOffset = TRANSACTIONS_PAGE_SIZE;
+			} else {
+				sessionKeyTransactions = [...sessionKeyTransactions, ...newTransactions];
+				transactionsOffset = currentOffset + TRANSACTIONS_PAGE_SIZE;
+			}
+
+			hasMoreTransactions = newTransactions.length === TRANSACTIONS_PAGE_SIZE;
+		} catch (e) {
+			console.error('Failed to fetch session key transactions:', e);
+		} finally {
+			loadingTransactions = false;
+		}
+	}
+
+	async function handleReauthorize() {
+		if (!sessionKey || reauthorizing) return;
+		reauthorizing = true;
+		sessionKeyError = '';
+
+		try {
+			const updated = await reauthorizeSessionKey(sessionKey);
+			sessionKey = updated;
+			await fetchSessionKeyInfo();
+		} catch (e) {
+			console.error('Failed to reauthorize session key:', e);
+			sessionKeyError = 'Failed to reauthorize: ' + (e instanceof Error ? e.message : 'Unknown error');
+		} finally {
+			reauthorizing = false;
+		}
+	}
+
+	async function handleWithdrawAll() {
+		if (!sessionKey || withdrawing) return;
+		
+		const balance = sessionKeyBalance;
+		if (balance === 0n) {
+			sessionKeyError = 'No balance to withdraw';
+			return;
+		}
+
+		if (!confirm(`Withdraw all balance (${formatEther(balance)} ETH) from Session Key to your main wallet?`)) {
+			return;
+		}
+
+		withdrawing = true;
+		sessionKeyError = '';
+
+		try {
+			await withdrawAllFromSessionKey(sessionKey.address);
+			await fetchSessionKeyInfo();
+		} catch (e) {
+			console.error('Failed to withdraw:', e);
+			sessionKeyError = 'Failed to withdraw: ' + (e instanceof Error ? e.message : 'Unknown error');
+		} finally {
+			withdrawing = false;
+		}
+	}
+
+	async function handleCreateNewKey() {
+		if (creatingNewKey) return;
+		creatingNewKey = true;
+		sessionKeyError = '';
+
+		try {
+			const newKey = await createNewSessionKey(false);
+			sessionKey = newKey;
+			await fetchSessionKeyInfo();
+		} catch (e) {
+			if (e instanceof Error && e.message === 'User cancelled Session Key creation') {
+				// User cancelled, do nothing
+				console.log('User cancelled Session Key creation');
+			} else {
+				console.error('Failed to create session key:', e);
+				sessionKeyError = 'Failed to create: ' + (e instanceof Error ? e.message : 'Unknown error');
+			}
+		} finally {
+			creatingNewKey = false;
+		}
+	}
+
+	async function handleRevoke() {
+		if (!sessionKey || !confirm('Are you sure you want to revoke this Session Key? This action cannot be undone.')) return;
+		sessionKeyError = '';
+
+		try {
+			await revokeSessionKey();
+			await fetchSessionKeyInfo();
+		} catch (e) {
+			console.error('Failed to revoke session key:', e);
+			sessionKeyError = 'Failed to revoke: ' + (e instanceof Error ? e.message : 'Unknown error');
+		}
+	}
+
 	function switchTab(tab: TabType) {
 		if (tab === activeTab) return;
 		activeTab = tab;
@@ -180,6 +348,8 @@
 			fetchFollowers(true);
 		} else if (tab === 'following') {
 			fetchFollowing(true);
+		} else if (tab === 'sessionkey') {
+			fetchSessionKeyInfo();
 		}
 	}
 
@@ -248,6 +418,15 @@
 			if (addr) {
 				fetchUserProfile();
 				fetchArticles(true);
+				
+				// Check URL parameter for tab
+				const urlTab = $page.url.searchParams.get('tab');
+				if (urlTab && ['articles', 'followers', 'following', 'about', 'sessionkey'].includes(urlTab)) {
+					activeTab = urlTab as TabType;
+					if (urlTab === 'sessionkey') {
+						fetchSessionKeyInfo();
+					}
+				}
 			} else {
 				user = null;
 				articles = [];
@@ -580,6 +759,179 @@
 					<SpinnerIcon size={24} class="text-gray-500" />
 					<span>{m.loading()}</span>
 				</div>
+			</div>
+		{:else if activeTab === 'sessionkey'}
+			<div class="py-4">
+				{#if loadingSessionKey}
+					<div class="flex justify-center py-8">
+						<SpinnerIcon size={32} class="text-gray-500" />
+					</div>
+				{:else}
+					<div class="space-y-6">
+						<!-- Error Message -->
+						{#if sessionKeyError}
+							<div class="rounded-lg border border-red-200 bg-red-50 p-4">
+								<p class="text-sm text-red-800">{sessionKeyError}</p>
+							</div>
+						{/if}
+
+						{#if sessionKey}
+							<!-- Session Key Info -->
+							<div class="rounded-lg border border-gray-200 bg-white p-6">
+								<div class="mb-4 flex items-center justify-between">
+									<h3 class="text-lg font-semibold text-gray-900">Session Key Information</h3>
+									<button
+										type="button"
+										onclick={handleCreateNewKey}
+										disabled={creatingNewKey}
+										class="text-sm text-blue-600 hover:text-blue-700 disabled:opacity-50"
+									>
+										{creatingNewKey ? 'Creating...' : 'Create New Session Key'}
+									</button>
+								</div>
+							
+							<!-- Address -->
+							<div class="mb-4">
+								<p class="text-sm font-medium text-gray-500">Address</p>
+								<p class="mt-1 font-mono text-sm text-gray-900">{sessionKey.address}</p>
+							</div>
+
+							<!-- Balance -->
+							<div class="mb-4">
+								<p class="text-sm font-medium text-gray-500">Balance</p>
+								<p class="mt-1 text-lg font-semibold text-gray-900">
+									{formatEther(sessionKeyBalance)} ETH
+								</p>
+							</div>
+
+							<!-- Validity Period -->
+							<div class="mb-4">
+								<p class="text-sm font-medium text-gray-500">Status</p>
+								<div class="mt-1">
+									{#if isSessionKeyExpired(sessionKey)}
+										<span class="inline-flex items-center rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-800">
+											Expired
+										</span>
+										<p class="mt-2 text-sm text-gray-600">
+											Expired at: {new Date(sessionKey.validUntil * 1000).toLocaleString()}
+										</p>
+									{:else}
+										<span class="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-800">
+											Active
+										</span>
+										<p class="mt-2 text-sm text-gray-600">
+											Expires at: {new Date(sessionKey.validUntil * 1000).toLocaleString()}
+										</p>
+									{/if}
+								</div>
+							</div>
+
+								<!-- Actions -->
+								<div class="flex flex-wrap gap-3">
+									{#if isSessionKeyExpired(sessionKey)}
+										<button
+											type="button"
+											onclick={handleReauthorize}
+											disabled={reauthorizing}
+											class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+										>
+											{reauthorizing ? 'Reauthorizing...' : 'Reauthorize'}
+										</button>
+									{/if}
+									<button
+										type="button"
+										onclick={handleWithdrawAll}
+										disabled={withdrawing || sessionKeyBalance === 0n}
+										class="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+									>
+										{withdrawing ? 'Withdrawing...' : 'Withdraw All'}
+									</button>
+									<button
+										type="button"
+										onclick={handleRevoke}
+										class="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+									>
+										Revoke
+									</button>
+								</div>
+							</div>
+
+						<!-- Recent Transactions -->
+						<div class="rounded-lg border border-gray-200 bg-white p-6">
+							<h3 class="mb-4 text-lg font-semibold text-gray-900">Recent Transactions</h3>
+							
+							{#if sessionKeyTransactions.length > 0}
+								<div class="divide-y divide-gray-100">
+									{#each sessionKeyTransactions as tx}
+										<div class="py-3">
+											<div class="flex items-center justify-between">
+												<div class="flex-1">
+													<div class="flex items-center gap-2">
+														<span class="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800">
+															TX
+														</span>
+														<span class="font-semibold text-gray-900">
+															{formatEther(BigInt(tx.value))} ETH
+														</span>
+													</div>
+													<p class="mt-1 text-xs text-gray-500">
+														Contract: {shortAddress(tx.target)}
+													</p>
+													<p class="mt-1 text-xs text-gray-400">
+														{new Date(tx.createdAt).toLocaleString()}
+													</p>
+												</div>
+												<div>
+													<a
+														href={getBlockExplorerTxUrl(tx.txHash)}
+														target="_blank"
+														rel="noopener noreferrer"
+														class="text-sm text-blue-600 hover:text-blue-700"
+													>
+														View →
+													</a>
+												</div>
+											</div>
+										</div>
+									{/each}
+								</div>
+								
+								<!-- Load More Button -->
+								{#if hasMoreTransactions}
+									<div class="mt-4 text-center">
+										<button
+											type="button"
+											onclick={() => fetchSessionKeyTransactions(false)}
+											disabled={loadingTransactions}
+											class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+										>
+											{loadingTransactions ? 'Loading...' : 'Load More'}
+										</button>
+									</div>
+								{/if}
+							{:else}
+								<p class="text-sm text-gray-500">No transactions found</p>
+							{/if}
+						</div>
+						{:else}
+							<!-- No Session Key -->
+							<div class="rounded-lg border border-gray-200 bg-gray-50 p-8 text-center">
+								<p class="text-gray-600">No Session Key found</p>
+								<p class="mt-2 text-sm text-gray-500">
+									Session Keys are automatically created when you perform actions like publishing articles or commenting.
+								</p>
+								<button
+									type="button"
+									onclick={handleCreateNewKey}
+									disabled={creatingNewKey}
+									class="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+								>
+									{creatingNewKey ? 'Creating...' : 'Create Session Key Now'}
+								</button>
+							</div>
+						{/if}
+					</div>
+				{/if}
 			</div>
 		{/if}
 	{/if}

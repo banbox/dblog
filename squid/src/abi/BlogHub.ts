@@ -31,6 +31,7 @@ export const events = {
 }
 
 export const functions = {
+    COLLECTOR_TOKEN_OFFSET: viewFun("0x94231a78", "COLLECTOR_TOKEN_OFFSET()", {}, p.uint256),
     DEFAULT_ADMIN_ROLE: viewFun("0xa217fddf", "DEFAULT_ADMIN_ROLE()", {}, p.bytes32),
     MAX_AVATAR_LENGTH: viewFun("0x1fe9d578", "MAX_AVATAR_LENGTH()", {}, p.uint256),
     MAX_BIO_LENGTH: viewFun("0xc477d7f7", "MAX_BIO_LENGTH()", {}, p.uint256),
@@ -59,6 +60,7 @@ export const functions = {
     followWithSessionKey: fun("0x5780400b", "followWithSessionKey(address,address,address,bool,uint256,bytes)", {"owner": p.address, "sessionKey": p.address, "_target": p.address, "_status": p.bool, "deadline": p.uint256, "signature": p.bytes}, ),
     getArticleByArweaveId: viewFun("0x989cfb57", "getArticleByArweaveId(string)", {"_arweaveId": p.string}, p.struct({"author": p.address, "timestamp": p.uint64, "categoryId": p.uint16, "originality": p.uint8, "collectPrice": p.uint96, "maxCollectSupply": p.uint32, "collectCount": p.uint32, "arweaveHash": p.string})),
     getArticleIdByArweaveId: viewFun("0x4b65f344", "getArticleIdByArweaveId(string)", {"_arweaveId": p.string}, p.uint256),
+    getArticleIdFromTokenId: viewFun("0xa2519189", "getArticleIdFromTokenId(uint256)", {"tokenId": p.uint256}, p.uint256),
     getRoleAdmin: viewFun("0x248a9ca3", "getRoleAdmin(bytes32)", {"role": p.bytes32}, p.bytes32),
     grantRole: fun("0x2f2ff15d", "grantRole(bytes32,address)", {"role": p.bytes32, "account": p.address}, ),
     hasRole: viewFun("0x91d14854", "hasRole(bytes32,address)", {"role": p.bytes32, "account": p.address}, p.bool),
@@ -95,6 +97,10 @@ export const functions = {
 }
 
 export class Contract extends ContractBase {
+
+    COLLECTOR_TOKEN_OFFSET() {
+        return this.eth_call(functions.COLLECTOR_TOKEN_OFFSET, {})
+    }
 
     DEFAULT_ADMIN_ROLE() {
         return this.eth_call(functions.DEFAULT_ADMIN_ROLE, {})
@@ -174,6 +180,10 @@ export class Contract extends ContractBase {
 
     getArticleIdByArweaveId(_arweaveId: GetArticleIdByArweaveIdParams["_arweaveId"]) {
         return this.eth_call(functions.getArticleIdByArweaveId, {_arweaveId})
+    }
+
+    getArticleIdFromTokenId(tokenId: GetArticleIdFromTokenIdParams["tokenId"]) {
+        return this.eth_call(functions.getArticleIdFromTokenId, {tokenId})
     }
 
     getRoleAdmin(role: GetRoleAdminParams["role"]) {
@@ -257,6 +267,9 @@ export type UpgradedEventArgs = EParams<typeof events.Upgraded>
 export type UserProfileUpdatedEventArgs = EParams<typeof events.UserProfileUpdated>
 
 /// Function types
+export type COLLECTOR_TOKEN_OFFSETParams = FunctionArguments<typeof functions.COLLECTOR_TOKEN_OFFSET>
+export type COLLECTOR_TOKEN_OFFSETReturn = FunctionReturn<typeof functions.COLLECTOR_TOKEN_OFFSET>
+
 export type DEFAULT_ADMIN_ROLEParams = FunctionArguments<typeof functions.DEFAULT_ADMIN_ROLE>
 export type DEFAULT_ADMIN_ROLEReturn = FunctionReturn<typeof functions.DEFAULT_ADMIN_ROLE>
 
@@ -340,6 +353,9 @@ export type GetArticleByArweaveIdReturn = FunctionReturn<typeof functions.getArt
 
 export type GetArticleIdByArweaveIdParams = FunctionArguments<typeof functions.getArticleIdByArweaveId>
 export type GetArticleIdByArweaveIdReturn = FunctionReturn<typeof functions.getArticleIdByArweaveId>
+
+export type GetArticleIdFromTokenIdParams = FunctionArguments<typeof functions.getArticleIdFromTokenId>
+export type GetArticleIdFromTokenIdReturn = FunctionReturn<typeof functions.getArticleIdFromTokenId>
 
 export type GetRoleAdminParams = FunctionArguments<typeof functions.getRoleAdmin>
 export type GetRoleAdminReturn = FunctionReturn<typeof functions.getRoleAdmin>

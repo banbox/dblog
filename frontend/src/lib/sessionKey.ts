@@ -3,10 +3,11 @@
  * Allows users to perform frequent operations without signing each time
  */
 
-import { formatEther } from 'viem';
+import { formatEther, createWalletClient, http } from 'viem';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
-import { getBlogHubContractAddress, getSessionKeyManagerAddress, getMinGasFeeMultiplier, getDefaultGasFeeMultiplier } from '$lib/config';
+import { getBlogHubContractAddress, getSessionKeyManagerAddress, getMinGasFeeMultiplier, getDefaultGasFeeMultiplier, getRpcUrl } from '$lib/config';
 import { getEthereumAccount, getWalletClient, getPublicClient } from '$lib/wallet';
+import { getChainConfig } from '$lib/chain';
 import { browser } from '$app/environment';
 import { getIrysUploaderDevnet, getIrysUploader, type IrysUploader } from '$lib/arweave/irys';
 import { getIrysNetwork } from '$lib/config';
@@ -182,8 +183,10 @@ export async function ensureSessionKeyBalance(sessionKeyAddress: string): Promis
 }
 
 /**
- * Check if there is a valid session key stored
- * @returns Stored session key data or null if not found/expired
+ * Check if there is a stored session key (including expired ones)
+ * NOTE: This returns expired keys as well. Use isSessionKeyExpired() to check validity.
+ * This is important to avoid losing funds in expired Session Keys.
+ * @returns Stored session key data or null if not found
  */
 export function getStoredSessionKey(): StoredSessionKey | null {
 	if (!browser) return null;
@@ -193,18 +196,21 @@ export function getStoredSessionKey(): StoredSessionKey | null {
 
 	try {
 		const data: StoredSessionKey = JSON.parse(stored);
-
-		// Check if expired
-		if (Date.now() / 1000 > data.validUntil) {
-			localStorage.removeItem(SESSION_KEY_STORAGE);
-			return null;
-		}
-
 		return data;
 	} catch {
 		localStorage.removeItem(SESSION_KEY_STORAGE);
 		return null;
 	}
+}
+
+/**
+ * Check if stored session key is expired based on local timestamp
+ * @param sessionKey - Session key to check
+ * @returns true if expired
+ */
+export function isSessionKeyExpired(sessionKey: StoredSessionKey | null): boolean {
+	if (!sessionKey) return true;
+	return Date.now() / 1000 > sessionKey.validUntil;
 }
 
 /**
@@ -325,6 +331,60 @@ export async function createSessionKey(options?: {
 }
 
 /**
+ * Reauthorize an existing session key with extended validity period.
+ * This is useful when a Session Key has expired but still has funds in it.
+ * Instead of creating a new key and losing access to funds, we re-register the same key.
+ * @param existingSessionKey - Existing session key to reauthorize
+ * @returns Updated session key data with new validity period
+ */
+export async function reauthorizeSessionKey(
+	existingSessionKey: StoredSessionKey
+): Promise<StoredSessionKey> {
+	const account = await getEthereumAccount();
+	const sessionKeyManager = getSessionKeyManagerAddress();
+	const blogHub = getBlogHubContractAddress();
+
+	// Verify ownership
+	if (account.toLowerCase() !== existingSessionKey.owner.toLowerCase()) {
+		throw new Error('Cannot reauthorize session key: owner mismatch');
+	}
+
+	// Set new validity period (use chain timestamp to avoid local/chain time drift)
+	const publicClient = getPublicClient();
+	const latestBlock = await publicClient.getBlock({ blockTag: 'latest' });
+	const validAfter = Number(latestBlock.timestamp);
+	const validUntil = validAfter + SESSION_KEY_DURATION;
+
+	// Re-register session key on blockchain (ONE MetaMask popup)
+	const walletClient = await getWalletClient();
+
+	const txHash = await walletClient.writeContract({
+		address: sessionKeyManager,
+		abi: SESSION_KEY_MANAGER_ABI,
+		functionName: 'registerSessionKey',
+		args: [
+			existingSessionKey.address as `0x${string}`,
+			validAfter,
+			validUntil,
+			blogHub,
+			ALLOWED_SELECTORS,
+			DEFAULT_SPENDING_LIMIT
+		]
+	});
+	await publicClient.waitForTransactionReceipt({ hash: txHash });
+
+	// Update localStorage with new validity period
+	const updatedSessionKey: StoredSessionKey = {
+		...existingSessionKey,
+		validUntil
+	};
+	localStorage.setItem(SESSION_KEY_STORAGE, JSON.stringify(updatedSessionKey));
+	console.log(`Session key reauthorized: ${existingSessionKey.address}`);
+
+	return updatedSessionKey;
+}
+
+/**
  * Revoke the current session key
  */
 export async function revokeSessionKey(): Promise<void> {
@@ -416,6 +476,9 @@ export async function isSessionKeyValidOnChain(
  * This is the unified entry point for all session key operations.
  * Only triggers MetaMask popup if no valid session key exists.
  * 
+ * IMPORTANT: When a Session Key is expired or invalid but has balance,
+ * this function will automatically reauthorize it to prevent fund loss.
+ * 
  * @param options - Optional configuration
  * @param options.requiredSelector - Specific function selector that must be authorized
  * @param options.autoCreate - If true, automatically create new session key if needed (default: true)
@@ -427,7 +490,7 @@ export async function getOrCreateValidSessionKey(options?: {
 }): Promise<StoredSessionKey | null> {
 	const { requiredSelector, autoCreate = true } = options ?? {};
 	
-	// 1. Check if we have a stored session key
+	// 1. Check if we have a stored session key (including expired ones)
 	let sessionKey = getStoredSessionKey();
 	
 	if (sessionKey) {
@@ -438,20 +501,68 @@ export async function getOrCreateValidSessionKey(options?: {
 			clearLocalSessionKey();
 			sessionKey = null;
 		} else {
-			// 3. Verify it's valid on-chain
-			const isOnChainValid = await isSessionKeyValidOnChain(sessionKey, requiredSelector);
-			if (!isOnChainValid) {
-				console.log('Stored session key is invalid or missing required selector, clearing...');
+			// 3. Check if expired locally
+			const isExpired = isSessionKeyExpired(sessionKey);
+			
+			if (isExpired) {
+				console.log('Session key expired, checking balance...');
+				
+				// Check if session key has balance - if so, automatically reauthorize
+				const balance = await getSessionKeyBalance(sessionKey.address);
+				if (balance > 0n) {
+					const balanceEth = formatEther(balance);
+					console.log(`Session key expired but contains ${balanceEth} ETH, reauthorizing...`);
+					
+					// Automatically reauthorize (triggers MetaMask popup)
+					try {
+						sessionKey = await reauthorizeSessionKey(sessionKey);
+						console.log('Session key reauthorized successfully');
+						return sessionKey;
+					} catch (error) {
+						console.error('Failed to reauthorize session key:', error);
+						throw new Error('Failed to reauthorize session key. Please try again.');
+					}
+				}
+				
+				// No balance, safe to clear and create new
+				console.log('Session key expired and has no balance, clearing...');
 				clearLocalSessionKey();
 				sessionKey = null;
 			} else {
-				console.log('Using existing valid session key:', sessionKey.address);
-				return sessionKey;
+				// 4. Verify it's valid on-chain
+				const isOnChainValid = await isSessionKeyValidOnChain(sessionKey, requiredSelector);
+				if (!isOnChainValid) {
+					console.log('Session key invalid on-chain, checking balance...');
+					
+					// Check balance before discarding
+					const balance = await getSessionKeyBalance(sessionKey.address);
+					if (balance > 0n) {
+						const balanceEth = formatEther(balance);
+						console.log(`Session key invalid but contains ${balanceEth} ETH, reauthorizing...`);
+						
+						// Automatically reauthorize (triggers MetaMask popup)
+						try {
+							sessionKey = await reauthorizeSessionKey(sessionKey);
+							console.log('Session key reauthorized successfully');
+							return sessionKey;
+						} catch (error) {
+							console.error('Failed to reauthorize session key:', error);
+							throw new Error('Failed to reauthorize session key. Please try again.');
+						}
+					}
+					
+					console.log('Session key invalid and has no balance, clearing...');
+					clearLocalSessionKey();
+					sessionKey = null;
+				} else {
+					console.log('Using existing valid session key:', sessionKey.address);
+					return sessionKey;
+				}
 			}
 		}
 	}
 	
-	// 4. No valid session key - create new one if autoCreate is enabled
+	// 5. No valid session key - create new one if autoCreate is enabled
 	if (!autoCreate) {
 		return null;
 	}
@@ -513,5 +624,153 @@ export async function ensureIrysApproval(sessionKey: StoredSessionKey): Promise<
 		await createIrysBalanceApproval(uploader, sessionKey.address, SESSION_KEY_DURATION);
 	} catch (error) {
 		console.warn('Failed to create Irys Balance Approval:', error);
+	}
+}
+
+/**
+ * Withdraw all balance from Session Key to main wallet
+ * @param sessionKeyAddress - Session Key address to withdraw from
+ * @returns Transaction hash
+ */
+export async function withdrawAllFromSessionKey(sessionKeyAddress: string): Promise<string> {
+	const sessionKey = getStoredSessionKey();
+	if (!sessionKey || sessionKey.address.toLowerCase() !== sessionKeyAddress.toLowerCase()) {
+		throw new Error('Session Key not found or mismatch');
+	}
+
+	const balance = await getSessionKeyBalance(sessionKeyAddress);
+	if (balance === 0n) {
+		throw new Error('Session Key has no balance to withdraw');
+	}
+
+	const publicClient = getPublicClient();
+	const sessionKeyAccount = privateKeyToAccount(sessionKey.privateKey as `0x${string}`);
+	const mainWallet = await getEthereumAccount();
+
+	// Estimate gas for the transfer
+	const gasPrice = await publicClient.getGasPrice();
+	const gasLimit = 21000n; // Standard ETH transfer gas
+	const gasCost = gasPrice * gasLimit;
+
+	if (balance <= gasCost) {
+		throw new Error('Balance too low to cover gas fees');
+	}
+
+	// Calculate amount to send (balance - gas cost)
+	const amountToSend = balance - gasCost;
+
+	console.log(`Withdrawing ${formatEther(amountToSend)} ETH from Session Key to main wallet...`);
+
+	// Create wallet client with session key
+	const walletClient = createWalletClient({
+		account: sessionKeyAccount,
+		chain: getChainConfig(),
+		transport: http(getRpcUrl())
+	});
+
+	const txHash = await walletClient.sendTransaction({
+		to: mainWallet,
+		value: amountToSend,
+		gas: gasLimit,
+		gasPrice
+	});
+
+	// Wait for confirmation
+	await publicClient.waitForTransactionReceipt({ hash: txHash });
+
+	console.log(`Withdrawn ${formatEther(amountToSend)} ETH. Tx: ${txHash}`);
+	return txHash;
+}
+
+/**
+ * Create a new Session Key, checking if old key has balance and requiring confirmation.
+ * This is for manual Session Key management in profile page.
+ * @param forceCreate - If true, skip balance check and create anyway
+ * @returns Created session key data
+ */
+export async function createNewSessionKey(forceCreate: boolean = false): Promise<StoredSessionKey> {
+	const existingKey = getStoredSessionKey();
+	
+	if (existingKey && !forceCreate) {
+		// Check if existing key has balance
+		const balance = await getSessionKeyBalance(existingKey.address);
+		if (balance > 0n) {
+			const balanceEth = formatEther(balance);
+			const confirmMsg = `Your current Session Key contains ${balanceEth} ETH. Creating a new Session Key will replace the old one. You should withdraw the balance first.\n\nDo you want to continue anyway?`;
+			
+			if (typeof window !== 'undefined' && !confirm(confirmMsg)) {
+				throw new Error('User cancelled Session Key creation');
+			}
+		}
+	}
+	
+	// Create new session key (this will overwrite the old one in localStorage)
+	return await createSessionKey();
+}
+
+/**
+ * Transaction record for Session Key
+ */
+export interface SessionKeyTransaction {
+	hash: string;
+	from: string;
+	to: string;
+	value: bigint;
+	timestamp: number;
+	blockNumber: bigint;
+	isIncoming: boolean;
+	selector?: string;
+	gasUsed?: bigint;
+	gasPrice?: bigint;
+}
+
+/**
+ * Get recent transactions for a Session Key address from Subsquid GraphQL
+ * Note: This function is deprecated and kept for backward compatibility.
+ * Use the GraphQL client directly in components for better pagination control.
+ * @param address - Session Key address
+ * @param limit - Maximum number of transactions to fetch (default: 10)
+ * @param offset - Offset for pagination (default: 0)
+ * @returns Array of transaction records
+ */
+export async function getSessionKeyTransactions(
+	address: string,
+	limit: number = 10,
+	offset: number = 0
+): Promise<SessionKeyTransaction[]> {
+	try {
+		// Import dynamically to avoid circular dependencies
+		const { client, SESSION_KEY_TRANSACTIONS_QUERY } = await import('$lib/graphql');
+		
+		const result = await client
+			.query(SESSION_KEY_TRANSACTIONS_QUERY, {
+				sessionKey: address.toLowerCase(),
+				limit,
+				offset
+			})
+			.toPromise();
+		
+		if (!result.data?.transactions) {
+			return [];
+		}
+		
+		// Transform GraphQL data to SessionKeyTransaction format
+		const transactions: SessionKeyTransaction[] = result.data.transactions.map((tx: any) => ({
+			hash: tx.txHash,
+			from: tx.user.id,
+			to: tx.target,
+			value: BigInt(tx.value),
+			timestamp: Math.floor(new Date(tx.createdAt).getTime() / 1000),
+			blockNumber: BigInt(tx.blockNumber),
+			isIncoming: false, // Session Key transactions are always outgoing
+			selector: tx.selector,
+			gasUsed: tx.gasUsed ? BigInt(tx.gasUsed) : undefined,
+			gasPrice: tx.gasPrice ? BigInt(tx.gasPrice) : undefined
+		}));
+		
+		return transactions;
+	} catch (error) {
+		console.error('Failed to fetch session key transactions from Subsquid:', error);
+		return [];
 	}
 }

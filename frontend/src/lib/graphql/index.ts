@@ -15,6 +15,7 @@ export {
 	USER_DISLIKED_ARTICLES_QUERY,
 	USER_COLLECTED_ARTICLES_QUERY,
 	USER_COMMENTED_ARTICLES_QUERY,
+	SESSION_KEY_TRANSACTIONS_QUERY,
 	type ArticleData,
 	type ArticleDetailData,
 	type ArticlesQueryResult,
@@ -25,5 +26,6 @@ export {
 	type FollowData,
 	type EvaluationWithArticle,
 	type CollectionWithArticle,
-	type CommentWithArticle
+	type CommentWithArticle,
+	type TransactionData
 } from './queries';

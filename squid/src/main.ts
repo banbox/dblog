@@ -1,7 +1,9 @@
 import { TypeormDatabase } from '@subsquid/typeorm-store'
 import { processor } from './processor'
-import { Article, User, Evaluation, Comment, Follow, Collection } from './model'
+import { Article, User, Evaluation, Comment, Follow, Collection, Transaction } from './model'
 import * as blogHub from './abi/BlogHub'
+import * as sessionKeyManager from './abi/SessionKeyManager'
+import { LessThan } from 'typeorm'
 
 // 事件签名（从生成的 ABI 类型中获取）
 const ARTICLE_PUBLISHED = blogHub.events.ArticlePublished.topic
@@ -12,9 +14,16 @@ const FOLLOW_STATUS_CHANGED = blogHub.events.FollowStatusChanged.topic
 const ARTICLE_COLLECTED = blogHub.events.ArticleCollected.topic
 const USER_PROFILE_UPDATED = blogHub.events.UserProfileUpdated.topic
 const ARTICLE_EDITED = blogHub.events.ArticleEdited.topic
+const SESSION_KEY_REGISTERED = sessionKeyManager.events.SessionKeyRegistered.topic
+const SESSION_KEY_REVOKED = sessionKeyManager.events.SessionKeyRevoked.topic
+const SESSION_KEY_USED = sessionKeyManager.events.SessionKeyUsed.topic
 
 // 收藏者 TokenID: articleId + COLLECTOR_TOKEN_OFFSET
 const COLLECTOR_TOKEN_OFFSET = 1n << 250n
+
+// Session Key 交易记录限制
+const MAX_TRANSACTIONS_PER_USER = 500 // 每个用户最多保存500条交易记录
+const MAX_TRANSACTION_AGE_MS = 90 * 24 * 60 * 60 * 1000 // 3个月
 
 processor.run(new TypeormDatabase(), async (ctx) => {
     const articles: Article[] = []
@@ -24,6 +33,7 @@ processor.run(new TypeormDatabase(), async (ctx) => {
     const commentsToUpdate = new Map<string, Comment>()
     const follows: Follow[] = []
     const collections: Collection[] = []
+    const transactions: Transaction[] = []
     const usersToUpdate = new Map<string, User>()
     const nextCommentIdByArticle = new Map<string, bigint>()
 
@@ -351,6 +361,86 @@ processor.run(new TypeormDatabase(), async (ctx) => {
                 article.editedAt = new Date(block.header.timestamp)
                 articlesToUpdate.set(article.id, article)
             }
+
+            // Session Key 事件处理
+            if (log.topics[0] === SESSION_KEY_REGISTERED) {
+                const event = sessionKeyManager.events.SessionKeyRegistered.decode(log)
+                const user = await ensureUser(event.owner, block.header.timestamp)
+                
+                // 更新用户的当前 Session Key 地址
+                user.sessionKey = event.sessionKey.toLowerCase()
+                // user 已经在 usersToUpdate 中，会自动保存
+            }
+
+            if (log.topics[0] === SESSION_KEY_REVOKED) {
+                const event = sessionKeyManager.events.SessionKeyRevoked.decode(log)
+                const user = await ensureUser(event.owner, block.header.timestamp)
+                
+                // 清空用户的 Session Key
+                user.sessionKey = null
+                // user 已经在 usersToUpdate 中，会自动保存
+            }
+
+            if (log.topics[0] === SESSION_KEY_USED) {
+                const event = sessionKeyManager.events.SessionKeyUsed.decode(log)
+                const user = await ensureUser(event.owner, block.header.timestamp)
+                
+                // 获取交易的 gas 信息
+                let gasUsed: bigint | null = null
+                let gasPrice: bigint | null = null
+                if (log.transaction) {
+                    gasUsed = log.transaction.gasUsed ?? null
+                    gasPrice = log.transaction.gasPrice ?? null
+                }
+
+                const transaction = new Transaction({
+                    id: `${log.transactionHash}-${log.logIndex}`,
+                    user: user,
+                    sessionKey: event.sessionKey.toLowerCase(),
+                    target: event.target.toLowerCase(),
+                    selector: event.selector,
+                    value: event.value,
+                    gasUsed: gasUsed,
+                    gasPrice: gasPrice,
+                    blockNumber: block.header.height,
+                    createdAt: new Date(block.header.timestamp),
+                    txHash: log.transactionHash
+                })
+                transactions.push(transaction)
+
+                // 清理超过3个月或超过500条的旧交易记录
+                const threeMonthsAgo = new Date(block.header.timestamp - MAX_TRANSACTION_AGE_MS)
+                const userId = event.owner.toLowerCase()
+                
+                // 删除超过3个月的交易
+                const oldTransactions = await ctx.store.find(Transaction, {
+                    where: {
+                        user: { id: userId } as any,
+                        createdAt: LessThan(threeMonthsAgo)
+                    } as any
+                })
+                if (oldTransactions.length > 0) {
+                    await ctx.store.remove(oldTransactions)
+                }
+
+                // 检查是否超过500条记录
+                const userTransactionCount = await ctx.store.count(Transaction, {
+                    where: { user: { id: userId } as any } as any
+                })
+
+                // 如果超过500条，删除最旧的记录
+                if (userTransactionCount >= MAX_TRANSACTIONS_PER_USER) {
+                    const excessCount = userTransactionCount - MAX_TRANSACTIONS_PER_USER + 1
+                    const oldestTransactions = await ctx.store.find(Transaction, {
+                        where: { user: { id: userId } as any } as any,
+                        order: { createdAt: 'ASC' } as any,
+                        take: excessCount
+                    })
+                    if (oldestTransactions.length > 0) {
+                        await ctx.store.remove(oldestTransactions)
+                    }
+                }
+            }
         }
     }
 
@@ -363,4 +453,5 @@ processor.run(new TypeormDatabase(), async (ctx) => {
     await ctx.store.upsert([...commentsToUpdate.values()])
     await ctx.store.insert(collections)
     await ctx.store.upsert(follows)
+    await ctx.store.insert(transactions)
 })

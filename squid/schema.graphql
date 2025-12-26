@@ -13,6 +13,7 @@ type User @entity {
   totalFollowing: Int!
   createdAt: DateTime!
   profileUpdatedAt: DateTime       # 资料最后更新时间
+  sessionKey: String               # 当前 Session Key 地址
 }
 
 # 文章实体
@@ -91,4 +92,19 @@ type Collection @entity {
   amount: BigInt!
   createdAt: DateTime!
   txHash: String!
+}
+
+# Session Key 交易记录
+type Transaction @entity {
+  id: ID!                          # txHash-logIndex
+  user: User!                      # 主账户（所有者）
+  sessionKey: String!              # Session Key 地址
+  target: String!                  # 目标合约地址
+  selector: String!                # 函数选择器
+  value: BigInt!                   # 交易金额
+  gasUsed: BigInt                  # 使用的 Gas（可选）
+  gasPrice: BigInt                 # Gas 价格（可选）
+  blockNumber: Int!                # 区块号
+  createdAt: DateTime!             # 交易时间
+  txHash: String!                  # 交易哈希
 }

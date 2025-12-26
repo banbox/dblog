@@ -47,4 +47,7 @@ export class User {
 
     @DateTimeColumn_({nullable: true})
     profileUpdatedAt!: Date | undefined | null
+
+    @StringColumn_({nullable: true})
+    sessionKey!: string | undefined | null
 }

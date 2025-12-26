@@ -124,9 +124,11 @@ squid/
 # 从 contracts 目录复制 ABI
 mkdir -p src/abi
 cp ../contracts/out/BlogHub.sol/BlogHub.json src/abi/
+cp ../contracts/out/SessionKeyManager.sol/SessionKeyManager.json src/abi/
 
 # 生成类型安全的事件解码器
 npx squid-evm-typegen src/abi src/abi/BlogHub.json
+npx squid-evm-typegen src/abi src/abi/SessionKeyManager.json
 ```
 
 ### 2.2 定义 GraphQL Schema
@@ -210,7 +212,11 @@ sqd deploy .
 
 ```bash
 cd squid
+cp ../contracts/out/BlogHub.sol/BlogHub.json src/abi/
+cp ../contracts/out/SessionKeyManager.sol/SessionKeyManager.json src/abi/
 npx squid-evm-typegen src/abi src/abi/BlogHub.json
+npx squid-evm-typegen src/abi src/abi/SessionKeyManager.json
+
 npx squid-typeorm-codegen
 npx tsc
 cp .env.example .env.test  # or prod

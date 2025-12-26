@@ -7,11 +7,15 @@ import {
     Transaction as _Transaction,
 } from '@subsquid/evm-processor'
 import * as blogHub from './abi/BlogHub'
+import * as sessionKeyManager from './abi/SessionKeyManager'
 
 // BlogHub 合约地址
 // Optimism Sepolia: 0x... (部署后填写)
 // Local Anvil:
 const BLOG_HUB_ADDRESS = (process.env.BLOG_HUB_ADDRESS || '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9').toLowerCase()
+
+// SessionKeyManager 合约地址
+const SESSION_KEY_MANAGER_ADDRESS = (process.env.SESSION_KEY_MANAGER_ADDRESS || '0x5FbDB2315678afecb367f032d93F642f64180aa3').toLowerCase()
 
 const envRateLimit = process.env.RPC_RATE_LIMIT
 const envFinalityConfirmation = process.env.FINALITY_CONFIRMATION
@@ -23,12 +27,13 @@ console.log('========================================')
 console.log('🚀 Squid Processor Starting...')
 console.log('========================================')
 console.log('📋 Environment Configuration:')
-console.log(`   RPC_ETH_HTTP:          ${process.env.RPC_ETH_HTTP || 'http://localhost:8545 (default)'}`)
-console.log(`   BLOG_HUB_ADDRESS:      ${BLOG_HUB_ADDRESS}`)
-console.log(`   RPC_RATE_LIMIT:        ${envRateLimit || '10 (default)'}`)
-console.log(`   FINALITY_CONFIRMATION: ${envFinalityConfirmation || '75 (default)'}`)
-console.log(`   BLOCK_RANGE_FROM:      ${envBlockRangeFrom || '0 (default)'}`)
-console.log(`   GATEWAY_URL:           ${envGatewayUrl || 'Not configured'}`)
+console.log(`   RPC_ETH_HTTP:               ${process.env.RPC_ETH_HTTP || 'http://localhost:8545 (default)'}`)
+console.log(`   BLOG_HUB_ADDRESS:           ${BLOG_HUB_ADDRESS}`)
+console.log(`   SESSION_KEY_MANAGER_ADDRESS: ${SESSION_KEY_MANAGER_ADDRESS}`)
+console.log(`   RPC_RATE_LIMIT:             ${envRateLimit || '10 (default)'}`)
+console.log(`   FINALITY_CONFIRMATION:      ${envFinalityConfirmation || '75 (default)'}`)
+console.log(`   BLOCK_RANGE_FROM:           ${envBlockRangeFrom || '0 (default)'}`)
+console.log(`   GATEWAY_URL:                ${envGatewayUrl || 'Not configured'}`)
 console.log('========================================')
 
 // 创建 processor 实例
@@ -62,6 +67,8 @@ export const processor = processorBuilder
             from: true,
             value: true,
             hash: true,
+            gasUsed: true,
+            gasPrice: true,
         },
         log: {
             transactionHash: true,
@@ -81,6 +88,14 @@ export const processor = processorBuilder
             blogHub.events.ArticleCollected.topic,
             blogHub.events.UserProfileUpdated.topic,
             blogHub.events.ArticleEdited.topic,
+        ],
+    })
+    .addLog({
+        address: [SESSION_KEY_MANAGER_ADDRESS],
+        topic0: [
+            sessionKeyManager.events.SessionKeyRegistered.topic,
+            sessionKeyManager.events.SessionKeyRevoked.topic,
+            sessionKeyManager.events.SessionKeyUsed.topic,
         ],
     })
 

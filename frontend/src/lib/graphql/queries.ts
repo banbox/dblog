@@ -586,3 +586,54 @@ export interface CommentWithArticle {
 	likes: number;
 	createdAt: string;
 }
+
+// ============================================================
+//                  Session Key Transaction Queries
+// ============================================================
+
+/**
+ * Get Session Key transactions with pagination
+ */
+export const SESSION_KEY_TRANSACTIONS_QUERY = gql`
+	query SessionKeyTransactions($sessionKey: String!, $limit: Int!, $offset: Int!) {
+		transactions(
+			orderBy: createdAt_DESC
+			limit: $limit
+			offset: $offset
+			where: { sessionKey_eq: $sessionKey }
+		) {
+			id
+			user {
+				id
+			}
+			sessionKey
+			target
+			selector
+			value
+			gasUsed
+			gasPrice
+			blockNumber
+			createdAt
+			txHash
+		}
+	}
+`;
+
+/**
+ * Transaction data from GraphQL
+ */
+export interface TransactionData {
+	id: string;
+	user: {
+		id: string;
+	};
+	sessionKey: string;
+	target: string;
+	selector: string;
+	value: string;
+	gasUsed: string | null;
+	gasPrice: string | null;
+	blockNumber: number;
+	createdAt: string;
+	txHash: string;
+}
