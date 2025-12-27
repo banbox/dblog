@@ -8,6 +8,8 @@
 	import SearchButton from './SearchButton.svelte';
 	import ArticleSearch from './ArticleSearch.svelte';
 	import { HomeIcon, BookmarkIcon, UserIcon, PencilIcon, SpinnerIcon } from './icons';
+	import { getConfig, envName } from '$lib/config';
+	import { SUPPORTED_CHAINS } from '$lib/chains';
 
 	interface Props {
 		walletAddress?: string | null;
@@ -36,6 +38,12 @@
 
 	let followingUsers = $state<FollowData[]>([]);
 	let loadingFollowing = $state(false);
+
+	// Environment info
+	const config = $derived(getConfig());
+	const chainInfo = $derived(SUPPORTED_CHAINS[config.chainId]);
+	const chainName = $derived(chainInfo?.name || `Chain ${config.chainId}`);
+	const rpcUrl = $derived(config.rpcUrl);
 
 	// Navigation items
 	const navItems = [
@@ -200,6 +208,19 @@
 			{/if}
 		</div>
 	</nav>
+
+	<!-- Environment Info -->
+	<div class="border-t border-gray-100 px-4 py-3">
+		<div class="space-y-1 text-xs">
+			<div class="flex flex-row gap-1">
+				<span class="font-medium text-gray-600">Chain:</span>
+				<span class="text-gray-700">{chainName}</span>
+			</div>
+			<div class="flex flex-col gap-0.5">
+				<span class="break-all text-gray-700">{rpcUrl}</span>
+			</div>
+		</div>
+	</div>
 
 	<!-- Footer Info -->
 	<div class="border-t border-gray-100 px-4 py-3">
