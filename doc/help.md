@@ -26,13 +26,13 @@ AmberInk 是一个完全去中心化的博客平台，无后端参与。采用 O
 
 ### 主业务合约 (src/)
 
-- **BlogHub.sol**: 核心业务合约，基于 ERC-1155 Upgradeable。支持文章发布（publish）、评价（evaluate）、评论（addComment）、点赞评论（likeComment）、关注（follow）、收藏（collect）等功能。定义 PublishParams、EditArticleParams、Article 等结构体，包含文章元数据、评价分数、原创性标记。支持 ERC-2981 版税、AccessControl 权限、Pausable 暂停、ReentrancyGuard 重入保护、UUPS 可升级、Multicall 多调用。
+- **BlogHub.sol**: 核心业务合约，基于 ERC-1155 Upgradeable。支持文章发布（publish）、评价（evaluate）、评论（addComment）、点赞评论（likeComment）、关注（follow）、收藏（collect）、编辑文章（editArticle）等功能。定义 PublishParams、EditArticleParams、Article 等结构体，包含文章元数据、评价分数、原创性标记（Original/SemiOriginal/Reprint）。支持 ERC-2981 版税、AccessControl 权限、Pausable 暂停、ReentrancyGuard 重入保护、UUPS 可升级、Multicall 多调用。收藏者 TokenID 使用 COLLECTOR_TOKEN_OFFSET (2^250) 与文章 ID 组合。
 
 - **BlogPaymaster.sol**: ERC-4337 Paymaster 合约，实现 Gas 代付。支持资金池模式（balanceOf 记录用户余额）、授权代付（allowance 机制允许他人使用余额）、Session Key 模式。完全去中心化，无需信任第三方 Relayer。支持 EIP-712 签名、ECDSA 验证、重入保护。
 
 - **BlogTokenPaymaster.sol**: ERC-4337 Token Paymaster 合约，允许用户使用 ERC-20 代币（USDT、USDC 等）支付 Gas。通过 TokenPriceOracle 获取代币/ETH 汇率进行自动转换。支持 Session Key 模式。paymasterAndData 格式支持普通模式和 Session Key 模式。
 
-- **SessionKeyManager.sol**: Session Key 管理合约，实现无感交互。用户在前端生成临时密钥对，主钱包签名授权一次（唯一弹窗），后续操作由临时私钥签名。支持时间限制（最长 7 天）、权限限制（指定合约和函数选择器）、消费限额、可撤销。使用 EIP-712 标准签名。
+- **SessionKeyManager.sol**: Session Key 管理合约，实现无感交互。用户在前端生成临时密钥对，主钱包签名授权一次（唯一弹窗），后续操作由临时私钥签名。支持时间限制（最长 7 天）、权限限制（指定合约和函数选择器）、消费限额、可撤销。使用 EIP-712 标准签名和 ECDSA 验证。
 
 - **TokenPriceOracle.sol**: 代币价格预言机。支持 Chainlink 价格源和手动设置价格两种模式。所有价格以 18 位精度存储，tokenToEthPrice 表示 1 个代币最小单位值多少 ETH。支持价格过期检查（stalePriceThreshold）。
 
@@ -42,6 +42,10 @@ AmberInk 是一个完全去中心化的博客平台，无后端参与。采用 O
 - **IPaymaster.sol**: ERC-4337 Paymaster 接口，定义 validatePaymasterUserOp 和 postOp 方法。
 - **ISessionKeyManager.sol**: Session Key 管理接口，定义注册、撤销、验证等方法。
 - **ITokenPriceFeed.sol**: 代币价格预言机接口，定义价格查询方法。
+
+### 工具库 (src/libraries/)
+
+- **CallDataParser.sol**: ERC-4337 UserOperation callData 解析工具。支持直接调用和 execute 调用两种格式，从 callData 中提取目标合约地址和函数选择器。
 
 ### 部署与配置 (根目录)
 
@@ -85,23 +89,30 @@ AmberInk 是一个完全去中心化的博客平台，无后端参与。采用 O
 
 - **contracts.ts**: 智能合约交互工具。定义 ContractError 错误类、错误解析函数、发布文章、评价、评论、点赞等链上操作。支持 viem 钱包客户端、Session Key 签名、错误处理。
 
-- **sessionKey.ts**: Session Key 管理工具。生成临时密钥对、注册 Session Key、验证有效性、存储在 LocalStorage。支持 Session Key 余额检查、权限验证、过期检查、自动创建。
+- **sessionKey.ts**: Session Key 管理工具。生成临时密钥对、注册 Session Key、验证有效性、存储在 LocalStorage。支持 Session Key 余额检查、权限验证、过期检查、自动创建。支持 EIP-712 签名和 ECDSA 验证。
 
 - **publish.ts**: 文章发布编排工具。协调 Arweave 上传和区块链发布流程。获取或创建有效 Session Key、上传文章文件夹、发布到 BlogHub 合约。
 
+- **chains.ts**: 集中化链配置。定义支持的链（Ethereum、Optimism、Arbitrum、Base、Polygon、zkSync、Mantle、Scroll 等）及其 Pyth Network 预言机地址、BlogHub 合约地址、SessionKeyManager 合约地址。所有链相关配置的唯一来源。
+
 - **chain.ts**: 链配置工具。管理不同网络的 RPC、合约地址、链 ID、网络参数等配置。
 
-- **config.ts**: 全局配置管理。包含 BlogHub 合约地址、SessionKeyManager 地址、RPC URL、Irys 网络、Arweave 网关、Gas 费用倍数等配置。
+- **config.ts**: 全局配置管理。包含 RPC URL、链 ID、Arweave 网关、Gas 费用倍数等配置。BlogHub 合约地址、SessionKeyManager 地址根据链 ID 自动从 chains.ts 获取，Irys 网络根据环境名称自动确定（prod -> mainnet, dev/test -> devnet）。
+
+- **priceService.ts**: 价格服务。从 Pyth Network 预言机获取原生代币价格（USD），支持多链，包含缓存机制。
 
 - **data.ts**: 数据处理工具函数。包含数据转换、格式化等通用函数。
+
+- **utils.ts**: 通用工具函数。
+
+- **wallet.ts**: 钱包工具函数。
 
 - **index.ts**: 库导出文件，导出公共 API。
 
 ### 状态管理 (src/lib/stores/)
 
-- **config.svelte.ts**: 配置状态管理，管理全局配置和设置。
+- **config.svelte.ts**: 配置状态管理，管理全局配置和设置。支持 localStorage 持久化，允许用户在部署后覆盖默认配置。
 - **wallet.svelte.ts**: 钱包状态管理，管理钱包连接状态、用户地址、余额等。
-- **wallet.ts**: 钱包工具函数（可能为空或包含辅助函数）。
 
 ### 组件库 (src/lib/components/)
 
@@ -109,26 +120,29 @@ AmberInk 是一个完全去中心化的博客平台，无后端参与。采用 O
 - **SessionKeyStatus.svelte**: Session Key 状态显示，显示有效期、权限范围、创建时间。
 - **ArticleListItem.svelte**: 文章列表项组件，展示文章标题、摘要、作者、评分、发布时间、收藏状态。
 - **ArticleSearch.svelte**: 文章搜索组件，支持关键词搜索、分类筛选、排序、分页。
+- **ArticleEditor.svelte**: 文章编辑器组件，支持 Markdown 编辑、实时预览、图片上传。
 - **CategoryFilter.svelte**: 分类筛选组件，展示分类列表、支持多选。
 - **CommentSection.svelte**: 评论区组件，支持评论展示、回复、删除、点赞、分页。
 - **ImageProcessor.svelte**: 图片处理组件，支持上传、预览、压缩、裁剪。
+- **ContentImageManager.svelte**: 内容图片管理组件，管理文章中的图片。
 - **SearchButton.svelte**: 搜索按钮组件，触发搜索操作。
 - **SearchSelect.svelte**: 搜索选择组件，支持搜索和下拉选择。
 - **Sidebar.svelte**: 侧边栏组件，导航菜单、用户信息、快速链接。
+- **icons/**: 图标组件库（35+ 个 SVG 图标）。
 
 ### Arweave 集成 (src/lib/arweave/)
 
-- **irys.ts**: Irys 客户端初始化和管理。支持 MetaMask 模式和 Session Key 模式。创建 Irys Uploader、管理余额、处理上传。
+- **irys.ts**: Irys 客户端初始化和管理。支持 Mainnet（永久存储）和 Devnet（测试用，约60天后删除）两种网络。支持 MetaMask 模式和 Session Key 模式。创建 Irys Uploader、管理余额、处理上传。
 
-- **folder.ts**: Irys 可更新文件夹功能。实现文章文件夹结构（index.md 文章内容、coverImage 封面）、Manifest 下载、文件夹更新。
+- **folder.ts**: Irys 可更新文件夹功能。实现文章文件夹结构（index.md 文章内容、coverImage 封面）、Manifest 下载、文件夹更新。支持 mutable folders 获取最新版本。
 
-- **upload.ts**: Arweave 上传功能。上传文章、图片、元数据到 Arweave。支持 MetaMask 和 Session Key 两种模式。
+- **upload.ts**: Arweave 上传功能。上传文章文件夹、图片、元数据到 Arweave。支持 MetaMask 和 Session Key 两种模式。支持免费上传额度检查。
 
 - **cache.ts**: Arweave 缓存管理。缓存已下载的文章内容、图片、Manifest，减少网络请求。
 
 - **fetch.ts**: Arweave 内容获取。从 Arweave 网关下载文章、图片、Manifest，支持多网关重试。
 
-- **types.ts**: Arweave 相关类型定义。定义 ArticleMetadata、IrysTag、IrysConfig 等类型。
+- **types.ts**: Arweave 相关类型定义。定义 ArticleMetadata、IrysTag、IrysConfig、ArticleFolderManifest 等类型。
 
 - **index.ts**: Arweave 模块导出，导出公共 API。
 
@@ -141,6 +155,11 @@ AmberInk 是一个完全去中心化的博客平台，无后端参与。采用 O
 - **index.ts**: GraphQL 模块导出，导出查询函数。
 
 ### 路由页面 (src/routes/)
+
+- **+page.svelte**: 首页，展示文章列表、热门文章、分类筛选、搜索功能。
+- **+layout.svelte**: 全局布局组件，处理钱包连接初始化、主题管理、模态框、警告消息、国际化。
+- **+layout.ts**: 布局数据加载，获取初始化数据。
+- **layout.css**: 全局样式，定义布局相关的 CSS。
 
 - **a/[id]/+page.svelte**: 文章详情页面，按 Arweave ID 显示完整文章内容、评论、评分。
 - **a/[id]/+page.ts**: 文章详情页面数据加载。
@@ -155,8 +174,6 @@ AmberInk 是一个完全去中心化的博客平台，无后端参与。采用 O
 - **profile/articles/[id]/+page.svelte**: 用户资料页面，展示用户信息、发布的文章列表。
 
 - **settings/+page.svelte**: 用户设置页面，修改用户资料、管理 Session Key、设置偏好。
-
-- **stories/+page.svelte**: 故事列表页面，展示热门故事、推荐内容。
 
 - **u/[id]/+page.svelte**: 用户主页，展示用户信息、发布的文章、粉丝关注。
 
@@ -181,20 +198,21 @@ AmberInk 是一个完全去中心化的博客平台，无后端参与。采用 O
 
 ### 处理器配置 (src/)
 
-- **processor.ts**: EvmBatchProcessor 配置。定义 BlogHub 合约地址、RPC 端点、事件监听。监听 ArticlePublished、ArticleEvaluated、CommentAdded、CommentLiked、FollowStatusChanged、ArticleCollected、UserProfileUpdated、ArticleEdited 等 8 个事件。支持本地 Anvil 和 Optimism Sepolia 网络。
+- **processor.ts**: EvmBatchProcessor 配置。定义 BlogHub 和 SessionKeyManager 合约地址、RPC 端点、事件监听。监听 ArticlePublished、ArticleEvaluated、CommentAdded、CommentLiked、FollowStatusChanged、ArticleCollected、UserProfileUpdated、ArticleEdited、SessionKeyRegistered、SessionKeyRevoked、SessionKeyUsed 等 11 个事件。支持本地 Anvil 和 Optimism Sepolia 网络。支持 Gateway 加速数据同步。
 
 ### 事件处理 (src/)
 
-- **main.ts**: 核心事件处理逻辑。处理所有 BlogHub 事件并更新数据库。包含 ensureUser、ensureArticleByArweaveId、ensureComment 等辅助函数。维护缓存映射（arweaveIdCache、articleIdToArweaveId）提高查询效率。处理文章发布、评价、评论、点赞、关注、收藏、用户资料更新、文章编辑等事件。
+- **main.ts**: 核心事件处理逻辑。处理所有 BlogHub 和 SessionKeyManager 事件并更新数据库。包含 ensureUser、ensureArticleByArweaveId、ensureComment 等辅助函数。维护缓存映射（arweaveIdCache、articleIdToArweaveId）提高查询效率。处理文章发布、评价、评论、点赞、关注、收藏、用户资料更新、文章编辑、Session Key 注册/撤销/使用等事件。支持 Session Key 交易记录（限制 500 条/用户，保留 3 个月）。
 
 ### 数据模型 (src/model/generated/)
 
-- **article.model.ts**: Article 实体模型，包含 ID、作者、标题、摘要、分类、原创性、时间戳、收藏价格、收藏数等字段。
-- **user.model.ts**: User 实体模型，包含昵称、头像、简介、文章数、粉丝数、关注数、创建时间等字段。
-- **evaluation.model.ts**: Evaluation 实体模型，记录用户对文章的评价（点赞/踩/打赏）、评价者、被评价文章、评价分数、时间戳。
-- **comment.model.ts**: Comment 实体模型，记录用户评论、评论者、所属文章、评论内容、点赞数、时间戳。
-- **follow.model.ts**: Follow 实体模型，记录关注关系、关注者、被关注者、关注时间戳。
-- **collection.model.ts**: Collection 实体模型，记录用户收藏、收藏者、被收藏文章、收藏时间戳。
+- **article.model.ts**: Article 实体模型，包含 arweaveId（主键）、articleId、作者、标题、摘要、分类、原创性、收藏价格、收藏数、点赞/踩数、打赏总额、创建/编辑时间、区块号、交易哈希等字段。
+- **user.model.ts**: User 实体模型，包含钱包地址、昵称、头像、简介、文章总数、粉丝数、关注数、当前 Session Key、资料更新时间、创建时间等字段。
+- **evaluation.model.ts**: Evaluation 实体模型，记录用户对文章的评价（点赞/踩/打赏）、评价者、被评价文章、评价分数、打赏金额、评论内容、推荐人、创建时间、交易哈希。
+- **comment.model.ts**: Comment 实体模型，记录用户评论、评论 ID、评论者、所属文章、评论内容、父评论 ID（回复时）、点赞数、创建时间、交易哈希。
+- **follow.model.ts**: Follow 实体模型，记录关注关系、关注者、被关注者、是否活跃、创建/更新时间。
+- **collection.model.ts**: Collection 实体模型，记录用户收藏、收藏者、被收藏文章、TokenID、收藏数量、创建时间、交易哈希。
+- **transaction.model.ts**: Transaction 实体模型，记录 Session Key 交易、主账户、Session Key、目标合约、函数选择器、交易数据、交易值、创建时间、交易哈希。
 - **index.ts**: 模型导出文件，导出所有实体模型。
 - **marshal.ts**: 数据序列化工具，处理模型与数据库之间的转换。
 
@@ -202,6 +220,8 @@ AmberInk 是一个完全去中心化的博客平台，无后端参与。采用 O
 
 - **BlogHub.ts**: 由 squid-evm-typegen 生成的 BlogHub 合约类型。包含事件解析、函数编码、类型定义。
 - **BlogHub.json**: BlogHub 合约 ABI JSON 文件，包含所有函数和事件的定义。
+- **SessionKeyManager.ts**: 由 squid-evm-typegen 生成的 SessionKeyManager 合约类型。
+- **SessionKeyManager.json**: SessionKeyManager 合约 ABI JSON 文件。
 - **multicall.ts**: Multicall 工具，支持批量调用合约函数。
 
 ### 服务器扩展 (src/server-extension/)
@@ -210,13 +230,13 @@ AmberInk 是一个完全去中心化的博客平台，无后端参与。采用 O
 
 ### 数据库 (db/)
 
-- **schema.graphql**: GraphQL schema 定义，定义所有实体、字段、关系、查询。
+- **schema.graphql**: GraphQL schema 定义，定义所有实体（User、Article、Evaluation、Comment、Follow、Collection、Transaction）、字段、关系、查询。
 - **migrations/**: 数据库迁移文件目录，包含所有数据库结构变更。
 
 ### 配置文件
 
 - **package.json**: 项目依赖和脚本，定义构建、开发、测试命令。
-- **.env**: 环境变量，包含 RPC_ETH_HTTP、BLOG_HUB_ADDRESS 等配置。
+- **.env**: 环境变量，包含 RPC_ETH_HTTP、BLOG_HUB_ADDRESS、SESSION_KEY_MANAGER_ADDRESS 等配置。
 - **squid.yaml**: Squid 配置文件，定义处理器、数据库、服务器设置。
 
 ---

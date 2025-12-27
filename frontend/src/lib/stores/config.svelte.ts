@@ -6,11 +6,8 @@ import { browser } from '$app/environment';
 
 // Import env defaults (build-time values)
 import {
-	PUBLIC_BLOG_HUB_CONTRACT_ADDRESS,
-	PUBLIC_SESSION_KEY_MANAGER_ADDRESS,
 	PUBLIC_RPC_URL,
 	PUBLIC_CHAIN_ID,
-	PUBLIC_IRYS_NETWORK,
 	PUBLIC_ARWEAVE_GATEWAYS,
 	PUBLIC_SUBSQUID_ENDPOINT
 } from '$env/static/public';
@@ -33,11 +30,13 @@ function getConfigStorageKey(): string {
 import {
 	PYTH_CONTRACT_ADDRESSES,
 	PYTH_PRICE_FEED_IDS,
-	CHAIN_NATIVE_TOKEN
+	CHAIN_NATIVE_TOKEN,
+	ALLOWED_CHAINS_BY_ENV,
+	SUPPORTED_CHAINS
 } from '../chains';
 
 // Re-export for external consumers
-export { PYTH_CONTRACT_ADDRESSES, PYTH_PRICE_FEED_IDS, CHAIN_NATIVE_TOKEN };
+export { PYTH_CONTRACT_ADDRESSES, PYTH_PRICE_FEED_IDS, CHAIN_NATIVE_TOKEN, ALLOWED_CHAINS_BY_ENV, SUPPORTED_CHAINS };
 
 
 
@@ -69,11 +68,8 @@ export const defaults = {
 
 // Environment-based defaults (build-time values from .env)
 export const envDefaults = {
-	blogHubContractAddress: PUBLIC_BLOG_HUB_CONTRACT_ADDRESS || defaults.blogHubContractAddress,
-	sessionKeyManagerAddress: PUBLIC_SESSION_KEY_MANAGER_ADDRESS || defaults.sessionKeyManagerAddress,
 	rpcUrl: PUBLIC_RPC_URL || defaults.rpcUrl,
 	chainId: PUBLIC_CHAIN_ID ? parseInt(PUBLIC_CHAIN_ID, 10) : defaults.chainId,
-	irysNetwork: (PUBLIC_IRYS_NETWORK || defaults.irysNetwork) as 'mainnet' | 'devnet',
 	arweaveGateways: PUBLIC_ARWEAVE_GATEWAYS
 		? PUBLIC_ARWEAVE_GATEWAYS.split(',').map((g: string) => g.trim())
 		: defaults.arweaveGateways,
@@ -96,13 +92,10 @@ export const envDefaults = {
 };
 
 // User-overridable config keys
-// NOT overridable: minGasFeeMultiplier, irysFreeUploadLimit, minActionValue
+// NOT overridable: minGasFeeMultiplier, irysFreeUploadLimit, minActionValue, blogHubContractAddress, sessionKeyManagerAddress, irysNetwork
 export type UserConfigKey =
-	| 'blogHubContractAddress'
-	| 'sessionKeyManagerAddress'
 	| 'rpcUrl'
 	| 'chainId'
-	| 'irysNetwork'
 	| 'arweaveGateways'
 	| 'subsquidEndpoint'
 	| 'defaultGasFeeMultiplier'
@@ -112,11 +105,8 @@ export type UserConfigKey =
 	| 'minActionValueUsd';
 
 export interface UserConfig {
-	blogHubContractAddress?: string;
-	sessionKeyManagerAddress?: string;
 	rpcUrl?: string;
 	chainId?: number;
-	irysNetwork?: 'mainnet' | 'devnet';
 	arweaveGateways?: string[];
 	subsquidEndpoint?: string;
 	defaultGasFeeMultiplier?: number;
@@ -139,7 +129,35 @@ export interface ConfigFieldMeta {
 // Minimum value for defaultGasFeeMultiplier
 export const MIN_DEFAULT_GAS_FEE_MULTIPLIER = 10;
 
+/**
+ * Get allowed chain IDs for current environment
+ */
+export function getAllowedChainIds(): number[] {
+	return ALLOWED_CHAINS_BY_ENV[envName] || [];
+}
+
+/**
+ * Get chain options for dropdown (chainId + name)
+ */
+export function getChainOptions(): { value: string; label: string }[] {
+	const allowedChains = getAllowedChainIds();
+	return allowedChains.map(chainId => {
+		const chainInfo = SUPPORTED_CHAINS[chainId];
+		return {
+			value: String(chainId),
+			label: chainInfo ? `${chainId} - ${chainInfo.name}` : String(chainId)
+		};
+	});
+}
+
 export const configFields: ConfigFieldMeta[] = [
+	{
+		key: 'chainId',
+		labelKey: 'chain_id',
+		type: 'select',
+		options: [], // Will be populated dynamically
+		description: 'Select the blockchain network to use'
+	},
 	{
 		key: 'rpcUrl',
 		labelKey: 'rpc_url',
@@ -147,37 +165,10 @@ export const configFields: ConfigFieldMeta[] = [
 		placeholder: 'https://...'
 	},
 	{
-		key: 'chainId',
-		labelKey: 'chain_id',
-		type: 'number',
-		placeholder: '31337'
-	},
-	{
-		key: 'blogHubContractAddress',
-		labelKey: 'blog_hub_address',
-		type: 'text',
-		placeholder: '0x...'
-	},
-	{
-		key: 'sessionKeyManagerAddress',
-		labelKey: 'session_manager_address',
-		type: 'text',
-		placeholder: '0x...'
-	},
-	{
 		key: 'subsquidEndpoint',
 		labelKey: 'subsquid_endpoint',
 		type: 'text',
 		placeholder: 'https://...'
-	},
-	{
-		key: 'irysNetwork',
-		labelKey: 'irys_network',
-		type: 'select',
-		options: [
-			{ value: 'mainnet', labelKey: 'mainnet' },
-			{ value: 'devnet', labelKey: 'devnet' }
-		]
 	},
 	{
 		key: 'arweaveGateways',
@@ -248,15 +239,27 @@ let userConfig = $state<UserConfig>(loadUserConfig());
 
 // Merged config (user overrides + env defaults)
 export function getConfig() {
+	const chainId = userConfig.chainId ?? envDefaults.chainId;
+	
+	// Get contract addresses from chain configuration
+	const chainContracts = SUPPORTED_CHAINS[chainId];
+	const blogHubContractAddress = chainContracts?.blogHubAddress || defaults.blogHubContractAddress as `0x${string}`;
+	const sessionKeyManagerAddress = chainContracts?.sessionKeyManagerAddress || defaults.sessionKeyManagerAddress as `0x${string}`;
+	
+	// Auto-determine Irys network: prod -> mainnet, otherwise -> devnet
+	const irysNetwork: 'mainnet' | 'devnet' = envName === 'prod' ? 'mainnet' : 'devnet';
+	
 	return {
 		appName: defaults.appName,
 		appVersion: defaults.appVersion,
+		// Derived from chainId (not user-overridable)
+		blogHubContractAddress,
+		sessionKeyManagerAddress,
+		// Auto-determined from environment (not user-overridable)
+		irysNetwork,
 		// Overridable
-		blogHubContractAddress: (userConfig.blogHubContractAddress || envDefaults.blogHubContractAddress) as `0x${string}`,
-		sessionKeyManagerAddress: (userConfig.sessionKeyManagerAddress || envDefaults.sessionKeyManagerAddress) as `0x${string}`,
 		rpcUrl: userConfig.rpcUrl || envDefaults.rpcUrl,
-		chainId: userConfig.chainId ?? envDefaults.chainId,
-		irysNetwork: userConfig.irysNetwork || envDefaults.irysNetwork,
+		chainId,
 		arweaveGateways: userConfig.arweaveGateways || envDefaults.arweaveGateways,
 		subsquidEndpoint: userConfig.subsquidEndpoint || envDefaults.subsquidEndpoint,
 		defaultGasFeeMultiplier: userConfig.defaultGasFeeMultiplier ?? envDefaults.defaultGasFeeMultiplier,

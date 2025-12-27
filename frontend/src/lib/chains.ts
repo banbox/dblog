@@ -35,8 +35,10 @@ export interface ChainInfo {
     id: number;
     name: string;
     nativeToken: string;
-    blockExplorerUrl: string;
+    explorerUrl: string;
     pythContractAddress: `0x${string}`;
+    blogHubAddress?: `0x${string}`;
+    sessionKeyManagerAddress?: `0x${string}`;
 }
 
 
@@ -47,7 +49,7 @@ export interface ChainInfo {
  * - id: Chain ID
  * - name: Human-readable chain name
  * - nativeToken: Symbol of the native token for price lookups
- * - blockExplorerUrl: Block explorer base URL
+ * - explorerUrl: Block explorer base URL
  * - pythContractAddress: Pyth Network oracle contract address
  */
 export const SUPPORTED_CHAINS: Record<number, ChainInfo> = {
@@ -56,14 +58,14 @@ export const SUPPORTED_CHAINS: Record<number, ChainInfo> = {
         id: 1,
         name: 'Ethereum',
         nativeToken: 'ETH',
-        blockExplorerUrl: 'https://etherscan.io',
+        explorerUrl: 'https://etherscan.io',
         pythContractAddress: '0x4305FB66699C3B2702D4d05CF36551390A4c69C6',
     },
     11155111: {
         id: 11155111,
         name: 'Sepolia',
         nativeToken: 'ETH',
-        blockExplorerUrl: 'https://sepolia.etherscan.io',
+        explorerUrl: 'https://sepolia.etherscan.io',
         pythContractAddress: '0xDd24F84d36BF92C65F92307595335bdFab5Bbd21',
     },
 
@@ -72,15 +74,19 @@ export const SUPPORTED_CHAINS: Record<number, ChainInfo> = {
         id: 10,
         name: 'Optimism',
         nativeToken: 'ETH',
-        blockExplorerUrl: 'https://optimistic.etherscan.io',
+        explorerUrl: 'https://optimistic.etherscan.io',
         pythContractAddress: '0xff1a0f4744e8582DF1aE09D5611b887B6a12925C',
+        blogHubAddress: '0x78Eaf1C87d999159b37E02Eb94ED23Fa62a06540',
+        sessionKeyManagerAddress: '0x5a6dEBC81299DD3ff464Dad0ba7Aa7a167fFA131',
     },
     11155420: {
         id: 11155420,
         name: 'Optimism Sepolia',
         nativeToken: 'ETH',
-        blockExplorerUrl: 'https://sepolia-optimism.etherscan.io',
+        explorerUrl: 'https://sepolia-optimism.etherscan.io',
         pythContractAddress: '0x0708325268dF9F66270F1401206434524814508b',
+        blogHubAddress: '0xa60eE127a075B62C3B5513F99CF91A15Cea238b6',
+        sessionKeyManagerAddress: '0x67284350C1B935Ca80A1e6658f472F3156cF7313',
     },
 
     // Arbitrum
@@ -88,21 +94,21 @@ export const SUPPORTED_CHAINS: Record<number, ChainInfo> = {
         id: 42161,
         name: 'Arbitrum One',
         nativeToken: 'ETH',
-        blockExplorerUrl: 'https://arbiscan.io',
+        explorerUrl: 'https://arbiscan.io',
         pythContractAddress: '0xff1a0f4744e8582DF1aE09D5611b887B6a12925C',
     },
     42170: {
         id: 42170,
         name: 'Arbitrum Nova',
         nativeToken: 'ETH',
-        blockExplorerUrl: '',
+        explorerUrl: 'https://nova.arbiscan.io',
         pythContractAddress: '0xff1a0f4744e8582DF1aE09D5611b887B6a12925C',
     },
     421614: {
         id: 421614,
         name: 'Arbitrum Sepolia',
         nativeToken: 'ETH',
-        blockExplorerUrl: 'https://sepolia.arbiscan.io',
+        explorerUrl: 'https://sepolia.arbiscan.io',
         pythContractAddress: '0x4374e5a8b9C22271E9EB878A2AA31DE97DF15DAF',
     },
 
@@ -111,14 +117,14 @@ export const SUPPORTED_CHAINS: Record<number, ChainInfo> = {
         id: 8453,
         name: 'Base',
         nativeToken: 'ETH',
-        blockExplorerUrl: 'https://basescan.org',
+        explorerUrl: 'https://basescan.org',
         pythContractAddress: '0x8250f4aF4B972684F7b336503E2D6dFeDeB1487a',
     },
     84532: {
         id: 84532,
         name: 'Base Sepolia',
         nativeToken: 'ETH',
-        blockExplorerUrl: 'https://sepolia.basescan.org',
+        explorerUrl: 'https://sepolia.basescan.org',
         pythContractAddress: '0xA2aa501b19aff244D90cc15a4Cf739D2725B5729',
     },
 
@@ -127,14 +133,14 @@ export const SUPPORTED_CHAINS: Record<number, ChainInfo> = {
         id: 324,
         name: 'zkSync Era',
         nativeToken: 'ETH',
-        blockExplorerUrl: '',
+        explorerUrl: 'https://explorer.zksync.io',
         pythContractAddress: '0xf087c864AEccFb6A2Bf1Af6A0382B0d0f6c5D834',
     },
     300: {
         id: 300,
         name: 'zkSync Sepolia',
         nativeToken: 'ETH',
-        blockExplorerUrl: '',
+        explorerUrl: 'https://sepolia.explorer.zksync.io',
         pythContractAddress: '0x056f829183Ec806A78c26C98961678c24faB71af',
     },
 
@@ -143,14 +149,14 @@ export const SUPPORTED_CHAINS: Record<number, ChainInfo> = {
         id: 1101,
         name: 'Polygon zkEVM',
         nativeToken: 'ETH',
-        blockExplorerUrl: '',
+        explorerUrl: 'https://zkevm.polygonscan.com',
         pythContractAddress: '0xC5E56d6b40F3e3B5fbfa266bCd35C37426537c65',
     },
     2442: {
         id: 2442,
         name: 'Polygon zkEVM Cardona',
         nativeToken: 'ETH',
-        blockExplorerUrl: '',
+        explorerUrl: 'https://cardona-zkevm.polygonscan.com',
         pythContractAddress: '0xFf255f800044225f54Af4510332Aa3D67CC77635',
     },
 
@@ -159,14 +165,14 @@ export const SUPPORTED_CHAINS: Record<number, ChainInfo> = {
         id: 137,
         name: 'Polygon',
         nativeToken: 'POL',
-        blockExplorerUrl: 'https://polygonscan.com',
+        explorerUrl: 'https://polygonscan.com',
         pythContractAddress: '0xff1a0f4744e8582DF1aE09D5611b887B6a12925C',
     },
     80002: {
         id: 80002,
         name: 'Polygon Amoy',
         nativeToken: 'POL',
-        blockExplorerUrl: 'https://amoy.polygonscan.com',
+        explorerUrl: 'https://amoy.polygonscan.com',
         pythContractAddress: '0x2880aB155794e7179c9eE2e38200202908C17B43',
     },
 
@@ -175,14 +181,14 @@ export const SUPPORTED_CHAINS: Record<number, ChainInfo> = {
         id: 5000,
         name: 'Mantle',
         nativeToken: 'MNT',
-        blockExplorerUrl: '',
+        explorerUrl: 'https://explorer.mantle.xyz',
         pythContractAddress: '0xA2aa501b19aff244D90cc15a4Cf739D2725B5729',
     },
     5003: {
         id: 5003,
         name: 'Mantle Sepolia',
         nativeToken: 'MNT',
-        blockExplorerUrl: '',
+        explorerUrl: 'https://sepolia.mantlescan.xyz',
         pythContractAddress: '0x98046Bd286715D3B0BC227Dd7a956b83D8978603',
     },
 
@@ -191,14 +197,14 @@ export const SUPPORTED_CHAINS: Record<number, ChainInfo> = {
         id: 534352,
         name: 'Scroll',
         nativeToken: 'ETH',
-        blockExplorerUrl: '',
+        explorerUrl: 'https://scrollscan.com',
         pythContractAddress: '0xA2aa501b19aff244D90cc15a4Cf739D2725B5729',
     },
     534351: {
         id: 534351,
         name: 'Scroll Sepolia',
         nativeToken: 'ETH',
-        blockExplorerUrl: '',
+        explorerUrl: 'https://sepolia.scrollscan.com',
         pythContractAddress: '0x41c9e39574F40Ad34c79f1C99B66A45eFB830d4c',
     },
 
@@ -207,8 +213,10 @@ export const SUPPORTED_CHAINS: Record<number, ChainInfo> = {
         id: 31337,
         name: 'Anvil',
         nativeToken: 'ANVIL',
-        blockExplorerUrl: '',
+        explorerUrl: '',
         pythContractAddress: '0x0000000000000000000000000000000000000000',
+        blogHubAddress: '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9',
+        sessionKeyManagerAddress: '0x5FbDB2315678afecb367f032d93F642f64180aa3',
     },
 };
 
@@ -225,6 +233,19 @@ export const PYTH_PRICE_FEED_IDS: Record<string, `0x${string}`> = {
     MNT: '0x4e3037c822d852d79af3ac80e35eb420ee3b870dca49f9344a38ef4773fb0585',
 };
 
+/**
+ * Allowed chain IDs per environment
+ * Restricts which chains users can select based on the deployment environment
+ */
+export const ALLOWED_CHAINS_BY_ENV: Record<'dev' | 'test' | 'prod', number[]> = {
+    // Development: only local Anvil
+    dev: [31337],
+    // Test: multiple test networks
+    test: [11155420],
+    // Production: multiple mainnet networks
+    prod: [10],
+};
+
 // ============================================
 // Derived exports for backward compatibility
 // ============================================
@@ -233,7 +254,7 @@ export const PYTH_PRICE_FEED_IDS: Record<string, `0x${string}`> = {
  * Block explorer URLs derived from SUPPORTED_CHAINS
  */
 export const BLOCK_EXPLORER_URLS: Record<number, string> = Object.fromEntries(
-    Object.entries(SUPPORTED_CHAINS).map(([id, info]) => [Number(id), info.blockExplorerUrl])
+    Object.entries(SUPPORTED_CHAINS).map(([id, info]) => [Number(id), info.explorerUrl])
 );
 
 /**
@@ -321,10 +342,10 @@ export function getViemChain(chainId: number, rpcUrl: string): Chain {
         rpcUrls: {
             default: { http: [rpcUrl] }
         },
-        blockExplorers: chainInfo?.blockExplorerUrl ? {
+        blockExplorers: chainInfo?.explorerUrl ? {
             default: {
                 name: 'Explorer',
-                url: chainInfo.blockExplorerUrl
+                url: chainInfo.explorerUrl
             }
         } : undefined,
     });

@@ -1243,9 +1243,25 @@ Session key reauthorized: 0xAD07E2287F5071a0B1aeED4f985980F91a3565B9
 Network页签也没有错误，但过了几秒，桌面右下角弹出通知，transaction dropped or replaced。请帮我排查问题原因并解决。  
 Claude: 已修复，reauthorizeSessionKey仅适用于已过期情况，新增了extendSessionKey用于延期。 
 
-### 2025-12-27 14:56  /profile 没有Session Key时不显示最近交易
+### 2025-12-27 15:16  /profile 没有Session Key时不显示最近交易
 @help.md frontend\src\routes\profile\+page.svelte 当前在Session Key这个页签，显示有最近交易记录，查询数据时应该按当前用户钱包查询，不应该用Session Key地址查询，因为Session Key是临时的，且squid中已经记录了用户的地址。请了解相关信息，帮我更新这里逻辑。且即使没有Session Key，也应当显示最近交易记录  
 Claude: 修改完成，遗留旧代码未删除，手动清理
 
+### 2025-12-27 15:39  更新 help.md
+@help.md  这是当前项目的索引文件，现在项目各个部分已经进行了很多更新，此文件内容有不少是过时的；请你以文件夹为单位，逐个文件夹、逐个代码文件，分析查看其包含的主要逻辑和功能，然后更新到索引文件中。
+务必分批次进行，读取一些，分析一些，更新一些；索引文件中不存在的描述进行删除，一些以实际代码逻辑为准；保持当前索引文件风格，简要凝练，无冗余信息，概括性高。注意跳过node_modules, dist, 等生成的文件夹或被.gitignore忽略的
 
+### 2025-12-27 15:51  用户配置优化
+@help.md 当前前端支持用户自定义关键配置，如ETH_URL地址、Subsquid地址，等等。目前支持dev, test, prod三套环境。我希望进行简单的限制，减少用户配置错误的可能。
+对于每个环境，只允许用户下拉选择几个ChainID，比如dev只允许31337；而test和prod允许用户选择多个已支持的链ID；（下拉选择时，显示ChainID和内置Chain名称方便用户标识）
+BlogHub Contract Address和SessionKeyManager Address不应该允许用户修改，直接在frontend\src\lib\chains.ts中按ChainID维护好即可。
+Irys Network也不应该允许用户修改，对于prod固定为mainnet，否则固定devnet即可，也不需要从环境变量配置。  
+Claude：基本完成，部分地方不优雅手动修改
 
+### 2025-12-27 16:11  区块链浏览器URL
+当前允许用户在配置页面自行修改区块链ETH_URL，不过当用户使用区块链浏览器时，应该使用固定的官方URL；所以请帮我在 frontend\src\lib\chains.ts 的SUPPORTED_CHAINS每一项都增加一个explorerUrl，指向这个链的官方URL链接，方便用户根据交易的txHash直接查看详情。没有的留空字符串即可，替换掉已有的blockExplorerUrl字段  
+Claude：已完成
+
+### 2025-12-27 16:20  不必要环境变量删除
+@help.md  PUBLIC_BLOG_HUB_CONTRACT_ADDRESS PUBLIC_SESSION_KEY_MANAGER_ADDRESS  PUBLIC_IRYS_NETWORK 这几个环境变量以及弃用删除了，直接代码中可以根据 frontend\src\lib\chains.ts 中的相关配置确定。请帮我在 frontend\src\lib\stores\config.svelte.ts 中删除这三个环境变量相关的引用，并替换为正确的最新逻辑  
+Claude: 已完成

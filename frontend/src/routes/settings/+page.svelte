@@ -9,8 +9,10 @@
 		getEnvDefault,
 		configFields,
 		MIN_DEFAULT_GAS_FEE_MULTIPLIER,
-		type UserConfigKey
+		type UserConfigKey,
+		getConfig
 	} from '$lib/config';
+	import { getChainOptions, envName } from '$lib/stores/config.svelte';
 	import { CloseIcon, PlusIcon, ResetIcon } from '$lib/components/icons';
 
 	// Local form state
@@ -19,6 +21,12 @@
 	let saveMessage = $state('');
 	let errorMessage = $state('');
 	let errorField = $state<string | null>(null);
+	
+	// Get chain options for dropdown
+	const chainOptions = getChainOptions();
+	
+	// Get current config for read-only display
+	let currentConfig = $derived(getConfig());
 
 	// Initialize form values from current config
 	function initFormValues() {
@@ -179,7 +187,23 @@
 							{/if}
 						</label>
 
-						{#if field.type === 'text'}
+						{#if field.key === 'chainId'}
+							<!-- ChainId dropdown with chain names -->
+							<select
+								id={field.key}
+								value={String(formValues[field.key] || '')}
+								onchange={(e) => {
+									const chainId = parseInt(e.currentTarget.value, 10);
+									handleChange(field.key, chainId);
+									saveField(field.key);
+								}}
+								class="mt-2 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+							>
+								{#each chainOptions as option}
+									<option value={option.value}>{option.label}</option>
+								{/each}
+							</select>
+						{:else if field.type === 'text'}
 							<input
 								type="text"
 								id={field.key}
@@ -199,20 +223,6 @@
 								onblur={() => saveField(field.key)}
 								class="mt-2 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
 							/>
-						{:else if field.type === 'select'}
-							<select
-								id={field.key}
-								value={(formValues[field.key] as string) || ''}
-								onchange={(e) => {
-									handleChange(field.key, e.currentTarget.value);
-									saveField(field.key);
-								}}
-								class="mt-2 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-							>
-								{#each field.options || [] as option}
-									<option value={option.value}>{getLabel(option.labelKey)}</option>
-								{/each}
-							</select>
 						{:else if field.type === 'array'}
 							<div class="mt-2 space-y-2">
 								{#each (formValues[field.key] as string[]) || [] as item, index}
@@ -251,9 +261,14 @@
 
 						<!-- Env default hint -->
 						<p class="mt-1 text-xs text-gray-500">
-							{getLabel('default_value')}: {field.type === 'array'
-								? (getEnvDefault(field.key) as string[]).join(', ')
-								: getEnvDefault(field.key)}
+							{getLabel('default_value')}: 
+							{#if field.key === 'chainId'}
+								{chainOptions.find(opt => opt.value === String(getEnvDefault(field.key)))?.label || getEnvDefault(field.key)}
+							{:else if field.type === 'array'}
+								{(getEnvDefault(field.key) as string[]).join(', ')}
+							{:else}
+								{getEnvDefault(field.key)}
+							{/if}
 						</p>
 					</div>
 
@@ -271,6 +286,32 @@
 				</div>
 			</div>
 		{/each}
+	</div>
+
+	<!-- Read-Only Information Section -->
+	<div class="mt-8 rounded-lg border border-gray-200 bg-gray-50 p-4">
+		<h3 class="text-sm font-medium text-gray-900 mb-3">{getLabel('fixed_configuration')}</h3>
+		<div class="space-y-2 text-sm text-gray-600">
+			<div class="flex justify-between">
+				<span class="font-medium">{getLabel('current_environment')}:</span>
+				<span class="text-gray-900">{envName}</span>
+			</div>
+			<div class="flex justify-between">
+				<span class="font-medium">{getLabel('blog_hub_address')}:</span>
+				<code class="text-xs text-gray-900">{currentConfig.blogHubContractAddress}</code>
+			</div>
+			<div class="flex justify-between">
+				<span class="font-medium">{getLabel('session_manager_address')}:</span>
+				<code class="text-xs text-gray-900">{currentConfig.sessionKeyManagerAddress}</code>
+			</div>
+			<div class="flex justify-between">
+				<span class="font-medium">{getLabel('irys_network')}:</span>
+				<span class="text-gray-900">{currentConfig.irysNetwork}</span>
+			</div>
+			<p class="mt-3 text-xs text-gray-500">
+				{getLabel('fixed_config_note')}
+			</p>
+		</div>
 	</div>
 
 	<!-- Reset All Section -->
