@@ -70,6 +70,7 @@
 	let reauthorizing = $state(false);
 	let withdrawing = $state(false);
 	let creatingNewKey = $state(false);
+	let extending = $state(false);
 	let sessionKeyError = $state('');
 	let transactionsOffset = $state(0);
 	let hasMoreTransactions = $state(true);
@@ -333,6 +334,23 @@
 		} catch (e) {
 			console.error('Failed to revoke session key:', e);
 			sessionKeyError = 'Failed to revoke: ' + (e instanceof Error ? e.message : 'Unknown error');
+		}
+	}
+
+	async function handleExtendSessionKey() {
+		if (!sessionKey || extending) return;
+		extending = true;
+		sessionKeyError = '';
+
+		try {
+			const updated = await reauthorizeSessionKey(sessionKey);
+			sessionKey = updated;
+			await fetchSessionKeyInfo();
+		} catch (e) {
+			console.error('Failed to extend session key:', e);
+			sessionKeyError = 'Failed to extend: ' + (e instanceof Error ? e.message : 'Unknown error');
+		} finally {
+			extending = false;
 		}
 	}
 
@@ -777,8 +795,8 @@
 
 						{#if sessionKey}
 							<!-- Session Key Info -->
-							<div class="rounded-lg border border-gray-200 bg-white p-6">
-								<div class="mb-4 flex items-center justify-between">
+							<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+								<div class="mb-6 flex items-center justify-between">
 									<h3 class="text-lg font-semibold text-gray-900">Session Key Information</h3>
 									<button
 										type="button"
@@ -786,87 +804,124 @@
 										disabled={creatingNewKey}
 										class="text-sm text-blue-600 hover:text-blue-700 disabled:opacity-50"
 									>
-										{creatingNewKey ? 'Creating...' : 'Create New Session Key'}
+										{creatingNewKey ? 'Creating...' : 'Create New'}
 									</button>
 								</div>
-							
-							<!-- Address -->
-							<div class="mb-4">
-								<p class="text-sm font-medium text-gray-500">Address</p>
-								<p class="mt-1 font-mono text-sm text-gray-900">{sessionKey.address}</p>
-							</div>
 
-							<!-- Balance -->
-							<div class="mb-4">
-								<p class="text-sm font-medium text-gray-500">Balance</p>
-								<p class="mt-1 text-lg font-semibold text-gray-900">
-									{formatEthDisplay(sessionKeyBalance)} ETH
-								</p>
-							</div>
+								<!-- Two-column grid layout -->
+								<div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+									<!-- Left Column: Key Details -->
+									<div class="space-y-4">
+										<!-- Address -->
+										<div>
+											<p class="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">Address</p>
+											<p class="break-all font-mono text-xs text-gray-700">{sessionKey.address}</p>
+										</div>
 
-							<!-- Validity Period -->
-							<div class="mb-4">
-								<p class="text-sm font-medium text-gray-500">Status</p>
-								<div class="mt-1">
-									{#if isSessionKeyExpired(sessionKey)}
-										<span class="inline-flex items-center rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-800">
-											Expired
-										</span>
-										<p class="mt-2 text-sm text-gray-600">
-											Expired at: {new Date(sessionKey.validUntil * 1000).toLocaleString()}
-										</p>
-									{:else}
-										<span class="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-800">
-											Active
-										</span>
-										<p class="mt-2 text-sm text-gray-600">
-											Expires at: {new Date(sessionKey.validUntil * 1000).toLocaleString()}
-										</p>
-									{/if}
+										<!-- Balance -->
+										<div>
+											<p class="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">Balance</p>
+											<p class="text-2xl font-bold text-gray-900">
+												{formatEthDisplay(sessionKeyBalance)}
+												<span class="ml-1 text-base font-normal text-gray-500">ETH</span>
+											</p>
+										</div>
+									</div>
+
+									<!-- Right Column: Status & Actions -->
+									<div class="space-y-4">
+										<!-- Status & Expiry Time in one row -->
+										<div class="flex items-start justify-between gap-4">
+											<!-- Status Badge -->
+											<div>
+												<p class="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">Status</p>
+												{#if isSessionKeyExpired(sessionKey)}
+													<span class="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1.5 text-sm font-medium text-red-800">
+														<svg class="h-2 w-2 fill-current" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" /></svg>
+														Expired
+													</span>
+												{:else}
+													<span class="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1.5 text-sm font-medium text-green-800">
+														<svg class="h-2 w-2 fill-current" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" /></svg>
+														Active
+													</span>
+												{/if}
+											</div>
+
+											<!-- Expiry Time -->
+											<div class="text-right">
+												<p class="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">
+													{isSessionKeyExpired(sessionKey) ? 'Expired At' : 'Expires At'}
+												</p>
+												<p class="text-sm text-gray-700">
+													{new Date(sessionKey.validUntil * 1000).toLocaleDateString('en-US', {
+														year: 'numeric',
+														month: 'short',
+														day: 'numeric'
+													})}
+												</p>
+												<p class="text-xs text-gray-500">
+													{new Date(sessionKey.validUntil * 1000).toLocaleTimeString('en-US', {
+														hour: '2-digit',
+														minute: '2-digit'
+													})}
+												</p>
+											</div>
+										</div>
+
+										<!-- Action Buttons -->
+										<div class="flex gap-2">
+											{#if !isSessionKeyExpired(sessionKey)}
+												<button
+													type="button"
+													onclick={handleExtendSessionKey}
+													disabled={extending}
+													class="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+												>
+													{extending ? '...' : '延期'}
+												</button>
+											{:else}
+												<button
+													type="button"
+													onclick={handleReauthorize}
+													disabled={reauthorizing}
+													class="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+												>
+													{reauthorizing ? '...' : '重授权'}
+												</button>
+											{/if}
+
+											<button
+												type="button"
+												onclick={handleWithdrawAll}
+												disabled={withdrawing || sessionKeyBalance === 0n}
+												class="flex-1 rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+											>
+												{withdrawing ? '...' : '提现'}
+											</button>
+
+											<button
+												type="button"
+												onclick={handleRevoke}
+												class="flex-1 rounded-lg border border-red-300 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+											>
+												撤销
+											</button>
+										</div>
+									</div>
 								</div>
 							</div>
 
-								<!-- Actions -->
-								<div class="flex flex-wrap gap-3">
-									{#if isSessionKeyExpired(sessionKey)}
-										<button
-											type="button"
-											onclick={handleReauthorize}
-											disabled={reauthorizing}
-											class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-										>
-											{reauthorizing ? 'Reauthorizing...' : 'Reauthorize'}
-										</button>
-									{/if}
-									<button
-										type="button"
-										onclick={handleWithdrawAll}
-										disabled={withdrawing || sessionKeyBalance === 0n}
-										class="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
-									>
-										{withdrawing ? 'Withdrawing...' : 'Withdraw All'}
-									</button>
-									<button
-										type="button"
-										onclick={handleRevoke}
-										class="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
-									>
-										Revoke
-									</button>
-								</div>
-							</div>
+							<!-- Recent Transactions -->
+							<div class="rounded-lg border border-gray-200 bg-white p-6">
+								<h3 class="mb-4 text-lg font-semibold text-gray-900">Recent Transactions</h3>
 
-						<!-- Recent Transactions -->
-						<div class="rounded-lg border border-gray-200 bg-white p-6">
-							<h3 class="mb-4 text-lg font-semibold text-gray-900">Recent Transactions</h3>
-							
-							{#if sessionKeyTransactions.length > 0}
-								<div class="divide-y divide-gray-100">
-									{#each sessionKeyTransactions as tx}
-										{@const viewUrl = getBlockExplorerTxUrl(tx.txHash)}
-										<div class="py-3">
-											<div class="flex items-center justify-between">
-												<div class="flex-1">
+								{#if sessionKeyTransactions.length > 0}
+									<div class="divide-y divide-gray-100">
+										{#each sessionKeyTransactions as tx}
+											{@const viewUrl = getBlockExplorerTxUrl(tx.txHash)}
+											<div class="py-3">
+												<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
 													<div class="flex items-center gap-2">
 														<span class="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800">
 															{tx.method}
@@ -875,50 +930,49 @@
 															{formatEthDisplay(BigInt(tx.value))} ETH
 														</span>
 													</div>
-													<p class="mt-1 text-xs text-gray-500">
+													<div class="flex items-center justify-between gap-4 md:justify-end">
+														<span class="text-xs text-gray-500">
+															Fee: {formatEthDisplay(BigInt(tx.feeAmount))} ETH
+														</span>
+														{#if viewUrl}
+															<a
+																href={viewUrl}
+																target="_blank"
+																rel="noopener noreferrer"
+																class="whitespace-nowrap text-sm text-blue-600 hover:text-blue-700"
+															>
+																View →
+															</a>
+														{/if}
+													</div>
+													<div class="text-xs text-gray-500">
 														Contract: {shortAddress(tx.target)}
-													</p>
-													<p class="mt-1 text-xs text-gray-500">
-														Fee: {formatEthDisplay(BigInt(tx.feeAmount))} ETH
-													</p>
-													<p class="mt-1 text-xs text-gray-400">
+													</div>
+													<div class="text-xs text-gray-400 md:text-right">
 														{new Date(tx.createdAt).toLocaleString()}
-													</p>
+													</div>
 												</div>
-												{#if viewUrl}
-												<div>
-													<a
-														href={viewUrl}
-														target="_blank"
-														rel="noopener noreferrer"
-														class="text-sm text-blue-600 hover:text-blue-700"
-													>
-														View →
-													</a>
-												</div>
-												{/if}
 											</div>
-										</div>
-									{/each}
-								</div>
-								
-								<!-- Load More Button -->
-								{#if hasMoreTransactions}
-									<div class="mt-4 text-center">
-										<button
-											type="button"
-											onclick={() => fetchSessionKeyTransactions(false)}
-											disabled={loadingTransactions}
-											class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-										>
-											{loadingTransactions ? 'Loading...' : 'Load More'}
-										</button>
+										{/each}
 									</div>
+
+									<!-- Load More Button -->
+									{#if hasMoreTransactions}
+										<div class="mt-4 text-center">
+											<button
+												type="button"
+												onclick={() => fetchSessionKeyTransactions(false)}
+												disabled={loadingTransactions}
+												class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+											>
+												{loadingTransactions ? 'Loading...' : 'Load More'}
+											</button>
+										</div>
+									{/if}
+								{:else}
+									<p class="text-sm text-gray-500">No transactions found</p>
 								{/if}
-							{:else}
-								<p class="text-sm text-gray-500">No transactions found</p>
-							{/if}
-						</div>
+							</div>
 						{:else}
 							<!-- No Session Key -->
 							<div class="rounded-lg border border-gray-200 bg-gray-50 p-8 text-center">
