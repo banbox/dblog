@@ -36,6 +36,7 @@
 	import { formatEthDisplay } from '$lib/data';
 	import { getBlockExplorerTxUrl } from '$lib/chain';
 	import { getNativeTokenSymbol } from '$lib/priceService';
+	import { localizeHref } from '$lib/paraglide/runtime';
 
 	type TabType = 'articles' | 'followers' | 'following' | 'about' | 'sessionkey';
 
@@ -568,7 +569,7 @@
 						{@const follower = follow.follower}
 						{#if follower}
 							<a
-								href="/author/{follower.id}"
+								href={localizeHref(`/u/${follower.id}`)}
 								class="flex items-center gap-4 py-4 transition-colors hover:bg-gray-50"
 							>
 								{#if getAvatarUrl(follower.avatar)}
@@ -611,7 +612,7 @@
 						{@const followingUser = follow.following}
 						{#if followingUser}
 							<a
-								href="/author/{followingUser.id}"
+								href={localizeHref(`/u/${followingUser.id}`)}
 								class="flex items-center gap-4 py-4 transition-colors hover:bg-gray-50"
 							>
 								{#if getAvatarUrl(followingUser.avatar)}

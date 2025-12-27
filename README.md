@@ -55,3 +55,5 @@ Web3交互：viem + @wagmi/core
 * 支持markdown编辑器[cherry-markdown](https://github.com/Tencent/cherry-markdown)
 * 接入去中心化身份DID
 
+* 冗余代码清理
+* 部分文本未使用多语言

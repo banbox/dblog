@@ -10,6 +10,7 @@
 	import { HomeIcon, BookmarkIcon, UserIcon, PencilIcon, SpinnerIcon } from './icons';
 	import { getConfig, envName } from '$lib/config';
 	import { SUPPORTED_CHAINS } from '$lib/chains';
+	import { localizeHref } from '$lib/paraglide/runtime';
 
 	interface Props {
 		walletAddress?: string | null;
@@ -112,7 +113,7 @@
 >
 	<!-- Logo -->
 	<div class="flex h-16 items-center border-b border-gray-100 px-6">
-		<a href="/" class="flex items-center gap-2" title={m.slogan()}>
+		<a href={localizeHref('/')} class="flex items-center gap-2" title={m.slogan()}>
 			<img src="/logo.png" alt="AmberInk" class="h-8 w-8 rounded-lg" />
 			<img src="/logo_t.png" alt="AmberInk" class="h-6" />
 		</a>
@@ -128,7 +129,7 @@
 			{#each navItems as item}
 				<li>
 					<a
-						href={item.href}
+						href={localizeHref(item.href)}
 						class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors"
 						class:bg-gray-100={isActive(item.href)}
 						class:text-gray-900={isActive(item.href)}
@@ -152,7 +153,7 @@
 		<!-- Write Button -->
 		<div class="mt-6 px-3">
 			<a
-				href="/publish"
+				href={localizeHref('/publish')}
 				class="flex w-full items-center justify-center gap-2 rounded-full bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
 			>
 				<PencilIcon size={16} />
@@ -181,7 +182,7 @@
 						{#if user}
 							<li>
 								<a
-									href="/u/{user.id}"
+									href={localizeHref(`/u/${user.id}`)}
 									class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors hover:bg-gray-50"
 								>
 									{#if getAvatarUrl(user.avatar)}
@@ -234,7 +235,7 @@
 				GitHub
 			</a>
 			<span class="text-gray-300">·</span>
-			<a href="/about" class="transition-colors">
+			<a href={localizeHref('/about')} class="transition-colors">
 				{m.about()}
 			</a>
 		</div>

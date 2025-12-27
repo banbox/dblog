@@ -7,6 +7,7 @@
 	import { getCoverImageUrl, getAvatarUrl } from '$lib/arweave';
 	import { onMount } from 'svelte';
 	import { getNativeTokenSymbol } from '$lib/priceService';
+	import { localizeHref } from '$lib/paraglide/runtime';
 	import { HeartIcon, CoinIcon, ArticleIcon } from './icons';
 
 	interface Props {
@@ -71,7 +72,7 @@
 	});
 </script>
 
-<a href="/a/{article.id}" class="group flex gap-4 border-b border-gray-100 py-5 transition-colors">
+<a href={localizeHref(`/a/${article.id}`)} class="group flex gap-4 border-b border-gray-100 py-5 transition-colors">
 	<!-- Left: Text Content -->
 	<div class="min-w-0 flex-1">
 		<!-- Category & Author -->

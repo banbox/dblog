@@ -33,6 +33,7 @@
 		type StoredSessionKey
 	} from '$lib/sessionKey';
 	import { getMinActionValue } from '$lib/config';
+	import { localizeHref } from '$lib/paraglide/runtime';
 	import { ClockIcon, ThumbsUpIcon, ThumbsDownIcon, CommentIcon, BookmarkIcon, CloseIcon, BackIcon, EditIcon, ShareIcon, SpinnerIcon } from '$lib/components/icons';
 
 	// Native token price state
@@ -678,7 +679,7 @@
 				<span class="text-sm font-medium">You are viewing a historical version</span>
 			</div>
 			<a
-				href={`/a/${article.id}`}
+				href={localizeHref(`/a/${article.id}`)}
 				class="rounded-md bg-amber-600 px-3 py-1 text-sm font-medium text-white transition-colors hover:bg-amber-700"
 			>
 				View Latest
@@ -695,7 +696,7 @@
 		<!-- Author Info Bar -->
 		<div class="flex items-center gap-3">
 			<!-- Avatar -->
-			<a href={`/u/${authorAddress}`} class="shrink-0">
+			<a href={localizeHref(`/u/${authorAddress}`)} class="shrink-0">
 				{#if getAvatarUrl(authorAvatar)}
 					<img
 						src={getAvatarUrl(authorAvatar)}
@@ -714,7 +715,7 @@
 			<div class="flex flex-1 flex-col">
 				<!-- Name & Follow -->
 				<div class="flex items-center gap-2">
-					<a href={`/u/${authorAddress}`} class="font-medium text-gray-900 hover:underline">
+					<a href={localizeHref(`/u/${authorAddress}`)} class="font-medium text-gray-900 hover:underline">
 						{displayAuthor}
 					</a>
 					<span class="text-gray-300">·</span>
@@ -788,7 +789,7 @@
 
 					<!-- Comments -->
 					<a
-						href="#comments"
+						href={localizeHref('#comments')}
 						class="group flex items-center gap-1.5 text-gray-500 transition-colors hover:text-gray-900"
 						title={m.comments({})}
 					>
@@ -878,7 +879,7 @@
 									{:else}
 										{#each versions as version, idx}
 											<a
-												href={idx === 0 ? `/a/${article.id}` : `/a/${article.id}?v=${version.txId}`}
+												href={localizeHref(idx === 0 ? `/a/${article.id}` : `/a/${article.id}?v=${version.txId}`)}
 												class="flex items-start gap-3 border-b border-gray-50 px-4 py-3 transition-colors hover:bg-gray-50"
 												class:bg-blue-50={versionTxId === version.txId ||
 													(idx === 0 && !versionTxId)}
@@ -920,7 +921,7 @@
 					<!-- Edit button (only for author) -->
 					{#if isAuthor}
 						<a
-							href={`/edit/${article.id}`}
+							href={localizeHref(`/edit/${article.id}`)}
 							class="text-gray-500 transition-colors hover:text-blue-600"
 							title={m.edit({})}
 						>
@@ -1224,7 +1225,7 @@
 									<tr class="hover:bg-gray-50">
 										<td class="px-3 py-2">
 											<a
-												href={`/u/${collection.user.id}`}
+												href={localizeHref(`/u/${collection.user.id}`)}
 												class="flex items-center gap-2 hover:underline"
 											>
 												{#if getAvatarUrl(collection.user.avatar)}

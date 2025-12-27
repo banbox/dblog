@@ -1275,3 +1275,12 @@ Gemini: 完全支持，这正是Subsquid的优势，每个链都需启动一个p
 请帮我在 frontend\src\lib\components\Sidebar.svelte 的下方显示当前使用的链名称、ETH_URL地址。
 然后帮我在 frontend\src\lib\components\WalletButton.svelte 中，针对test和dev环境，使用不同的颜色，当前默认的深蓝接近黑色用于prod  
 Claude: 已支持，略微手动修改SideBar的样式
+
+### 2025-12-27 16:49  多语言切换
+@help.md 目前 frontend\src\routes\+layout.svelte 的53行 支持中英文一键切换，不过我发现点击切换后页面并没有变化，只是url变了，刷新后才生效。我希望点击后立刻生效。当前使用的多语言是  paraglide 请帮我排查相关原因并解决  
+Claude: 增加data-sveltekit-reload解决
+
+### 2025-12-27 16:54  多语言链接
+@help.md 当前项目支持了多语言，但很多地方并未生效，原因是在 `<a href=""` 时使用了原始URL，应该使用localizeHref得到本地化url才对，请帮我检查前端所有的svelte组件和页面，帮我找到不规范的地方并修正  
+Claude: 已完成
+

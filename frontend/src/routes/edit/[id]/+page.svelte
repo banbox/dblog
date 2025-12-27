@@ -9,6 +9,7 @@
 	import { getCoverImageUrl } from '$lib/arweave/folder';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { localizeHref } from '$lib/paraglide/runtime';
 	import {
 		ensureSessionKeyReady,
 		type StoredSessionKey
@@ -317,7 +318,7 @@
 		{:else if !isAuthorized}
 			<div class="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
 				<p class="text-red-800">{m.not_article_author()}</p>
-				<a href={`/a/${article.id}`} class="mt-4 inline-block text-blue-600 hover:underline">
+				<a href={localizeHref(`/a/${article.id}`)} class="mt-4 inline-block text-blue-600 hover:underline">
 					{m.back_to_article()}
 				</a>
 			</div>
@@ -366,7 +367,7 @@
 						{submitButtonText}
 					</button>
 					<a
-						href={`/a/${article.id}`}
+						href={localizeHref(`/a/${article.id}`)}
 						class="rounded-lg border border-gray-200 px-6 py-3 font-medium text-gray-900 transition-colors hover:bg-gray-50 {isSubmitting
 							? 'pointer-events-none opacity-50'
 							: ''}"

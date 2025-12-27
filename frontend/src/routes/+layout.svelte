@@ -43,6 +43,7 @@
 							{#each locales as locale}
 								<a
 									href={localizeHref(page.url.pathname, { locale })}
+									data-sveltekit-reload
 									class="rounded-md px-3 py-1.5 text-sm font-medium transition-colors"
 									class:bg-white={getLocale() === locale}
 									class:text-gray-900={getLocale() === locale}
@@ -58,7 +59,7 @@
 
 					<!-- Settings Button -->
 					<a
-						href="/settings"
+						href={localizeHref('/settings')}
 						class="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
 						title={m.settings()}
 					>
